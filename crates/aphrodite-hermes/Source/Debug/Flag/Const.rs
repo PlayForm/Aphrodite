@@ -5,4 +5,8 @@
 //! one of the two behind.
 
 /// Basename of a debug flag file: the scoped form appends `.<session_id>`.
-pub(crate) const FLAG_PREFIX:&str = "debug";
+///
+/// The value is the on-disk file name (`debug`), which is an external contract
+/// with the core logger and the operator's `echo on >` command: it does not
+/// follow a rename.
+pub(crate) const Prefix:&str = "debug";

@@ -2,25 +2,25 @@
 
 use crate::{
 	PollWorker::{
-		Insert::Fn::InsertBgTask,
+		Insert::Fn::Fn as Insert,
 		Registry::ReadFrom::Fn::Fn as ReadFrom,
 		Select::Eviction::Fn::Fn as Evict,
-		Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+		Task::Status::{Enum::Enum as Status, Stored::Struct::Struct as Payload},
 	},
 	State::{
-		Identity::{Command::Struct::CommandID, Content::Struct::ContentHash},
+		Identity::{Command::Struct::Struct as Command, Content::Struct::Struct as Digest},
 		Struct::AphroditeState,
 	},
 };
 
-fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
+fn Finished() -> Payload { Payload { Hash:Digest::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 fn Four() -> AphroditeState {
 	let mut State = AphroditeState::default();
 	(0..4).for_each(|i| {
-		InsertBgTask(
+		Insert(
 			&mut State,
-			CommandID::from(format!("t{i}")),
+			Command::from(format!("t{i}")),
 			"terminal".into(),
 			format!("cmd{i}"),
 			i,
@@ -30,28 +30,28 @@ fn Four() -> AphroditeState {
 }
 
 #[test]
-fn TestOldestStaleIsEvictedFirst() {
+fn Oldest() {
 	let mut State = Four();
-	State.BgTasks[1].Status = BgStatus::Stale;
-	State.BgTasks[3].Status = BgStatus::Stale;
+	State.BgTasks[1].Status = Status::Stale;
+	State.BgTasks[3].Status = Status::Stale;
 
 	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(1), "the older of two stale tasks goes");
 }
 
 #[test]
-fn TestFinishedBeatsRunningAndLosesToStale() {
+fn Order() {
 	let mut State = Four();
-	State.BgTasks[2].Status = BgStatus::Done { Output:Finished() };
-	State.BgTasks[3].Status = BgStatus::Stale;
+	State.BgTasks[2].Status = Status::Done { Output:Finished() };
+	State.BgTasks[3].Status = Status::Stale;
 
 	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(3), "stale outranks finished");
 
-	State.BgTasks[3].Status = BgStatus::Running;
+	State.BgTasks[3].Status = Status::Running;
 	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(2), "finished outranks running");
 }
 
 #[test]
-fn TestOldestRunningIsTheLastResort() {
+fn Last() {
 	let State = Four();
 
 	assert_eq!(
@@ -62,7 +62,7 @@ fn TestOldestRunningIsTheLastResort() {
 }
 
 #[test]
-fn TestEmptyRegistryHasNoVictim() {
+fn Empty() {
 	let State = AphroditeState::default();
 
 	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), None);

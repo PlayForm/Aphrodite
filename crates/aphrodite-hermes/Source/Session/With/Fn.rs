@@ -16,10 +16,10 @@
 use aphrodite::State::Struct::AphroditeState;
 
 use crate::{
-	Configuration::Template::Fn::config_template,
+	Configuration::Template,
 	Session::{
-		Lock::{Fn::lock_bounded, Outcome},
-		Registry::Struct::{DEFAULT_SESSION, session_state},
+		Lock::{self, Outcome},
+		Registry::{Const::Fallback, Get},
 	},
 };
 
@@ -29,11 +29,15 @@ use crate::{
 /// that session's mutex - a heavy hook in one session can never block
 /// another session's hooks. `None` means the session's lock is wedged by an
 /// abandoned worker; the caller MUST degrade fail-open (never block).
+///
+/// `with_session` keeps its qualifier until the callers outside this partition
+/// (`Hook::Call::Dispatch`, which names this leaf) repoint at
+/// `Session::With::Session::Fn`.
 pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T) -> Option<T> {
-	let state = session_state(sid);
+	let State = Get::Fn::Fn(sid);
 
-	match lock_bounded(&state) {
-		Outcome::Enum::Enum::Held(mut guard) => Some(f(&mut guard)),
+	match Lock::Fn::Fn(&State) {
+		Outcome::Enum::Enum::Held(mut Guard) => Some(f(&mut Guard)),
 		Outcome::Enum::Enum::Wedged => None,
 	}
 }
@@ -41,39 +45,40 @@ pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T)
 /// Run `f` against the session state under a bounded lock.
 ///
 /// Compatibility shim for tools and tests that lack a `session_id`: resolves
-/// `crate::Debug::Session::Last::Fn::Fn()` (fallback to the [`DEFAULT_SESSION`] key
-/// when empty) and locks ONLY that session with the bounded lock. On a wedged
-/// lock it runs `f` against a THROWAWAY clone of the config template so the call
-/// still returns quickly - fail-open, never block; the mutation is discarded
-/// (the template itself is never mutated, so future session seeds stay
-/// pristine). The discard is the price of a tool call that has nothing better
-/// to do than answer; a caller that needs to know whether its write landed uses
-/// `Session::Broadcast` (which counts) or `with_session` (which reports the
-/// wedged lock as `None`) instead.
+/// `crate::Debug::Session::Last::Fn::Fn()` (fallback to the
+/// [`Fallback`](crate::Session::Registry::Const::Fallback) key when empty) and
+/// locks ONLY that session with the bounded lock. On a wedged lock it runs `f`
+/// against a THROWAWAY clone of the config template so the call still returns
+/// quickly - fail-open, never block; the mutation is discarded (the template
+/// itself is never mutated, so future session seeds stay pristine). The discard
+/// is the price of a tool call that has nothing better to do than answer; a
+/// caller that needs to know whether its write landed uses `Session::Broadcast`
+/// (which counts) or `with_session` (which reports the wedged lock as `None`)
+/// instead.
 ///
 /// Torn-state contract (report 06 F12): `with_shared` itself does not
-/// `catch_unwind` - the panic guard lives one layer up, in `guarded()` at
-/// every call site that dispatches into this fn. If `f` panics partway
-/// through a multi-step mutation, whatever partial state existed at the
-/// panic point is what the next caller observes (the lock itself is fine -
-/// poison is recovered via `into_inner` in `lock_bounded`). Keep multi-step
-/// mutations (e.g. `retain` then `push_front` in `inline_store_put`) ordered
-/// so an interruption degrades to "entry missing" rather than "duplicate
-/// entry".
+/// `catch_unwind` - the panic guard lives one layer up, in
+/// `Guard::Fn::Fn(guarded)` at every call site that dispatches into this fn. If
+/// `f` panics partway through a multi-step mutation, whatever partial state
+/// existed at the panic point is what the next caller observes (the lock itself
+/// is fine - poison is recovered via `into_inner` in `Lock::Fn::Fn`). Keep
+/// multi-step mutations (e.g. `retain` then `push_front` in
+/// `inline_store_put`) ordered so an interruption degrades to "entry missing"
+/// rather than "duplicate entry".
 pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
-	let sid = crate::Debug::Session::Last::Fn::Fn();
-	let sid = match sid.is_empty() {
-		true => DEFAULT_SESSION.to_string(),
-		false => sid,
+	let Sid = crate::Debug::Session::Last::Fn::Fn();
+	let Sid = match Sid.is_empty() {
+		true => Fallback.to_string(),
+		false => Sid,
 	};
-	let state = session_state(&sid);
+	let State = Get::Fn::Fn(&Sid);
 
-	match lock_bounded(&state) {
-		Outcome::Enum::Enum::Held(mut guard) => f(&mut guard),
+	match Lock::Fn::Fn(&State) {
+		Outcome::Enum::Enum::Held(mut Guard) => f(&mut Guard),
 		// Wedged session lock: degrade on a throwaway clone rather than block.
 		Outcome::Enum::Enum::Wedged => {
-			let mut scratch = config_template().clone();
-			f(&mut scratch)
+			let mut Scratch = Template::Fn::Fn().clone();
+			f(&mut Scratch)
 		},
 	}
 }

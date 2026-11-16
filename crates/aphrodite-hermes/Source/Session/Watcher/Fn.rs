@@ -30,7 +30,7 @@ use crate::Session::Watcher::{Handle, Ready, Run, Start, State};
 /// could not start" into "the first hook never returned". Two seconds is far
 /// above the cost of building a notifier and watching two directories, and far
 /// below Hermes' hook timeout.
-const READY_TIMEOUT:Duration = Duration::from_secs(2);
+const Timeout:Duration = Duration::from_secs(2);
 
 /// Spawn the opt-in config auto-reload watcher and report whether it is running.
 ///
@@ -47,7 +47,12 @@ const READY_TIMEOUT:Duration = Duration::from_secs(2);
 ///
 /// A watcher that cannot start is reported, not swallowed: the caller asked for
 /// auto-reload, and "it is silently off" is the one answer it cannot act on.
-pub(crate) fn spawn_config_watcher() -> Start::Enum::Enum {
+///
+/// `ReadySender` / `ReadyReceiver` keep their qualifier because this scope holds
+/// TWO channels - the notifier's event channel (`Receiver` / `Wake`) and the
+/// readiness channel - so the bare `Sender` / `Receiver` would be ambiguous
+/// (doctrine §4).
+pub(crate) fn Fn() -> Start::Enum::Enum {
 	let Stop = Arc::new(AtomicBool::new(false));
 	let (Wake, Receiver) = channel::<()>();
 	let (ReadySender, ReadyReceiver) = sync_channel::<Ready::Enum::Enum>(1);
@@ -64,16 +69,16 @@ pub(crate) fn spawn_config_watcher() -> Start::Enum::Enum {
 		Err(e) => {
 			crate::Debug::Warn::Fn::Fn(&format!("config auto-reload watcher failed to start: {e}"));
 
-			return Start::Enum::Enum::NotRunning;
+			return Start::Enum::Enum::Failed;
 		},
 	};
 
 	let Running = Handle::Struct::Struct { Stop, Wake, Joined:Thread };
 
-	match ReadyReceiver.recv_timeout(READY_TIMEOUT) {
+	match ReadyReceiver.recv_timeout(Timeout) {
 		Ok(Ready::Enum::Enum::Watching) => {
 			let Previous = {
-				let mut Slot = State::RUNNING
+				let mut Slot = State::Running
 					.get_or_init(|| std::sync::Mutex::new(None))
 					.lock()
 					.unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -94,7 +99,7 @@ pub(crate) fn spawn_config_watcher() -> Start::Enum::Enum {
 			crate::Debug::Warn::Fn::Fn(&Reason);
 			Running.stop();
 
-			Start::Enum::Enum::NotRunning
+			Start::Enum::Enum::Failed
 		},
 		// No report at all: the thread is stuck before readiness, which is a
 		// state the loop cannot be in (readiness is sent before the first
@@ -102,11 +107,11 @@ pub(crate) fn spawn_config_watcher() -> Start::Enum::Enum {
 		Err(e) => {
 			crate::Debug::Warn::Fn::Fn(&format!(
 				"config auto-reload watcher did not report readiness within {}ms ({e}); stopping it",
-				READY_TIMEOUT.as_millis()
+				Timeout.as_millis()
 			));
 			Running.stop();
 
-			Start::Enum::Enum::NotRunning
+			Start::Enum::Enum::Failed
 		},
 	}
 }

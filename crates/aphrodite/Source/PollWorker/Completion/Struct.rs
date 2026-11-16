@@ -6,13 +6,13 @@
 //! keeps, so the marker, the status and the nudge cannot disagree about the hash,
 //! the preview or the size.
 
-use crate::PollWorker::Task::Status::Stored::Struct::StoredOutput;
+use crate::PollWorker::Task::Status::Stored::Struct::Struct as Payload;
 
 /// A completed poll worker's output, as the store and the marker need it.
 #[derive(Debug, Clone)]
 pub(crate) struct Completion {
 	/// Where the output goes: hash, preview and byte size.
-	pub Stored:StoredOutput,
+	pub Stored:Payload,
 	/// The stored output itself, moved out of the accumulator.
 	pub Output:String,
 	/// The command line the marker's centre names.

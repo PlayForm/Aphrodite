@@ -11,10 +11,10 @@
 //! predicates never run once an earlier one has claimed the content - which a
 //! precomputed tuple of booleans matched afterwards would not.
 
-use crate::Proxy::Analysis::Classify::FirstLine::Rule::Type::Type as FirstLineRule;
+use crate::Proxy::Analysis::Classify::FirstLine::Rule::Type::Type as Rule;
 
 /// The three first-line families, in priority order.
-const Rules:[FirstLineRule; 3] = [("error", Errorish), ("build_output", Buildish), ("linter", Linterish)];
+const Rules:[Rule; 3] = [("error", Errorish), ("build_output", Buildish), ("linter", Linterish)];
 
 /// Classify by the content's first line.
 pub(crate) fn Fn(Content:&str) -> &'static str {
@@ -22,7 +22,7 @@ pub(crate) fn Fn(Content:&str) -> &'static str {
 
 	Rules
 		.iter()
-		.find(|(_, Rule)| Rule(Line))
+		.find(|(_, Match)| Match(Line))
 		.map(|(Name, _)| *Name)
 		.unwrap_or("text")
 }

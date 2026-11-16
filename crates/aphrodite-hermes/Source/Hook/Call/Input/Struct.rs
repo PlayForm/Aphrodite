@@ -17,7 +17,7 @@ pub(crate) struct Struct {
 	pub(crate) Session:String,
 	/// Byte length of the raw kwargs JSON - the request-size proxy the turn
 	/// telemetry reports (`pre_llm_call`).
-	pub(crate) ArgsLength:usize,
+	pub(crate) Length:usize,
 }
 
 impl Struct {
@@ -26,7 +26,7 @@ impl Struct {
 
 	/// Tool output: Hermes passes it under `result`; `content` is accepted for
 	/// direct/test callers.
-	pub(crate) fn ToolContent(&self) -> &str {
+	pub(crate) fn Content(&self) -> &str {
 		self.Parsed
 			.get("result")
 			.or_else(|| self.Parsed.get("content"))
@@ -36,7 +36,7 @@ impl Struct {
 
 	/// Terminal output: Hermes passes it under `output`; `content` is accepted
 	/// for direct/test callers.
-	pub(crate) fn TermContent(&self) -> &str {
+	pub(crate) fn Output(&self) -> &str {
 		self.Parsed
 			.get("output")
 			.or_else(|| self.Parsed.get("content"))

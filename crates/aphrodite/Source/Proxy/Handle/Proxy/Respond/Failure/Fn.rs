@@ -29,10 +29,10 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Failure:FailureStruct) -> Response
 			Context.State.UpstreamTimeouts.fetch_add(1, Ordering::Relaxed);
 		},
 		FailureKind::Connect => {
-			Context.State.UpstreamConnectErrors.fetch_add(1, Ordering::Relaxed);
+			Context.State.ConnectErrors.fetch_add(1, Ordering::Relaxed);
 		},
 		FailureKind::Other => {
-			Context.State.UpstreamOtherErrors.fetch_add(1, Ordering::Relaxed);
+			Context.State.OtherErrors.fetch_add(1, Ordering::Relaxed);
 		},
 	}
 

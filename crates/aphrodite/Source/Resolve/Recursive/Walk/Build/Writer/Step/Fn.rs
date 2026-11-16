@@ -24,12 +24,12 @@ pub(crate) fn Fn(
 	let Filled = match Resolved {
 		Nested::Enum::Enum::Replaced(Text) => Text.as_str(),
 		Nested::Enum::Enum::Unresolved => Occurrence.Marker,
-		Nested::Enum::Enum::Abandoned => return Err(Halt::Enum::Enum::OverBudget),
+		Nested::Enum::Enum::Abandoned => return Err(Halt::Enum::Enum::Budget),
 	};
 
 	Traversal
 		.Charge(Writer.Out.len() + Gap.len() + Filled.len())
-		.ok_or(Halt::Enum::Enum::OverBudget)?;
+		.ok_or(Halt::Enum::Enum::Budget)?;
 
 	let mut Out = Writer.Out;
 	Out.push_str(Gap);

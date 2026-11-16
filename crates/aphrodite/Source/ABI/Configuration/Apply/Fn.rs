@@ -1,4 +1,4 @@
-//! `ApplyUpdate`: a parsed write to session state, or the reason there is none.
+//! `Apply`: a parsed write to session state, or the reason there is none.
 
 use crate::{
 	ABI::Configuration::{Outcome::Enum::Enum as Outcome, Update::Enum::Enum as Update},
@@ -19,17 +19,17 @@ pub(crate) fn Fn(State:&mut AphroditeState, Parsed:Result<Update, Outcome>) -> O
 
 			Outcome::Applied
 		},
-		Ok(Update::EngineThresholdPct(Value)) => {
+		Ok(Update::Engine(Value)) => {
 			State.EngineThresholdPct = Value;
 
 			Outcome::Applied
 		},
-		Ok(Update::ToolThreshold(Value)) => {
+		Ok(Update::Tool(Value)) => {
 			State.ToolThreshold = Value;
 
 			Outcome::Applied
 		},
-		Ok(Update::ContextEngineEnabled(Value)) => {
+		Ok(Update::Context(Value)) => {
 			State.ContextEngineEnabled = Value;
 
 			Outcome::Applied

@@ -4,11 +4,11 @@ use std::num::NonZeroUsize;
 
 use crate::Preview::Limit::Enum::Enum as Limit;
 
-/// Smallest cap that can hold the ellipsis and the closing bracket together.
-const BracketFloor:usize = 4;
+/// Smallest cap that can hold the ellipsis and the closing bracket together: four.
+const Floor:usize = 4;
 
-/// Characters the closing bracket and the ellipsis occupy together.
-const BracketAndEllipsis:usize = 4;
+/// Characters the closing bracket and the ellipsis occupy together: four.
+const Reserve:usize = 4;
 
 /// Truncate a preview to its budget, on a character boundary.
 ///
@@ -44,7 +44,7 @@ pub(crate) fn Fn(Preview:String, Limit:&Limit) -> String {
 fn Cut(Preview:&str, Maximum:usize) -> String {
 	let KeepClose = Preview.trim_end().ends_with(']');
 
-	match (KeepClose && Maximum >= BracketFloor).then(|| Maximum - BracketAndEllipsis) {
+	match (KeepClose && Maximum >= Floor).then(|| Maximum - Reserve) {
 		None => Preview.chars().take(Maximum).collect(),
 		Some(Room) => {
 			let mut Out:String = Preview.chars().take(Room).collect();

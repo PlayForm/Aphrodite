@@ -15,12 +15,12 @@ pub enum Enum {
 	/// The index's fill ratio is below the configured threshold.
 	BelowThreshold,
 	/// The middle slice would be shorter than the minimum worth compacting.
-	MiddleTooSmall,
+	Small,
 	/// The protect bounds do not describe a slice of this index at all - a
 	/// configuration pair whose head reaches past the tail. Distinct from
-	/// `MiddleTooSmall` because the fix is different: the bounds are wrong, not
+	/// `Small` because the fix is different: the bounds are wrong, not
 	/// the history.
-	MiddleOutOfRange,
+	OutOfRange,
 	/// The middle turns could not be packed. Unreachable in practice -
 	/// serialising a `serde_json::Value` cannot fail - but named rather than
 	/// panicking, because a refusal is always cheaper than a crash.
@@ -34,8 +34,8 @@ impl Enum {
 			Enum::Disabled => "engine_off_or_threshold_gate",
 			Enum::BelowMinimum => "below_min_msgs",
 			Enum::BelowThreshold => "fill_below_threshold",
-			Enum::MiddleTooSmall => "middle_too_small",
-			Enum::MiddleOutOfRange => "middle_out_of_range",
+			Enum::Small => "middle_too_small",
+			Enum::OutOfRange => "middle_out_of_range",
 			Enum::Unpackable => "unpackable",
 		}
 	}

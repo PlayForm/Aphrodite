@@ -11,9 +11,7 @@ use super::super::{Command::Enum::Enum as Command, Prepared::Enum::Enum as Prepa
 /// and passes through as `Ready`.
 pub(crate) fn Fn(Command:Command<'_>) -> Prepared<'_> {
 	match Command {
-		Command::Prefetch { Paths } => {
-			Prepared::Prefetch { Outcomes:crate::Prefetch::Read::Entry::Fn::ReadPaths(&Paths) }
-		},
+		Command::Prefetch { Paths } => Prepared::Prefetch { Outcomes:crate::Prefetch::Read::Entry::Fn::Fn(&Paths) },
 		Other => Prepared::Ready(Other),
 	}
 }

@@ -32,30 +32,30 @@ use crate::{
 /// The 47 public fields fall into three discipline groups:
 /// - **Write-once configuration**: `Client`, `StreamClient`, `APIURL`,
 ///   `Model`, `APIKey`, `ccr`, `AddMarkers`, `Mode`, `ToolRelay`,
-///   `NotifyURL`, `NotifyKey`, `Dev`, `ResponseCacheTtl`,
+///   `NotifyURL`, `NotifyKey`, `Dev`, `CacheTtl`,
 ///   `TaskTracker` - set in `build_state` and never mutated afterward
 ///   (hot-reload re-writes the atomic threshold fields below, not these).
-/// - **Live-tunable atomics**: `CacheCompressThreshold`,
-///   `TokenCompressThreshold`, `InlineCCRThreshold`,
-///   `CodeMultiplierX100`, `AutoExpand`, `AutoExpandLimit`
+/// - **Live-tunable atomics**: `CacheThreshold`,
+///   `TokenThreshold`, `InlineThreshold`,
+///   `CodeMultiplier`, `AutoExpand`, `ExpandLimit`
 ///   (re-written by config reload), plus
-///   `CompressionRatioEma` and `FillPct` (re-written by the compression
+///   `RatioEma` and `FillPct` (re-written by the compression
 ///   feedback loop). These are the only fields that change in place after
 ///   startup.
 /// - **Monotonic counters**: `RequestsTotal`, `RequestsCompressed`,
 ///   `TokensSaved`, `CCRHits`, `CCRMisses`, `CCRCreated`,
-///   `ToolRelayCalls`, `CacheHits`, `CacheMisses`, `InlineCCRHits`,
-///   `InlineCCRMisses`, `ToolRelaySuccess`, `ToolRelayFailure`,
+///   `RelayCalls`, `CacheHits`, `CacheMisses`, `InlineHits`,
+///   `InlineMisses`, `RelaySuccess`, `RelayFailure`,
 ///   `NotifySuccess`, `NotifyFailure`, `UpstreamErrors4xx`,
-///   `UpstreamErrors5xx`, `UpstreamTimeouts`, `UpstreamConnectErrors`,
-///   `SSEStreamErrors`, `RequestBodyBytes`, `ResponseBodyBytes`,
-///   `UpstreamLatencyMicros`, `TotalLatencyMicros` - only ever
+///   `UpstreamErrors5xx`, `UpstreamTimeouts`, `ConnectErrors`,
+///   `StreamErrors`, `RequestBytes`, `ResponseBytes`,
+///   `UpstreamLatency`, `TotalLatency` - only ever
 ///   incremented via `fetch_add`, never reassigned; `LatencyBuckets` is a
 ///   fixed histogram of the same class.
 ///
 /// The remaining lock-guarded fields (`RequestHistory`, `InlineCCR`,
-/// `LastErrors`, `CompressionsByType`, `ResponseCache`,
-/// `UpstreamHealthCache`) are mutable state accessed only under their
+/// `LastErrors`, `Compressions`, `ResponseCache`,
+/// `UpstreamHealth`) are mutable state accessed only under their
 /// mutex.
 ///
 /// Discipline: every field belongs to exactly one group; moving one (or
@@ -92,8 +92,9 @@ pub struct Struct {
 	/// tolerated: a poisoned mutex returns Err, and unwrap_or_default gives
 	/// an empty/logical-default so the proxy stays up.
 	pub RequestHistory:std::sync::Mutex<VecDeque<serde_json::Value>>,
-	/// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD
-	/// bytes). Lock uses `.lock().map(...)` - same poison safety pattern.
+	/// Inline CCR for tiny entries - no round-trip needed (below
+	/// `Threshold::Const::Inline` bytes). Lock uses `.lock().map(...)` - same
+	/// poison safety pattern.
 	/// Bounded to 1024 entries via LruCache to prevent unbounded memory growth.
 	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
 	/// lock is NEVER held across an `.await`; any future code that must hold
@@ -104,7 +105,7 @@ pub struct Struct {
 	/// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
 	pub LatencyBuckets:[AtomicU64; 5],
 	/// Running total latency in microseconds for Prometheus _sum
-	pub TotalLatencyMicros:AtomicU64,
+	pub TotalLatency:AtomicU64,
 	/// Track last N errors for hot-path analysis
 	/// Mapped through `.lock().map(...)` - a poisoned lock returns Err and
 	/// unwrap_or_default provides an empty Vec so error recording degrades
@@ -112,7 +113,7 @@ pub struct Struct {
 	pub LastErrors:std::sync::Mutex<VecDeque<String>>,
 	/// Compression decision counters by content type
 	/// Uses `.lock().map(...)` - poison tolerant by design.
-	pub CompressionsByType:std::sync::Mutex<std::collections::HashMap<String, u64>>,
+	pub Compressions:std::sync::Mutex<std::collections::HashMap<String, u64>>,
 
 	// Stats
 	pub RequestsTotal:AtomicU64,
@@ -129,18 +130,23 @@ pub struct Struct {
 	///
 	/// A cache hit used to add its whole serialised response body here, which is
 	/// an ENCODED-body measurement and now has its own counter
-	/// (`BodyBytesSaved`): a hit replaces no content at all.
+	/// (`BytesSaved`): a hit replaces no content at all.
 	pub TokensSaved:AtomicU64,
 	/// Cumulative encoded response-body bytes a cache hit avoided. Kept apart
 	/// from `TokensSaved` because the two measure different things on different
 	/// denominators - content replaced versus body bytes never fetched - and one
 	/// counter holding both described neither.
-	pub BodyBytesSaved:AtomicU64,
+	pub BytesSaved:AtomicU64,
 	pub CCRHits:AtomicU64,
 	pub CCRMisses:AtomicU64,
 	pub CCRCreated:AtomicU64,
-	pub ToolRelayCalls:AtomicU64,
-	pub CompressionRatioEma:AtomicU64, // ×100 for EMA of compression ratio
+	/// Tool-relay invocations on `POST /relay` - one per request the Hermes
+	/// plugin routes through the proxy, whatever the tool.
+	pub RelayCalls:AtomicU64,
+	/// Compression-ratio exponential moving average, ×100 fixed point (`200` =
+	/// 2.0×). Exposed as `compression_ratio_ema` in `/stats` and divided by 100
+	/// on the way out.
+	pub RatioEma:AtomicU64,
 
 	// LLM API response cache (request identity → compressed response)
 	/// LRU cache: request identity → (inserted-at, serialized response body).
@@ -149,7 +155,7 @@ pub struct Struct {
 	/// F5 (report 06): entries never expired on their own - a marker minted at
 	/// minute 0 of a long session was replayed unchanged at minute 90, silently
 	/// diverging from what a fresh (possibly temperature>0) upstream call would
-	/// return. Checked against `ResponseCacheTtl` on the hit path.
+	/// return. Checked against `CacheTtl` on the hit path.
 	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
 	/// lock is NEVER held across an `.await`; any future code that must hold
 	/// it across one switches this field to `tokio::sync::Mutex`.
@@ -157,7 +163,7 @@ pub struct Struct {
 	/// TTL applied to `ResponseCache` entries - reuses `cli.ccr_ttl_seconds`
 	/// so cached LLM responses don't outlive the CCR content they were
 	/// derived from by a different, uncoordinated lifetime.
-	pub ResponseCacheTtl:std::time::Duration,
+	pub CacheTtl:std::time::Duration,
 	pub CacheHits:AtomicU64,
 	pub CacheMisses:AtomicU64,
 
@@ -172,10 +178,16 @@ pub struct Struct {
 	pub FillPct:AtomicU64,
 
 	// Extended metrics
-	pub InlineCCRHits:AtomicU64,
-	pub InlineCCRMisses:AtomicU64,
-	pub ToolRelaySuccess:AtomicU64,
-	pub ToolRelayFailure:AtomicU64,
+	/// Inline-store lookups served without touching the CCR backend
+	/// (`/stats` `inline_ccr.hits`).
+	pub InlineHits:AtomicU64,
+	/// Inline-store lookups that missed and fell through to the CCR backend
+	/// (`/stats` `inline_ccr.misses`).
+	pub InlineMisses:AtomicU64,
+	/// Tool-relay calls that returned a result (`/stats` `tool_relay.success`).
+	pub RelaySuccess:AtomicU64,
+	/// Tool-relay calls that returned an error (`/stats` `tool_relay.failure`).
+	pub RelayFailure:AtomicU64,
 	pub NotifySuccess:AtomicU64,
 	pub NotifyFailure:AtomicU64,
 	pub UpstreamErrors4xx:AtomicU64,
@@ -184,24 +196,30 @@ pub struct Struct {
 	/// Non-timeout transport failures (connection refused, DNS, TLS) - split
 	/// from `UpstreamTimeouts` (F17), which previously counted every kind
 	/// of transport error as a "timeout".
-	pub UpstreamConnectErrors:AtomicU64,
+	pub ConnectErrors:AtomicU64,
 	/// Transport failures that are neither a timeout nor a connect error -
 	/// a body error, a malformed URL, a TLS handshake that got past connect.
-	/// Split out of `UpstreamConnectErrors`, which used to absorb all of them,
+	/// Split out of `ConnectErrors`, which used to absorb all of them,
 	/// so `connect_errors` means what it says.
-	pub UpstreamOtherErrors:AtomicU64,
+	pub OtherErrors:AtomicU64,
 	/// 02-F9: mid-stream chunk errors on the SSE relay path - distinct from
-	/// `UpstreamConnectErrors`/`UpstreamTimeouts`, which only ever see
+	/// `ConnectErrors`/`UpstreamTimeouts`, which only ever see
 	/// failures before the response status/headers arrive. Once
 	/// `Body::from_stream` owns the stream, a later chunk `Err` (the F2
 	/// failure mode: an upstream that hangs or drops mid-stream) was
 	/// otherwise invisible to every counter - a 200 status had already been
 	/// recorded, so an operator diagnosing "streams cut off" from `/stats`
 	/// saw nothing.
-	pub SSEStreamErrors:AtomicU64,
-	pub RequestBodyBytes:AtomicU64,
-	pub ResponseBodyBytes:AtomicU64,
-	pub UpstreamLatencyMicros:AtomicU64,
+	pub StreamErrors:AtomicU64,
+	/// Request-body bytes read on the proxy path, for `/stats`
+	/// `body_bytes.request`.
+	pub RequestBytes:AtomicU64,
+	/// Response-body bytes written on the proxy path, for `/stats`
+	/// `body_bytes.response`.
+	pub ResponseBytes:AtomicU64,
+	/// Microseconds spent waiting for the upstream's response headers, summed -
+	/// the upstream half of the latency pair whose total is `TotalLatency`.
+	pub UpstreamLatency:AtomicU64,
 
 	/// TTL cache for the `/health/upstream` probe result: `(ok, checked_at)`.
 	/// F19: without this, a monitor polling `/health/upstream` every 10-15s
@@ -210,25 +228,25 @@ pub struct Struct {
 	/// upstream call was already removed from the plain `/health` endpoint
 	/// for this reason; `/health/upstream` just re-introduced it under a
 	/// different path).
-	pub UpstreamHealthCache:std::sync::Mutex<Option<(bool, std::time::Instant)>>,
+	pub UpstreamHealth:std::sync::Mutex<Option<(bool, std::time::Instant)>>,
 
 	/// Live compression thresholds (report 07 F2/F4/T15) - previously
-	/// `CacheCompressThreshold`/`TokenCompressThreshold`/
-	/// `InlineCCRThreshold` were consts, so every shipped TOML's
+	/// `CacheThreshold`/`TokenThreshold`/
+	/// `InlineThreshold` were consts, so every shipped TOML's
 	/// `[compression]` table was parsed and then silently discarded; `POST
 	/// /reload` and the config-file watcher logged success while applying
 	/// nothing. Resolved once at startup (env > TOML > const default, see
 	/// `ResolveThresholds`) and updated in place by both the watcher and
 	/// `/reload` - this is what makes hot-reload real instead of theater.
-	pub CacheCompressThreshold:AtomicUsize,
-	pub TokenCompressThreshold:AtomicUsize,
-	pub InlineCCRThreshold:AtomicUsize,
+	pub CacheThreshold:AtomicUsize,
+	pub TokenThreshold:AtomicUsize,
+	pub InlineThreshold:AtomicUsize,
 	/// `CodeMultiplier`, ×100 for integer atomic storage (matches the
-	/// existing `CompressionRatioEma` ×100 convention above).
-	pub CodeMultiplierX100:AtomicU64,
+	/// existing `RatioEma` ×100 convention above).
+	pub CodeMultiplier:AtomicU64,
 	/// `[compression] auto_expand` (pre-Rust port): when true, the cache and
 	/// token compress paths resolve the just-stored content inline instead
-	/// of emitting a `<<<CCR:...>>>` marker, capped at `AutoExpandLimit`
+	/// of emitting a `<<<CCR:...>>>` marker, capped at `ExpandLimit`
 	/// bytes (content larger than the limit still emits the marker). Same
 	/// live-tunable discipline as the thresholds above - resolved at startup
 	/// (env > TOML > false, see `ResolveThresholds`) and re-applied by
@@ -236,9 +254,9 @@ pub struct Struct {
 	/// (markers appear).
 	pub AutoExpand:AtomicBool,
 	/// `[compression] auto_expand_limit` - byte cap for auto-expanded
-	/// content (see `AutoExpand`). Default `AutoExpandLimitDefault`
+	/// content (see `AutoExpand`). Default `InitialExpand`
 	/// (matches the Hermes-side `AphroditeState` default).
-	pub AutoExpandLimit:AtomicUsize,
+	pub ExpandLimit:AtomicUsize,
 	/// `APHRODITE_MAX_REQUEST_BODY_SIZE` (pre-Rust port): request-body cap
 	/// in bytes enforced by the [`CappedBody`] extractor while the body is
 	/// read - `Some(n)` rejects over-`n` bodies with 413, `None` (the
@@ -246,5 +264,5 @@ pub struct Struct {
 	/// Hermes-side `AphroditeState::max_request_body_size` (same env/TOML
 	/// key, resolved by `ResolveThresholds`). Write-once: set in
 	/// `build_state`, never mutated after startup.
-	pub MaximumRequestBodySize:Option<usize>,
+	pub BodyLimit:Option<usize>,
 }

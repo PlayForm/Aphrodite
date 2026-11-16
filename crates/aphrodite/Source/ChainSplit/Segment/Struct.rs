@@ -9,5 +9,5 @@ pub struct Struct {
 	/// segment was dropped.
 	pub Index:usize,
 	/// The segment's own command text, trimmed of surrounding whitespace.
-	pub command:String,
+	pub Command:String,
 }

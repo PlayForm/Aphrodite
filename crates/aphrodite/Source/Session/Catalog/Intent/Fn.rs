@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::State::Marker::Struct::Struct as Entry;
 
 /// The last three marker hashes, truncated to twelve characters each.
 ///
@@ -15,12 +15,12 @@ use crate::State::Marker::Struct::MarkerEntry;
 /// the same order the marker delta line uses - and truncated because twelve
 /// characters is enough for the model to name one in a retrieval request while
 /// keeping the line short.
-pub(crate) fn Fn(Enabled:bool, Markers:&VecDeque<MarkerEntry>, Current:usize) -> Option<String> {
+pub(crate) fn Fn(Enabled:bool, Markers:&VecDeque<Entry>, Current:usize) -> Option<String> {
 	(Enabled && Current > 0).then(|| {
 		// `rev().take(3).rev()` is the last three markers in insertion order: the
 		// ring is oldest-first, so the newest three are at the back and the double
 		// reversal restores the order the marker delta line uses - without the
-		// intermediate `Vec<&MarkerEntry>` a collect-then-reverse would need.
+		// intermediate `Vec<&Entry>` a collect-then-reverse would need.
 		let Hashes:Vec<String> = Markers
 			.iter()
 			.rev()

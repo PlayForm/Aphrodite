@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use crate::{
 	Catalog::Size::Fn::Fn as FmtSize,
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 	StructExtract::Format::Floor::Fn as FloorBoundary,
 };
 

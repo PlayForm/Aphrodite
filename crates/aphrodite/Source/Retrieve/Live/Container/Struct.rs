@@ -8,28 +8,37 @@ use serde::{Deserialize, Serialize};
 ///
 /// Every field defaults, because the envelope is written by a hook and read
 /// here: a missing field must degrade to "not a container" rather than fail
-/// the parse, and `live == false` (the default) is exactly that verdict.
+/// the parse, and `Enable == false` (the default) is exactly that verdict.
+///
+/// The names are the envelope's own `snake_case` JSON keys, pinned per field.
+/// The envelope is a contract between the hook that writes it and this read, so
+/// the identifiers moved and the keys did not.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct Struct {
-	/// `true` only for a container envelope; the default keeps a malformed
-	/// entry on the plain path.
+	/// `live`; `true` only for a container envelope. The default keeps a
+	/// malformed entry on the plain path, which is why the flag is not the
+	/// presence of the entry itself.
 	#[serde(default)]
 	#[serde(rename = "live")]
-	pub(crate) Live:bool,
-	/// Total bytes the container holds.
+	pub(crate) Enable:bool,
+	/// `size`; total bytes the container holds. `0` is a container with no
+	/// content, never "unknown".
 	#[serde(default)]
 	#[serde(rename = "size")]
 	pub(crate) Size:usize,
-	/// Number of stored chunks.
+	/// `chunks`; number of stored chunks. `0` is a degenerate envelope - a
+	/// container claiming nothing to reassemble - and the read refuses it.
 	#[serde(default)]
 	#[serde(rename = "chunks")]
-	pub(crate) Chunks:usize,
-	/// Target byte size of one chunk.
+	pub(crate) Count:usize,
+	/// `chunk_size`; target byte size of one chunk. `0` means the writer chose
+	/// no target, and no reader consults it for reassembly.
 	#[serde(default)]
 	#[serde(rename = "chunk_size")]
-	pub(crate) ChunkSize:usize,
-	/// Bytes already served; advanced and written back on every retrieve.
+	pub(crate) Granularity:usize,
+	/// `bytes_arrived`; bytes already served, advanced and written back on
+	/// every retrieve. `0` means the container has not been read yet.
 	#[serde(default)]
 	#[serde(rename = "bytes_arrived")]
-	pub(crate) BytesArrived:usize,
+	pub(crate) Arrived:usize,
 }

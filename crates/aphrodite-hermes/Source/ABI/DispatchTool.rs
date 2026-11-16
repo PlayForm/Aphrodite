@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 use crate::{
 	Guard::{
 		Fn::{cstr_to_string, guarded},
-		ToJSON::Fn::Fn as to_json,
+		ToJSON,
 	},
 	Tool,
 };
@@ -15,11 +15,11 @@ use crate::{
 /// aphrodite_hermes_free_string.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_json:*const c_char) -> *mut c_char {
-	let name = unsafe { cstr_to_string(tool_name) };
-	let args = unsafe { cstr_to_string(args_json) };
+	let Name = unsafe { cstr_to_string(tool_name) };
+	let Args = unsafe { cstr_to_string(args_json) };
 
 	guarded(std::panic::AssertUnwindSafe(move || {
-		let result = Tool::Dispatch::Fn::Fn(&name, &args);
-		to_json(&result)
+		let Payload = Tool::Dispatch::Fn::Fn(&Name, &Args);
+		ToJSON::Fn::Fn(&Payload)
 	}))
 }

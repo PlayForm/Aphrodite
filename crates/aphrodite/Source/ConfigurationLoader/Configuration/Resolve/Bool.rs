@@ -20,7 +20,7 @@ impl Struct {
 	/// was three `match` statements with an early `return` and an empty `None` arm,
 	/// which made the precedence a property of the statement order rather than of the
 	/// value.
-	pub fn GetBool(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:bool) -> bool {
+	pub fn Bool(&self, EnvironmentKey:&str, Section:&str, Key:&str, Fallback:bool) -> bool {
 		let AsBool = |Raw:&str| {
 			let Lowered = Raw.to_ascii_lowercase();
 
@@ -33,9 +33,9 @@ impl Struct {
 			.or_else(|| std::env::var(EnvironmentKey).ok().map(|Raw| AsBool(&Raw)))
 			.unwrap_or_else(|| {
 				self.Section(Section)
-					.and_then(|s| s.get(Key))
-					.and_then(|v| v.as_bool())
-					.unwrap_or(default)
+					.and_then(|Table| Table.get(Key))
+					.and_then(|Value| Value.as_bool())
+					.unwrap_or(Fallback)
 			})
 	}
 }

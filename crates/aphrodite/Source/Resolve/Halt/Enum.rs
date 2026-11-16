@@ -16,6 +16,7 @@ pub(crate) enum Enum {
 	/// The store does not hold the hash.
 	Absent,
 	/// A bounded traversal would have exceeded its budget, so its output was abandoned
-	/// mid-construction and no text exists to return.
-	OverBudget,
+	/// mid-construction and no text exists to return. `Budget` names the cause, not the
+	/// effect: `Nested::Enum::Abandoned` is what a nested reference does with this answer.
+	Budget,
 }

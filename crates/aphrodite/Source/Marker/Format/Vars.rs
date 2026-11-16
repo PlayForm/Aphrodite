@@ -10,6 +10,11 @@
 
 /// Substitute `{name}` placeholders in a template string.
 ///
+/// External contract: `Template` is the `[templates.marker] format` (or
+/// `[templates.prompt]`) string exactly as it appears in `aphrodite.toml`, and
+/// `Vars` is the closed set of names a template may use. The result is what the
+/// consumer reads, byte for byte.
+///
 /// - `{{` / `}}` escape to literal braces (Python str.format).
 /// - Known variable names are replaced by their string values.
 /// - Unknown placeholders, malformed groups (e.g. `{hash!r}`), and stray
@@ -17,75 +22,75 @@
 ///   crash in `_render_marker_tmpl`, a raw-template fallback in
 ///   `_render_prompt_tmpl`); this crate degrades without panicking and
 ///   keeps the template readable.
-pub(crate) fn SubstituteVars(Tmpl:&str, Vars:&[(&str, &str)]) -> String {
-	let Chars:Vec<char> = Tmpl.chars().collect();
-	let mut Out = String::with_capacity(Tmpl.len() + 16);
-	let mut i = 0;
+pub(crate) fn Fn(Template:&str, Vars:&[(&str, &str)]) -> String {
+	let Characters:Vec<char> = Template.chars().collect();
+	let mut Rendered = String::with_capacity(Template.len() + 16);
+	let mut Index = 0;
 
 	loop {
-		match Chars.get(i).copied() {
+		match Characters.get(Index).copied() {
 			Some('{') => {
-				match Chars.get(i + 1) {
+				match Characters.get(Index + 1) {
 					// `{{` escapes to a literal brace.
 					Some('{') => {
-						Out.push('{');
-						i += 2;
+						Rendered.push('{');
+						Index += 2;
 					},
 					_ => {
 						// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
-						let mut j = i + 1;
-						let mut name = String::new();
+						let mut End = Index + 1;
+						let mut Name = String::new();
 						loop {
-							match Chars.get(j) {
-								Some(c) if c.is_ascii_alphanumeric() || *c == '_' => {
-									name.push(*c);
-									j += 1;
+							match Characters.get(End) {
+								Some(Character) if Character.is_ascii_alphanumeric() || *Character == '_' => {
+									Name.push(*Character);
+									End += 1;
 								},
 								_ => break,
 							}
 						}
 						// A substitution needs a closed, non-empty group whose name is
 						// registered; anything else leaves the brace literal.
-						let Value = (!name.is_empty() && Chars.get(j) == Some(&'}'))
-							.then(|| Vars.iter().find(|(k, _)| *k == name.as_str()))
+						let Value = (!Name.is_empty() && Characters.get(End) == Some(&'}'))
+							.then(|| Vars.iter().find(|(Key, _)| *Key == Name.as_str()))
 							.flatten()
-							.map(|(_, v)| *v);
+							.map(|(_, Text)| *Text);
 
 						match Value {
-							Some(v) => {
-								Out.push_str(v);
-								i = j + 1;
+							Some(Text) => {
+								Rendered.push_str(Text);
+								Index = End + 1;
 							},
 							None => {
 								// Unknown var or malformed group: emit the opening
 								// brace verbatim and keep scanning - the rest of the
 								// group text is then emitted literally.
-								Out.push('{');
-								i += 1;
+								Rendered.push('{');
+								Index += 1;
 							},
 						}
 					},
 				}
 			},
 			Some('}') => {
-				match Chars.get(i + 1) {
+				match Characters.get(Index + 1) {
 					Some('}') => {
-						Out.push('}');
-						i += 2;
+						Rendered.push('}');
+						Index += 2;
 					},
 					_ => {
-						Out.push('}');
-						i += 1;
+						Rendered.push('}');
+						Index += 1;
 					},
 				}
 			},
-			Some(c) => {
-				Out.push(c);
-				i += 1;
+			Some(Character) => {
+				Rendered.push(Character);
+				Index += 1;
 			},
 			None => break,
 		}
 	}
 
-	Out
+	Rendered
 }

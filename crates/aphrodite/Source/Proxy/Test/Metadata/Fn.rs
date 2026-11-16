@@ -5,7 +5,7 @@ use crate::Proxy::{Metadata::Fn::Fn as GenerateMetadata, Test::Support::Analysis
 
 // ── T3: generate_metadata ───────────────────────────────────
 #[test]
-fn TestGenerateMetadataRustHasLanguageAndFns() {
+fn Rust() {
 	let Src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
 	let meta = GenerateMetadata(&NamedAnalysis(Src, "code_rust"));
 
@@ -14,7 +14,7 @@ fn TestGenerateMetadataRustHasLanguageAndFns() {
 }
 
 #[test]
-fn TestGenerateMetadataEscapesPipes() {
+fn Pipes() {
 	// The 'On branch' line can legally contain a literal '|' - must be escaped
 	// to '/'.
 	let Src = "On branch feature|weird\n";
@@ -24,7 +24,7 @@ fn TestGenerateMetadataEscapesPipes() {
 }
 
 #[test]
-fn TestGenerateMetadataMaximum400Chars() {
+fn Limit() {
 	let Src = (0..100).map(|i| format!("fn f{i}() {{}}")).collect::<Vec<_>>().join("\n");
 	let meta = GenerateMetadata(&NamedAnalysis(&Src, "code_rust"));
 
@@ -32,7 +32,7 @@ fn TestGenerateMetadataMaximum400Chars() {
 }
 
 #[test]
-fn TestGenerateMetadataErrorBranchNoPanicOnMultibyteUtf8() {
+fn Multibyte() {
 	// Multi-byte UTF-8 characters sit right around the ".rs:" match position -
 	// byte-index slicing here must not panic on a non-char-boundary.
 	let Src = "日本語エラー at src/日本.rs:10:5 something\n";
@@ -43,7 +43,7 @@ fn TestGenerateMetadataErrorBranchNoPanicOnMultibyteUtf8() {
 }
 
 #[test]
-fn TestGenerateMetadataTextHasLineCount() {
+fn Lines() {
 	let meta = GenerateMetadata(&NamedAnalysis("a\nb\nc\n", "text"));
 
 	assert_eq!(meta, "ln=3");
@@ -52,7 +52,7 @@ fn TestGenerateMetadataTextHasLineCount() {
 // ── Field order is the contract: the model reads the block left to right, so a
 // producer's fields must keep the order its own stage comments name. ──
 #[test]
-fn TestGenerateMetadataKeepsProducerFieldOrder() {
+fn Order() {
 	// A real cargo block: the status leads, the compile count follows, and the
 	// first error - the one line the producer can actually find - comes last.
 	let meta = GenerateMetadata(&NamedAnalysis(

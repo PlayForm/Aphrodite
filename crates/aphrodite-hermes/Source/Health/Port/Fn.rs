@@ -13,9 +13,9 @@
 use crate::Health::Port::Resolve;
 
 /// Default cache proxy port, used when `APHRODITE_CACHE_PORT` is unset.
-pub(crate) const DEFAULT_CACHE_PORT:u16 = 9797;
+pub(crate) const Cache:u16 = 9797;
 /// Default token proxy port, used when `APHRODITE_TOKEN_PORT` is unset.
-pub(crate) const DEFAULT_TOKEN_PORT:u16 = 9798;
+pub(crate) const Token:u16 = 9798;
 
 /// Resolve the cache/token proxy ports for this process.
 ///
@@ -23,4 +23,4 @@ pub(crate) const DEFAULT_TOKEN_PORT:u16 = 9798;
 /// so that multiple concurrent Hermes Agent instances on the same machine can
 /// each be pointed at their own proxy pair (see `aphrodite setup --cache-port
 /// / --token-port`), falling back to the historical 9797/9798 defaults.
-pub(crate) fn configured_ports() -> (u16, u16) { Resolve::Fn::Fn(|Var| std::env::var(Var).ok()) }
+pub(crate) fn Fn() -> (u16, u16) { Resolve::Fn::Fn(|Var| std::env::var(Var).ok()) }

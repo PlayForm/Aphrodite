@@ -5,7 +5,7 @@
 /// Matched case-insensitively against the trimmed command line, so `Cargo Build`
 /// and `cargo build` are the same command. The table is a denylist: a command it
 /// does not name is never backgrounded.
-pub(crate) const SlowCommandPrefixes:&[&str] = &[
+pub(crate) const Slow:&[&str] = &[
 	"cargo",
 	"npm",
 	"yarn",

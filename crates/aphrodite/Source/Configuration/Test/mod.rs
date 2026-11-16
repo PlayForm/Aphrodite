@@ -18,6 +18,4 @@ use crate::Configuration::Proxy::Multi::Struct::Struct as MultiConfiguration;
 /// Shared by the parse and resolve areas: every one of those tests is written
 /// as "here is the file, what does it resolve to", so the panic-on-invalid
 /// wrapper belongs in one place.
-pub(super) fn MultiConfigurationFromToml(TomlStr:&str) -> MultiConfiguration {
-	toml::from_str(TomlStr).expect("valid test TOML")
-}
+pub(super) fn Toml(TomlStr:&str) -> MultiConfiguration { toml::from_str(TomlStr).expect("valid test TOML") }

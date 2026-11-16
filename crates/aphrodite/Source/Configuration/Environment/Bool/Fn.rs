@@ -12,9 +12,9 @@
 /// Present-and-false and absent are indistinguishable here, deliberately:
 /// callers that need to tell "explicitly off" from "unset" must read the
 /// variable themselves.
-pub fn EnvironmentBool(Var:&str) -> bool {
+pub fn Fn(Var:&str) -> bool {
 	match std::env::var(Var) {
-		Ok(v) => matches!(v.to_lowercase().as_str(), "1" | "true"),
+		Ok(Value) => matches!(Value.to_lowercase().as_str(), "1" | "true"),
 		Err(_) => false,
 	}
 }

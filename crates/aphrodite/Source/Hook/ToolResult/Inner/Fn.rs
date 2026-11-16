@@ -2,7 +2,7 @@
 
 use crate::{
 	Hook::{
-		Meta::Struct::Struct as ToolCallMeta,
+		Meta::Struct::Struct as Call,
 		Observation::{Apply::Fn::Fn as ApplyObservation, Tool::Fn::Fn as Observe},
 		ToolResult::{
 			Apply::Fn::Fn as Apply,
@@ -33,12 +33,12 @@ pub(crate) fn Fn(
 	Content:&str,
 	ToolName:&str,
 	Classify:Option<(&str, &str)>,
-	meta:&ToolCallMeta,
+	Meta:&Call,
 ) -> serde_json::Value {
-	let Observation = (!Content.is_empty()).then(|| Observe(Content, ToolName, meta));
+	let Observation = (!Content.is_empty()).then(|| Observe(Content, ToolName, Meta));
 	let _ = Observation.as_ref().map(|Observation| ApplyObservation(State, Observation));
 
-	let Input = Input { Content, Tool:ToolName, Classify, Meta:meta };
+	let Input = Input { Content, Tool:ToolName, Classify, Meta };
 	let Policy = ResolvePolicy(State, Content);
 	let Plan = Select(&Policy, Input);
 

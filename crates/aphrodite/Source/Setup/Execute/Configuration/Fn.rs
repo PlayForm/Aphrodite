@@ -26,10 +26,10 @@ pub(crate) fn Fn(Context:&SetupContext, Args:&SetupArgs) -> anyhow::Result<()> {
 	let ConfigurationPath = Context.AphroditeDirectory.join("aphrodite.toml");
 
 	let Configuration = ConfigurationTemplate
-		.replace("{api_url}", &Args.APIURL)
+		.replace("{api_url}", &Args.URL)
 		.replace("{model}", &Args.Model)
-		.replace("{cache_port}", &Args.CachePort.to_string())
-		.replace("{token_port}", &Args.TokenPort.to_string());
+		.replace("{cache_port}", &Args.Cache.to_string())
+		.replace("{token_port}", &Args.Token.to_string());
 
 	println!("writing config -> {}", ConfigurationPath.display());
 

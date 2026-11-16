@@ -5,12 +5,13 @@
 //! nobody ended the watch. Each case below is one row of that distinction.
 
 use crate::Session::{
-	Broadcast::Report::Struct::Struct as Report,
-	Watcher::{Continue::Fn::Fn as keep_watching, Outcome},
+	Broadcast::Report,
+	Watcher::{Continue, Outcome},
 };
 
-fn applied(Applied:usize, Skipped:usize, WantsReload:usize) -> Outcome::Enum::Enum {
-	Outcome::Enum::Enum::Applied(Report { Applied, Skipped, WantsReload })
+/// One applied pass with the given reach, as the policy sees it.
+fn Pass(Applied:usize, Skipped:usize, Reload:usize) -> Outcome::Enum::Enum {
+	Outcome::Enum::Enum::Applied(Report::Struct::Struct { Applied, Skipped, Reload })
 }
 
 // ── Every session wedged: the sweep could not look at any of them, so it learned
@@ -18,7 +19,7 @@ fn applied(Applied:usize, Skipped:usize, WantsReload:usize) -> Outcome::Enum::En
 #[test]
 fn probe_a_sweep_that_could_not_look_keeps_watching() {
 	assert!(
-		keep_watching(&applied(0, 3, 0)),
+		Continue::Fn::Fn(&Pass(0, 3, 0)),
 		"a sweep whose every session lock was wedged must not stop the watch"
 	);
 }
@@ -28,7 +29,7 @@ fn probe_a_sweep_that_could_not_look_keeps_watching() {
 #[test]
 fn probe_an_empty_registry_keeps_watching() {
 	assert!(
-		keep_watching(&applied(0, 0, 0)),
+		Continue::Fn::Fn(&Pass(0, 0, 0)),
 		"a sweep that ran before the first session registered must not stop the watch"
 	);
 }
@@ -37,7 +38,7 @@ fn probe_an_empty_registry_keeps_watching() {
 #[test]
 fn probe_a_session_that_still_wants_reload_keeps_watching() {
 	assert!(
-		keep_watching(&applied(2, 1, 1)),
+		Continue::Fn::Fn(&Pass(2, 1, 1)),
 		"one session still asking for auto-reload keeps the watch alive"
 	);
 }
@@ -47,7 +48,7 @@ fn probe_a_session_that_still_wants_reload_keeps_watching() {
 #[test]
 fn probe_every_reached_session_turning_reload_off_stops() {
 	assert!(
-		!keep_watching(&applied(2, 0, 0)),
+		!Continue::Fn::Fn(&Pass(2, 0, 0)),
 		"every reached session said stop, so the watch stops"
 	);
 }
@@ -57,7 +58,11 @@ fn probe_every_reached_session_turning_reload_off_stops() {
 #[test]
 fn probe_a_parse_failure_keeps_watching() {
 	assert!(
-		keep_watching(&Outcome::Enum::Enum::Failed(Report { Applied:0, Skipped:2, WantsReload:0 })),
+		Continue::Fn::Fn(&Outcome::Enum::Enum::Failed(Report::Struct::Struct {
+			Applied:0,
+			Skipped:2,
+			Reload:0
+		})),
 		"a parse failure must keep watching even when no session could be reached"
 	);
 }

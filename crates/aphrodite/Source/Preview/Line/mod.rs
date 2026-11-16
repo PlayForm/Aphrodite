@@ -11,11 +11,10 @@
 pub mod Code;
 pub mod Error;
 pub mod Failure;
-pub mod GitStatus;
+pub mod Git;
 pub mod Grep;
 pub mod Lint;
-pub mod MarkdownHeading;
-pub mod MarkdownStructure;
+pub mod Markdown;
 pub mod Path;
 pub mod Test;
 pub mod Warning;

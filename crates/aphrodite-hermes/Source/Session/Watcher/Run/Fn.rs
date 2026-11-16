@@ -65,7 +65,7 @@ pub(crate) fn Fn(
 					target: crate::Debug::Init::Const::TARGET,
 					applied = %Report.Applied,
 					skipped = %Report.Skipped,
-					wants_reload = %Report.WantsReload,
+					wants_reload = %Report.Reload,
 					"config reload applied"
 				)
 			},

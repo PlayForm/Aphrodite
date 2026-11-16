@@ -26,7 +26,7 @@ use super::{Prior, Walk};
 /// tree: once a hash is loaded, nested references to it reuse the cached value. Both belong
 /// to the traversal, so a guard from one retrieval can never reach the next.
 ///
-/// `Err(Halt::Absent)` means the top-level hash is not in the store; `Err(Halt::OverBudget)`
+/// `Err(Halt::Absent)` means the top-level hash is not in the store; `Err(Halt::Budget)`
 /// means a bounded traversal abandoned its output. It is not idempotent by accident: the same
 /// call twice must give the same answer, which is exactly why nothing here writes back.
 ///
@@ -35,23 +35,19 @@ use super::{Prior, Walk};
 /// loader, so the pre-port hardcoded constant's value is byte-identical when unset. Every
 /// entry point takes a traversal, which reads the cap from the state it holds, so there is no
 /// state-less path needing its own fallback.
-pub(crate) fn Fn(
-	Traversal:&mut Traversal,
-	HashValue:&str,
-	Depth:usize,
-) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
-	match Prior::Classify::Fn::Fn(Traversal, HashValue, Depth) {
+pub(crate) fn Fn(Traversal:&mut Traversal, Hash:&str, Depth:usize) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
+	match Prior::Classify::Fn::Fn(Traversal, Hash, Depth) {
 		// On the path already: the entry as loaded is the only answer that terminates.
-		Prior::Enum::Enum::Revisit => Traversal.Cached(HashValue).cloned().ok_or(Halt::Enum::Enum::Absent),
+		Prior::Enum::Enum::Revisit => Traversal.Cached(Hash).cloned().ok_or(Halt::Enum::Enum::Absent),
 		// At the cap the entry is answered as stored, never expanded further.
 		Prior::Enum::Enum::AtCap => {
 			Traversal
-				.Load(HashValue)
+				.Load(Hash)
 				.map(Expansion::Enum::Enum::Loaded)
 				.ok_or(Halt::Enum::Enum::Absent)
 		},
 		// Resolved earlier in this tree, off the current path: reuse it.
 		Prior::Enum::Enum::Cached(Cached) => Ok(Cached),
-		Prior::Enum::Enum::Fresh => Walk::Fn::Fn(Traversal, HashValue, Depth),
+		Prior::Enum::Enum::Fresh => Walk::Fn::Fn(Traversal, Hash, Depth),
 	}
 }

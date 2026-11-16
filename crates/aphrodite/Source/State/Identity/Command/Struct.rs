@@ -10,31 +10,31 @@
 ///
 /// Constructible from text because a command identity is minted from a command line
 /// and from nowhere else, and it hands its text back through `as_str` rather than
-/// `Deref` - a `&str` parameter must not be able to absorb a `CommandID` by
+/// `Deref` - a `&str` parameter must not be able to absorb a `Command` by
 /// coercion, or the boundary the type exists to draw would have a hole in it.
 ///
 /// ```compile_fail
-/// use aphrodite::State::Identity::{Command::Struct::CommandID, Execution::Struct::ExecutionID};
+/// use aphrodite::State::Identity::{Command::Struct::Struct as Command, Execution::Struct::Struct as Execution};
 ///
-/// let command: CommandID = "cargo build".into();
-/// let execution: ExecutionID = command;
+/// let command: Command = "cargo build".into();
+/// let execution: Execution = command;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CommandID(String);
+pub struct Struct(String);
 
-impl CommandID {
+impl Struct {
 	/// The identity's text.
 	pub fn as_str(&self) -> &str { &self.0 }
 }
 
-impl From<String> for CommandID {
+impl From<String> for Struct {
 	fn from(Value:String) -> Self { Self(Value) }
 }
 
-impl From<&str> for CommandID {
+impl From<&str> for Struct {
 	fn from(Value:&str) -> Self { Self(Value.to_string()) }
 }
 
-impl std::fmt::Display for CommandID {
+impl std::fmt::Display for Struct {
 	fn fmt(&self, Formatter:&mut std::fmt::Formatter<'_>) -> std::fmt::Result { Formatter.write_str(&self.0) }
 }

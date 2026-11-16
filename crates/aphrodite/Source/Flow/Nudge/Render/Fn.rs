@@ -10,7 +10,7 @@ use crate::State::Struct::AphroditeState;
 /// Render at most 2 active inline nudges as `[nudge: <text>]` lines, newest
 /// wins (P3/T9). An entry renders while it has not expired
 /// (`expires_after_turn >= turn_counter`, or `None` = permanent).
-pub fn RenderNudges(State:&AphroditeState) -> String {
+pub fn Fn(State:&AphroditeState) -> String {
 	let mut Lines:Vec<String> = State
 		.EphemeralDirectives
 		.iter()

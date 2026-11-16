@@ -19,7 +19,7 @@ pub(crate) fn Fn(Index:usize, Text:String) -> Segment {
 	let Hash = headroom_core::ccr::compute_key(Text.as_bytes());
 	let Builder = crate::Preview::Builder::Entry::Fn(&Type, Text.as_str());
 	let Preview = Decorate(&Builder, Text.as_str()).into_owned();
-	let Marker = crate::Marker::Format::Entry::CCRMarker(&Hash, &Type, Text.len(), &Preview, None, None, None);
+	let Marker = crate::Marker::Format::Entry::Fn(&Hash, &Type, Text.len(), &Preview, None, None, None);
 
 	Segment { Index, Text, Type, Hash, Preview, Marker }
 }

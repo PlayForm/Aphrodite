@@ -19,17 +19,17 @@ impl Struct {
 	/// The counter lock is released before the table lock is taken, so a lookup
 	/// on another thread is never blocked behind an allocation.
 	pub(crate) fn Allocate(&self, State:AphroditeState) -> usize {
-		let Hid = {
+		let Identity = {
 			let mut Next = self.Next.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-			let Hid = *Next;
+			let Identity = *Next;
 
 			*Next = Next.wrapping_add(1); // overflow-safe
 
-			Hid
+			Identity
 		};
 
-		self.With(|Map| Map.insert(Hid, std::sync::Arc::new(Mutex::new(State))));
+		self.With(|Map| Map.insert(Identity, std::sync::Arc::new(Mutex::new(State))));
 
-		Hid
+		Identity
 	}
 }

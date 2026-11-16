@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 use headroom_core::transforms;
 
-use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::MaximumContent};
+use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::Maximum};
 
 stateful!(
 	/// Compress `Content` into the session's inline store and answer with its
@@ -34,16 +34,14 @@ stateful!(
 	AphroditeCompress,
 	|s, Content:*const c_char, Hint:*const c_char| {
 		crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty(), || anyhow::anyhow!("empty"))?;
-		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
-			anyhow::anyhow!("content exceeds 16MB limit")
-		})?;
+		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > Maximum, || anyhow::anyhow!("content exceeds 16MB limit"))?;
 
 		// The hint is usable only when the caller supplied a label of its own: an
 		// empty hint and the literal "text" both defer to the detector. The
 		// detection therefore lives on the arm that needs it, so a caller that
 		// already knows its content type never pays for a classification it
 		// would discard.
-		let t = Some(Hint).filter(|Hint| !Hint.is_empty() && &**Hint != "text").map_or_else(
+		let Type = Some(Hint).filter(|Hint| !Hint.is_empty() && &**Hint != "text").map_or_else(
 			|| {
 				transforms::content_detector::detect_content_type(&Content)
 					.content_type
@@ -52,16 +50,16 @@ stateful!(
 			},
 			|Hint| Hint.into_owned(),
 		);
-		let hash = headroom_core::ccr::compute_key(Content.as_bytes());
+		let Hash = headroom_core::ccr::compute_key(Content.as_bytes());
 
-		s.InlineStorePut(hash.clone(), Content.to_string());
+		s.Put(Hash.clone(), Content.to_string());
 
-		let Preview = crate::Preview::Builder::Entry::Fn(&t, &Content);
-		let Marker = crate::Marker::Format::Entry::CCRMarker(&hash, &t, Content.len(), &Preview, None, None, None);
+		let Preview = crate::Preview::Builder::Entry::Fn(&Type, &Content);
+		let Marker = crate::Marker::Format::Entry::Fn(&Hash, &Type, Content.len(), &Preview, None, None, None);
 
-		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
-			hash:hash.clone(),
-			CCRType:t.clone(),
+		s.RecordMarker(crate::State::Marker::Struct::Struct {
+			hash:Hash.clone(),
+			CCRType:Type.clone(),
 			Size:Content.len(),
 			Preview:Preview.clone(),
 			Turn:s.TurnCounter,
@@ -70,7 +68,7 @@ stateful!(
 		});
 
 		Ok(Answer::JSON(
-			serde_json::json!({"hash":hash,"type":t,"size":Content.len(),"preview":Preview,"marker":Marker}),
+			serde_json::json!({"hash":Hash,"type":Type,"size":Content.len(),"preview":Preview,"marker":Marker}),
 		))
 	}
 );

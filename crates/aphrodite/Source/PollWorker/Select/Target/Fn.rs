@@ -8,7 +8,7 @@
 //! same process land on the same task.
 //!
 //! The two are compared as the types they are: a command LINE against a command line,
-//! an `ExecutionID` against an `ExecutionID`. They used to be two `String`s, which is
+//! an `Execution` against an `Execution`. They used to be two `String`s, which is
 //! how a comparison can silently cross the two identities.
 //!
 //! A poll that names a command no tracked task is running is *not* attributed to
@@ -18,23 +18,23 @@
 //! oldest running task, which is the only attribution such a result supports.
 
 use crate::PollWorker::{
-	Event::Struct::PollEvent,
+	Event::Struct::Struct as Wire,
 	Registry::Reader::Struct::Reader,
-	Task::{Status::Enum::BgStatus, Struct::BgTask},
+	Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 };
 
 /// The one task this poll applies to.
-pub(crate) fn Fn(This:&Reader, Event:&PollEvent<'_>) -> Option<usize> {
-	let Running = |Task:&BgTask| Task.Status == BgStatus::Running;
+pub(crate) fn Fn(This:&Reader, Event:&Wire<'_>) -> Option<usize> {
+	let Running = |Task:&Record| Task.Status == Status::Running;
 
 	let ByCommand = Event
 		.Command
 		.as_deref()
 		.and_then(|Named| This.Tasks.iter().position(|Task| Running(Task) && Task.command == Named));
-	let ByExecution = Event.ExecutionID.as_ref().and_then(|Named| {
+	let ByExecution = Event.Execution.as_ref().and_then(|Named| {
 		This.Tasks
 			.iter()
-			.position(|Task| Running(Task) && Task.ExecutionID.as_ref() == Some(Named))
+			.position(|Task| Running(Task) && Task.Execution.as_ref() == Some(Named))
 	});
 	let Oldest = This.Tasks.iter().position(Running);
 

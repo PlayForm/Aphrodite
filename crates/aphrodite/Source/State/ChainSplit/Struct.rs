@@ -7,7 +7,7 @@
 /// (retrieved/produced) over the recent window to move
 /// `ChainSplitMinimumSegments` within its bounds.
 #[derive(Debug, Clone)]
-pub struct SplitEvent {
+pub struct Struct {
 	/// Event id (matches `SplitSegmentMap` values).
 	pub ID:usize,
 	/// Turn on which the chain output was split.

@@ -9,4 +9,4 @@
 /// 10 MiB. It is a ceiling, not a target: a larger file is REFUSED rather than
 /// truncated, because a silently shortened read looks like a complete file to the
 /// model and would be trusted as one.
-pub(crate) const MAX_PATH_READ:u64 = 10 * 1024 * 1024;
+pub(crate) const CAP:u64 = 10 * 1024 * 1024;

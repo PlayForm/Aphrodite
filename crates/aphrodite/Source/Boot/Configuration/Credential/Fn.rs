@@ -14,7 +14,7 @@ use aphrodite::Configuration::CLI::Struct::Struct as CLI;
 /// configuration sources, and a caller reading the listener table should not have
 /// to find it in the middle of a `match`.
 pub(crate) fn Fn(CLI:&CLI) -> anyhow::Result<()> {
-	CLI.APIKey
+	CLI.Key
 		.trim()
 		.is_empty()
 		.then(|| {

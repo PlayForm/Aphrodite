@@ -8,24 +8,24 @@ use axum::{
 	response::{IntoResponse, Json},
 };
 
-use crate::Retrieve::{Handle::Fn::Fn as HandleRetrieve, Request::Struct::Struct as RetrieveRequest};
+use crate::Retrieve::{Handle::Fn::Fn as Handle, Request::Struct::Struct as Request};
 
 // ── T5 (F3): handle_retrieve must normalize the `hash` argument the
-// same way `ResolveOne` already does - strip a `|type|size` marker-body
+// same way `Resolve::One::Fn` already does - strip a `|type|size` marker-body
 // suffix an LLM might echo back, and trim surrounding whitespace. Seeds
 // `InlineCCR` directly (it's checked first, before any CCR backend
 // round-trip) via the crate's shared `AppState` test fixture instead of
 // duplicating its ~47-field literal.
 #[test]
 fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::WithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("abc123".to_string(), "<the real content>".to_string());
 	}
 	let state = Arc::new(state);
 
-	async fn BodyOf(Response:axum::response::Response) -> serde_json::Value {
+	async fn Decode(Response:axum::response::Response) -> serde_json::Value {
 		let bytes = axum::body::to_bytes(Response.into_body(), usize::MAX).await.unwrap();
 		serde_json::from_slice(&bytes).unwrap()
 	}
@@ -33,15 +33,15 @@ fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
 		// Residue: a `for` whose body contains `.await` - an iterator adapter cannot
 		// await, and this crate's `futures` dependency is optional.
-		for HashArgument in ["abc123", "abc123|tool|1024", "  abc123  "] {
-			let Response = HandleRetrieve(
+		for Argument in ["abc123", "abc123|tool|1024", "  abc123  "] {
+			let Response = Handle(
 				State(state.clone()),
-				Json(RetrieveRequest { hash:Some(HashArgument.to_string()), Query:None, Offset:0, Limit:0 }),
+				Json(Request { hash:Some(Argument.to_string()), Query:None, Offset:0, Limit:0 }),
 			)
 			.await
 			.into_response();
-			let body = BodyOf(Response).await;
-			assert_eq!(body["found"], true, "hash arg {HashArgument:?} must resolve: {body:?}");
+			let body = Decode(Response).await;
+			assert_eq!(body["found"], true, "hash arg {Argument:?} must resolve: {body:?}");
 			assert_eq!(body["content"], "<the real content>");
 		}
 	});
@@ -52,7 +52,7 @@ fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
 // miss (which turned every request into a confusing 404). ──
 #[test]
 fn TestHandleRetrievePoisonedInlineCCRLockReturns500() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::WithCCR();
 	// Poison the mutex: panic while holding the guard (contained via
 	// catch_unwind so it stays inside this test).
 	let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -63,9 +63,9 @@ fn TestHandleRetrievePoisonedInlineCCRLockReturns500() {
 	let state = Arc::new(state);
 
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
-		let Response = HandleRetrieve(
+		let Response = Handle(
 			State(state.clone()),
-			Json(RetrieveRequest { hash:Some("abc123".into()), Query:None, Offset:0, Limit:0 }),
+			Json(Request { hash:Some("abc123".into()), Query:None, Offset:0, Limit:0 }),
 		)
 		.await
 		.into_response();

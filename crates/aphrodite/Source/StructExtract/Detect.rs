@@ -7,11 +7,11 @@
 
 use crate::StructExtract::Format::Floor::Fn as FloorBoundary;
 
-/// Number of non-comment lines this scan reads before giving up.
-const AutoDetectScanLines:usize = 60;
+/// Number of non-comment lines this scan reads before giving up: sixty.
+const Lines:usize = 60;
 
-/// Bytes of the sample the `sh` rule inspects for an `echo `.
-const ShellHeadBytes:usize = 200;
+/// Bytes of the sample the `sh` rule inspects for an `echo `: two hundred.
+const Window:usize = 200;
 
 /// Is this line a comment/doc-comment line, for the purposes of skipping leading file-header comment
 /// blocks?
@@ -20,7 +20,7 @@ const ShellHeadBytes:usize = 200;
 /// including `///` and `//!`), `#` (Python, shell, including shebangs), and both the first and
 /// continuation lines of a `/* ... */` block. It is a prefix test, not a parser, so a `#` that opens a
 /// string literal is skipped as a comment.
-fn IsCommentLine(Trimmed:&str) -> bool {
+fn Comment(Trimmed:&str) -> bool {
 	Trimmed.is_empty()
 		|| Trimmed.starts_with("//")
 		|| Trimmed.starts_with('#')
@@ -31,7 +31,7 @@ fn IsCommentLine(Trimmed:&str) -> bool {
 /// The detected language tag, or the empty string when nothing matched.
 ///
 /// Returns `"rust"`, `"python"`, `"go"`, `"js"`, `"sh"` or `""`. The sample is the first
-/// [`AutoDetectScanLines`] non-comment lines rather than a fixed byte prefix of the raw content: a file
+/// [`Lines`] non-comment lines rather than a fixed byte prefix of the raw content: a file
 /// that opens with a long `//!` module doc comment pushes every real `fn`/`struct` keyword past a byte
 /// window, so a prefix scan saw only comment prose and reported "unknown" for a file that is
 /// unambiguously Rust. Skipping comment lines fixes that without a real tokenizer.
@@ -43,13 +43,13 @@ fn IsCommentLine(Trimmed:&str) -> bool {
 pub(crate) fn Fn(Content:&str) -> String {
 	let Sample:String = Content
 		.lines()
-		.filter(|Line| !IsCommentLine(Line.trim()))
-		.take(AutoDetectScanLines)
+		.filter(|Line| !Comment(Line.trim()))
+		.take(Lines)
 		.collect::<Vec<_>>()
 		.join("\n");
 	let Head = Sample.as_str();
 	let Shell = Content.trim_start().starts_with("#!/")
-		|| (Head.len() > ShellHeadBytes && FloorBoundary(Head, ShellHeadBytes).contains("echo "));
+		|| (Head.len() > Window && FloorBoundary(Head, Window).contains("echo "));
 
 	(Head.contains("fn ") && Head.contains("->"))
 		.then_some("rust")

@@ -2,7 +2,7 @@
 
 use std::num::NonZeroUsize;
 
-use super::super::{Enum::Enum, MaximumWindowLines::Const::Const as MaximumWindowLines};
+use super::super::{Enum::Enum, Maximum::Const::Const as Maximum};
 
 /// Interpret a wire `(Offset, Limit)` pair as a retrieval mode.
 ///
@@ -23,7 +23,7 @@ use super::super::{Enum::Enum, MaximumWindowLines::Const::Const as MaximumWindow
 /// A non-zero limit is clamped here rather than in the slicer, so `Window` can
 /// only be built with a limit the server is willing to serve.
 pub fn Fn(Offset:usize, Limit:usize) -> Enum {
-	let Limit = NonZeroUsize::new(Limit.min(MaximumWindowLines));
+	let Limit = NonZeroUsize::new(Limit.min(Maximum));
 
 	match (Offset, Limit) {
 		(0, None) => Enum::Exact,

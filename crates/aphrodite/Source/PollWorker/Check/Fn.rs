@@ -10,9 +10,9 @@
 //! happen under another.
 
 use crate::{
-	Flow::Nudge::Push::Fn::PushNudge,
+	Flow::Nudge::Push::Fn::Fn as PushNudge,
 	PollWorker::{
-		Check::{Plan::Struct::NudgePlan, Render::Fn::Fn as Render, Select::Fn::Fn as Select},
+		Check::{Plan::Struct::Struct as Nudge, Render::Fn::Fn as Render, Select::Fn::Fn as Select},
 		Registry::ReadFrom::Fn::Fn as ReadFrom,
 	},
 	State::Struct::AphroditeState,
@@ -20,8 +20,8 @@ use crate::{
 
 /// Check all background tasks and push ephemeral nudges for any that need the
 /// agent's attention.
-pub fn CheckBgTasks(State:&mut AphroditeState) {
-	let Plans:Vec<NudgePlan> = Select(&ReadFrom(&State.BgTasks)).into_iter().filter_map(Render).collect();
+pub fn Fn(State:&mut AphroditeState) {
+	let Plans:Vec<Nudge> = Select(&ReadFrom(&State.BgTasks)).into_iter().filter_map(Render).collect();
 
 	Plans.into_iter().for_each(|Plan| PushNudge(State, &Plan.Text, Plan.TtlTurns));
 }

@@ -64,7 +64,7 @@ fn Refusal() -> Response {
 /// The lock guard is dropped before either arm runs, so the cache write below
 /// re-locks a free mutex instead of deadlocking on one held by the scrutinee.
 async fn Answer(s:&Arc<AppState>) -> Response {
-	let Cached = *s.UpstreamHealthCache.lock().unwrap_or_else(|e| e.into_inner());
+	let Cached = *s.UpstreamHealth.lock().unwrap_or_else(|e| e.into_inner());
 
 	match Cached.filter(Fresh) {
 		Some((Okay, _)) => Json(serde_json::json!({ "upstream": Okay, "cached": true })).into_response(),
@@ -90,7 +90,7 @@ async fn Probe(s:&Arc<AppState>) -> Response {
 	// A poisoned cache is not worth failing a health probe over: the answer is
 	// reported either way, and the next probe re-locks it. Recording is the effect
 	// a successful lock carries, so the `Result` is the gate rather than a test.
-	s.UpstreamHealthCache
+	s.UpstreamHealth
 		.lock()
 		.ok()
 		.into_iter()

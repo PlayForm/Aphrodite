@@ -1,7 +1,7 @@
 //! The build stamp: a version is always present, and the stamp says how far past
 //! a version it goes.
 
-use crate::Health::Build::{Fn::Fn as build, Identity, Struct};
+use crate::Health::Build::{Fn, Identity, Struct};
 
 // ── The stamp is never empty (cargo always supplies the version) and it always
 // states which KIND of identity it is. The second half is the seed's point: a
@@ -9,7 +9,7 @@ use crate::Health::Build::{Fn::Fn as build, Identity, Struct};
 // images of the same version, so the payload has to say whether it can. ──
 #[test]
 fn probe_build_stamp_states_its_own_precision() {
-	let Stamp = build();
+	let Stamp = Fn::Fn();
 
 	assert!(!Stamp.Version.is_empty(), "the crate version is always stamped");
 
@@ -33,7 +33,7 @@ fn probe_build_stamp_states_its_own_precision() {
 	);
 }
 
-// ── A stamp with no revision is VersionOnly, and one with a revision is Commit:
+// ── A stamp with no revision is Version, and one with a revision is Commit:
 // the two identities are the enum's whole content, and a probe that reported
 // Commit for an unstamped build would be the same lie as reporting a version as a
 // build. ──
@@ -54,7 +54,7 @@ fn probe_identity_follows_the_revision() {
 		"a stamped revision is a build identity"
 	);
 	assert!(
-		matches!(Unstamped.identity(), Identity::Enum::Enum::VersionOnly),
+		matches!(Unstamped.identity(), Identity::Enum::Enum::Version),
 		"an unstamped build must not claim a revision identity"
 	);
 }

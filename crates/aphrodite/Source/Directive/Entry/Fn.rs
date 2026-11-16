@@ -13,8 +13,8 @@ use std::fs::DirEntry;
 /// extension. That is the whole point of the `Option`: a directives directory is
 /// user-owned, so one unusable file must not fail the load, and the caller's `filter_map`
 /// says so without a branch.
-pub(crate) fn Fn(Entry:DirEntry) -> Option<(String, String)> {
-	let path = Entry.path();
+pub(crate) fn Fn(Item:DirEntry) -> Option<(String, String)> {
+	let path = Item.path();
 	let Extension = path.extension().and_then(|Extension| Extension.to_str());
 
 	let Some("md") = Extension else {

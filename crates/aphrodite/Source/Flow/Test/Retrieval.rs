@@ -2,14 +2,14 @@
 //! and verbose inject progressively more, and an unknown value warns and
 //! degrades to standard rather than injecting nothing.
 
-use crate::{Flow::TurnContext::Fn::BuildTurnContext, State::Struct::AphroditeState};
+use crate::{Flow::TurnContext::Fn::Fn as Assemble, State::Struct::AphroditeState};
 
 #[test]
-fn TestRetrieveGuidanceMinimalInjectsNothing() {
+fn Minimal() {
 	let mut s = AphroditeState::default();
 	s.RetrieveGuidance = "minimal".into();
 	s.TurnCounter = 5;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[retrieval:"),
 		"minimal must not inject retrieval guidance: {Context}"
@@ -17,10 +17,10 @@ fn TestRetrieveGuidanceMinimalInjectsNothing() {
 }
 
 #[test]
-fn TestRetrieveGuidanceDefaultInjectsNothing() {
+fn Default() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 5;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[retrieval:"),
 		"absent knob (default) must not inject: {Context}"
@@ -28,11 +28,11 @@ fn TestRetrieveGuidanceDefaultInjectsNothing() {
 }
 
 #[test]
-fn TestRetrieveGuidanceStandardInjectsLine() {
+fn Standard() {
 	let mut s = AphroditeState::default();
 	s.RetrieveGuidance = "standard".into();
 	s.TurnCounter = 5;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval: CCR markers compress large tool output."),
 		"standard must inject one guidance line: {Context}"
@@ -41,11 +41,11 @@ fn TestRetrieveGuidanceStandardInjectsLine() {
 }
 
 #[test]
-fn TestRetrieveGuidanceVerboseInjectsExtended() {
+fn Verbose() {
 	let mut s = AphroditeState::default();
 	s.RetrieveGuidance = "verbose".into();
 	s.TurnCounter = 5;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval:") && Context.contains("Never re-read a file"),
 		"verbose must inject the extended guidance: {Context}"
@@ -53,11 +53,11 @@ fn TestRetrieveGuidanceVerboseInjectsExtended() {
 }
 
 #[test]
-fn TestRetrieveGuidanceUnknownValueDegradesToStandard() {
+fn Unknown() {
 	let mut s = AphroditeState::default();
 	s.RetrieveGuidance = "bogus".into();
 	s.TurnCounter = 5;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval: CCR markers compress large tool output."),
 		"unknown value must warn + degrade to standard: {Context}"

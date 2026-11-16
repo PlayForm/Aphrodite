@@ -1,4 +1,4 @@
-//! The refusal guard's proof: every arm of `RefuseReason` must refuse, and
+//! The refusal guard's proof: every arm of `Refuse` must refuse, and
 //! must refuse for the stated reason rather than by accident.
 //!
 //! These are security tests, not I/O tests. A change that makes prefetch load
@@ -6,7 +6,7 @@
 //! directory has removed the guard `Maintain/SECURITY.md` names, and one of
 //! these must fail.
 
-use crate::{Prefetch::Files::Fn::PrefetchFiles, State::Struct::AphroditeState};
+use crate::{Prefetch::Files::Fn::Fn as Files, State::Struct::AphroditeState};
 
 // ── Teknium1 review ask 1: prefetch applies the same guard as
 // `AphroditeRetrieve` (`read_path_guarded` semantics, implemented here
@@ -14,7 +14,7 @@ use crate::{Prefetch::Files::Fn::PrefetchFiles, State::Struct::AphroditeState};
 // Hermes-home / non-file paths with a distinct `Refused` outcome. ──
 
 #[test]
-fn TestPrefetchRefusesDotEnvironment() {
+fn Environment() {
 	// Exact file name `.env` is refused even though it exists and is
 	// small - prefetch must never absorb credentials.
 	let Directory = std::env::temp_dir().join(format!("aphrodite_prefetch_dotenv_{}", std::process::id()));
@@ -23,7 +23,7 @@ fn TestPrefetchRefusesDotEnvironment() {
 	std::fs::write(&path, "SECRET=value\n").unwrap();
 
 	let mut s = AphroditeState::default();
-	let r = PrefetchFiles(&mut s, &[path.to_string_lossy().to_string()]);
+	let r = Files(&mut s, &[path.to_string_lossy().to_string()]);
 	assert_eq!(r["refused"], 1, "dot-env must be refused: {r:?}");
 	assert_eq!(r["loaded"], 0);
 	assert_eq!(r["results"][0]["status"], "refused");
@@ -33,14 +33,14 @@ fn TestPrefetchRefusesDotEnvironment() {
 }
 
 #[test]
-fn TestPrefetchRefusesAuthJSON() {
+fn Auth() {
 	let Directory = std::env::temp_dir().join(format!("aphrodite_prefetch_auth_{}", std::process::id()));
 	std::fs::create_dir_all(&Directory).unwrap();
 	let path = Directory.join("auth.json");
 	std::fs::write(&path, "{\"token\":\"x\"}\n").unwrap();
 
 	let mut s = AphroditeState::default();
-	let r = PrefetchFiles(&mut s, &[path.to_string_lossy().to_string()]);
+	let r = Files(&mut s, &[path.to_string_lossy().to_string()]);
 	assert_eq!(r["refused"], 1, "auth.json must be refused: {r:?}");
 	assert_eq!(r["loaded"], 0);
 	assert_eq!(r["results"][0]["status"], "refused");
@@ -50,22 +50,22 @@ fn TestPrefetchRefusesAuthJSON() {
 }
 
 #[test]
-fn TestPrefetchRefusesSsh() {
+fn SSH() {
 	// Refusal is by `~/.ssh` prefix, so the file need not exist.
 	let Home = dirs::home_dir().expect("test machine has a home");
 	let Abs = Home.join(".ssh").join("id_rsa");
 	let mut s = AphroditeState::default();
-	let r = PrefetchFiles(&mut s, &[Abs.to_string_lossy().to_string()]);
+	let r = Files(&mut s, &[Abs.to_string_lossy().to_string()]);
 	assert_eq!(r["refused"], 1, "~/.ssh path must be refused: {r:?}");
 	assert_eq!(r["results"][0]["status"], "refused");
 
 	// The literal tilde form must be refused too.
-	let R2 = PrefetchFiles(&mut s, &["~/.ssh/id_rsa".to_string()]);
+	let R2 = Files(&mut s, &["~/.ssh/id_rsa".to_string()]);
 	assert_eq!(R2["refused"], 1, "tilde ~/.ssh path must be refused: {R2:?}");
 }
 
 #[test]
-fn TestPrefetchRefusesHermesHome() {
+fn Home() {
 	// Hold the SHARED env guard (crate::Home::Environment::Guard::Fn::Fn - one mutex for
 	// every env-mutating test) for the WHOLE test, and clear HERMES_HOME
 	// first: the default-home refusal must never observe a concurrent
@@ -78,7 +78,7 @@ fn TestPrefetchRefusesHermesHome() {
 	let Home = dirs::home_dir().expect("test machine has a home");
 	let p = Home.join(".hermes").join("aphrodite").join("tokens.json");
 	let mut s = AphroditeState::default();
-	let r = PrefetchFiles(&mut s, &[p.to_string_lossy().to_string()]);
+	let r = Files(&mut s, &[p.to_string_lossy().to_string()]);
 	assert_eq!(r["refused"], 1, "~/.hermes path must be refused: {r:?}");
 	assert_eq!(r["results"][0]["status"], "refused");
 
@@ -87,7 +87,7 @@ fn TestPrefetchRefusesHermesHome() {
 	std::fs::create_dir_all(&Directory).unwrap();
 	std::fs::write(Directory.join("secrets.toml"), "token = \"x\"\n").unwrap();
 	unsafe { std::env::set_var("HERMES_HOME", &Directory) };
-	let R2 = PrefetchFiles(&mut s, &[Directory.join("secrets.toml").to_string_lossy().to_string()]);
+	let R2 = Files(&mut s, &[Directory.join("secrets.toml").to_string_lossy().to_string()]);
 	assert_eq!(R2["refused"], 1, "$HERMES_HOME path must be refused: {R2:?}");
 	match Prior {
 		Some(v) => unsafe { std::env::set_var("HERMES_HOME", v) },
@@ -97,14 +97,14 @@ fn TestPrefetchRefusesHermesHome() {
 }
 
 #[test]
-fn TestPrefetchRefusesNonFileDirectory() {
+fn Directory() {
 	// An existing directory is a non-file path - refused, distinct from
 	// a missing file (which stays `Missing`).
 	let Directory = std::env::temp_dir().join(format!("aphrodite_prefetch_dir_{}", std::process::id()));
 	std::fs::create_dir_all(&Directory).unwrap();
 
 	let mut s = AphroditeState::default();
-	let r = PrefetchFiles(&mut s, &[Directory.to_string_lossy().to_string()]);
+	let r = Files(&mut s, &[Directory.to_string_lossy().to_string()]);
 	assert_eq!(r["refused"], 1, "directory must be refused: {r:?}");
 
 	let _ = std::fs::remove_dir_all(&Directory);

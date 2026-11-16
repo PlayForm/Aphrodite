@@ -37,7 +37,7 @@ pub(crate) fn Fn(PluginDirectory:&Path, HermesHome:&Path) -> Enum {
 	Metadata
 		.file_type()
 		.is_symlink()
-		.then_some(Enum::DevStaleSymlink)
+		.then_some(Enum::Stale)
 		.unwrap_or_else(|| Canonical(PluginDirectory, HermesHome))
 }
 

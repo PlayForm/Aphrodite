@@ -16,7 +16,7 @@ pub(crate) enum Enum {
 	Dev,
 	/// A symlink from an older install (plugin dir -> runtime home). It has to be
 	/// removed before the loader can land as real files.
-	DevStaleSymlink,
+	Stale,
 	/// A real directory under the Hermes home, placed there by
 	/// `download.sh`/`download.ps1`: Hermes owns it and setup is report-only.
 	Catalog,

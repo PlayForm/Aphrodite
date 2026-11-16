@@ -13,6 +13,8 @@ pub(crate) enum Enum {
 	/// from that revision at build time).
 	Commit,
 	/// No revision was stamped: this image cannot be told apart from another
-	/// build of the same version, and the health payload says so.
-	VersionOnly,
+	/// build of the same version, and the health payload says so. The payload
+	/// string is `"version-only"` - pinned in `Struct::json`, which is what a
+	/// consumer reads; the variant is only this crate's name for it.
+	Version,
 }

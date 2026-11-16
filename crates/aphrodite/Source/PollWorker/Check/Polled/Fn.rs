@@ -5,10 +5,10 @@
 //! are what tell the agent "you have never looked" apart from "you looked, here is
 //! when".
 
-use crate::PollWorker::Task::Struct::BgTask;
+use crate::PollWorker::Task::Struct::Struct as Record;
 
 /// The parenthetical a running-task nudge carries.
-pub(crate) fn Fn(Task:&BgTask) -> String {
+pub(crate) fn Fn(Task:&Record) -> String {
 	match Task.PollCount {
 		0 => String::from(" (not polled yet)"),
 		Count => format!(" (polled {Count}×, last turn {})", Task.LastPollTurn),

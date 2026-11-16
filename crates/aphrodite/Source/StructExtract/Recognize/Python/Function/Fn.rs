@@ -28,11 +28,11 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 		};
 
 		match (!Name.is_empty()).then_some(Name) {
-			Some(Name) => Declaration::Declaration { Kind:"def", Name, Parameters:Some(Parameters), Return:None },
+			Some(Name) => Declaration::Present { Kind:"def", Name, Parameters:Some(Parameters), Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {
 		Some(Declaration) => Declaration,
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

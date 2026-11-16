@@ -7,7 +7,7 @@ use crate::{
 			Gate::Resolve::Fn::Fn as ResolveGate,
 			Plan::Build::Fn::Fn as BuildPlan,
 		},
-		Turn::Const::ConvIndexCap,
+		Turn::Const::Cap,
 	},
 	State::Struct::AphroditeState,
 };
@@ -18,7 +18,7 @@ use crate::{
 /// the raw conversation message list (Hermes holds it) and has no token counts or
 /// context length, so the closest available message-count proxy is the
 /// conversation index itself - `ConvIndex.len()` is the number of archived turns,
-/// and the "fill ratio" is `len * 100 / ConvIndexCap`. The index's own eviction
+/// and the "fill ratio" is `len * 100 / Cap`. The index's own eviction
 /// cap is the only "full" reference available.
 ///
 /// Read-only: the gates and the packing both borrow the session, so a refusal and
@@ -26,7 +26,7 @@ use crate::{
 pub(crate) fn Fn(State:&AphroditeState) -> Assessment {
 	let Total = State.ConvIndex.len();
 	// Fill ratio: archived-turn count against the index's own cap.
-	let FillPct = ((Total as u64 * 100) / ConvIndexCap as u64).min(100);
+	let FillPct = ((Total as u64 * 100) / Cap as u64).min(100);
 	let HeadN = State.EngineProtectFirst;
 	let TailN = State.EngineProtectLast;
 	let MiddleN = Total.saturating_sub(HeadN).saturating_sub(TailN);
@@ -34,7 +34,7 @@ pub(crate) fn Fn(State:&AphroditeState) -> Assessment {
 	match ResolveGate(State, Total, FillPct, MiddleN) {
 		Some(Reason) => Assessment::Skip(Reason),
 		// The plan's own refusal is reported as the reason it named, not folded into
-		// a generic "unpackable": the two failures (`MiddleOutOfRange` from a bad
+		// a generic "unpackable": the two failures (`OutOfRange` from a bad
 		// protect-bound pair, `Unpackable` from a packing failure) need different
 		// fixes, and the `engine_skip` line is what an investigation reads.
 		None => BuildPlan(State, Total, HeadN, TailN, MiddleN).map_or_else(Assessment::Skip, Assessment::Archive),

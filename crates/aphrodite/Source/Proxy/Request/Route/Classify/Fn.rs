@@ -7,12 +7,18 @@
 
 use std::cmp::Ordering;
 
-use crate::Proxy::{Request::Route::Enum::Enum as ProxyRoute, Threshold::Const::ChatCompletionsPath};
+use crate::Proxy::Request::Route::{Chat::Const::Path as Endpoint, Enum::Enum as ProxyRoute};
 
 /// Classify a request path as the Chat Completions route or not.
+///
+/// `Path` is the inbound path as the catch-all router hands it over, leading
+/// slash included; it is compared against the Chat Completions endpoint literal
+/// (`Request::Route::Chat::Path`) after the same normalisation, so `/v1/chat/
+/// completions` and `v1/chat/completions` are one route. `Other` is every path
+/// that is not that endpoint - forwarded and returned untouched.
 pub(crate) fn Fn(Path:&str) -> ProxyRoute {
 	// Both sides are normalised the same way, and the comparison is the value.
-	match Path.trim_start_matches('/').cmp(ChatCompletionsPath.trim_start_matches('/')) {
+	match Path.trim_start_matches('/').cmp(Endpoint.trim_start_matches('/')) {
 		Ordering::Equal => ProxyRoute::ChatCompletions,
 		Ordering::Less | Ordering::Greater => ProxyRoute::Other,
 	}

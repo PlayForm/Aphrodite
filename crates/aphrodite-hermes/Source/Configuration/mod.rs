@@ -4,7 +4,7 @@
 //! This crate never reads `aphrodite.toml` per call: `Template/` builds the
 //! config-seeded `AphroditeState` once per process and every session is a
 //! clone of it, `Reload/` re-applies a freshly loaded config to a live session
-//! through the narrowed core pass (`ApplyReload`), which has no directive step at
+//! through the narrowed core pass (`Apply::Reload::Fn`), which has no directive step at
 //! all - the live session owns its directive set, so the authority to overwrite it
 //! is absent rather than undone - and `Path/` predicts which compression path a
 //! tool call will take from those config fields.

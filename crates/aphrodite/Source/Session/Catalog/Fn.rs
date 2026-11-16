@@ -33,7 +33,7 @@ use crate::{
 /// space. A section that has nothing to say answers `None` rather than an empty
 /// string, so "absent" and "empty" are the same fact and the join cannot leave a
 /// stray separator.
-pub fn CatalogSummary(State:&mut AphroditeState) -> String {
+pub fn Fn(State:&mut AphroditeState) -> String {
 	let CurrentMarkers = State.RecentMarkers.len();
 	let PreviousMarkers = State.LastEmittedMarkerCount;
 	let CurrentFiles = State.ReferencedFiles.len();

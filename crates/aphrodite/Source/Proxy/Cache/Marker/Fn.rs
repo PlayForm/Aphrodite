@@ -9,7 +9,7 @@
 use crate::Proxy::{
 	Analysis::Struct::Struct as ContentAnalysis,
 	Body::Chars::Fn::Fn as CharPrefix,
-	Format::Fn::Fn as ProxyFormatCCROutput,
+	Format::Fn::Fn as Format,
 };
 
 /// Cache-mode CCR output - a 512-CHARACTER head plus the marker.
@@ -19,5 +19,5 @@ pub(crate) fn Fn(hash:&str, Analysis:&ContentAnalysis<'_>, Center:Option<&str>) 
 	// gets.
 	let Preview = CharPrefix(Analysis.Content(), 512);
 
-	ProxyFormatCCROutput(Preview, Analysis.Ct(), "", Center, hash, Analysis.Size())
+	Format(Preview, Analysis.Ct(), "", Center, hash, Analysis.Size())
 }

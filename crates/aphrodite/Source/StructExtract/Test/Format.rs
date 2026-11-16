@@ -3,8 +3,7 @@
 
 use crate::StructExtract::{
 	Format::{Cap::Fn::Fn as Cap, Floor::Fn as FloorBoundary, Parameters::Fn as Params, Signature::Fn as Sig},
-	MaximumParametersLength::Const as MaximumParamsLength,
-	MaximumSignatureLength::Const as MaximumSigLength,
+	Maximum::{Parameters::Const as Parameters, Signature::Const as Signature},
 };
 
 #[test]
@@ -21,31 +20,31 @@ fn TestSigMultibyteSignatureDoesNotPanic() {
 	let name = "é".repeat(40);
 	// Must not panic when truncating a signature full of multi-byte chars.
 	let s = Sig("fn", &name);
-	assert!(s.len() <= MaximumSigLength + 3); // +3 for "..."
+	assert!(s.len() <= Signature::Const + 3); // +3 for "..."
 }
 
 /// The caps' boundary: a value exactly at the cap comes back whole.
 ///
 /// The previous `checked_sub` test read equality as an overrun, so a parameter list at exactly
-/// `MaximumParametersLength` bytes lost its last three characters to `...`, and a signature at exactly
-/// `MaximumSignatureLength` did the same - the same size, three characters less information.
+/// `Maximum::Parameters::Const` bytes lost its last three characters to `...`, and a signature at exactly
+/// `Maximum::Signature::Const` did the same - the same size, three characters less information.
 #[test]
 fn TestCapsFitsUnchangedAtBoundary() {
-	let ExactParams = "a".repeat(MaximumParamsLength);
-	let OverParams = "a".repeat(MaximumParamsLength + 1);
+	let ExactParams = "a".repeat(Parameters::Const);
+	let OverParams = "a".repeat(Parameters::Const + 1);
 
 	assert_eq!(Params(&ExactParams), ExactParams, "a list at the cap must not be truncated");
 	assert_eq!(
 		Params(&OverParams).len(),
-		MaximumParamsLength,
+		Parameters::Const,
 		"a list over the cap keeps the cap's width"
 	);
 	assert!(Params(&OverParams).ends_with("..."));
 
-	let ExactName = "n".repeat(MaximumSigLength - "fn ".len());
+	let ExactName = "n".repeat(Signature::Const - "fn ".len());
 	let ExactLine = format!("fn {ExactName}");
 
-	assert_eq!(ExactLine.len(), MaximumSigLength);
+	assert_eq!(ExactLine.len(), Signature::Const);
 	assert_eq!(Sig("fn", &ExactName), ExactLine, "a signature at the cap must not be truncated");
 	assert_eq!(Cap(ExactLine.clone()), ExactLine, "the line cap must not truncate at equality");
 }

@@ -17,7 +17,7 @@ const BUILD:&[&str] = &[
 	"warning:",
 	"error[",
 ];
-const BUILD_ERROR:&[&str] = &["error[", "error: could not"];
+const ERROR:&[&str] = &["error[", "error: could not"];
 
 /// Resolve `Output` into its kind, LAZILY.
 ///
@@ -31,6 +31,6 @@ pub(crate) fn Fn(Output:&str) -> Kind::Enum {
 
 	Present(FAILURE)
 		.then_some(Kind::Enum::Failure)
-		.or_else(|| Present(BUILD).then(|| Kind::Enum::Build { CompilerError:Present(BUILD_ERROR) }))
+		.or_else(|| Present(BUILD).then(|| Kind::Enum::Build { Error:Present(ERROR) }))
 		.unwrap_or(Kind::Enum::Detected)
 }

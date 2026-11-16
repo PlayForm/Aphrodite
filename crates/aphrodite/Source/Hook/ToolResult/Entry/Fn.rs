@@ -1,64 +1,34 @@
-//! The tool-result entry points.
+//! The tool-result entry point.
 //!
-//! Three signatures, one pipeline: the plain form, the form that accepts a
-//! caller-supplied classification, and the form that also carries Hermes' call
-//! metadata. They exist as separate functions because the FFI, the proxy and
-//! the bridge each know a different amount about the call; they must never
-//! fork on what the pipeline does with it.
+//! One pipeline, three signatures: this leaf is the plain form, `Classify/`
+//! accepts a caller-supplied classification and `Meta/` also carries Hermes' call
+//! metadata. They exist as separate functions because the FFI, the proxy and the
+//! bridge each know a different amount about the call; they must never fork on
+//! what the pipeline does with it.
 //!
 //! Every form opens the same `hook.tool_result` span (`Span/`) and records the
 //! pipeline's decision on it (`Hook::Outcome::Record`), so one trace line says
 //! which gate answered - `below_threshold`, `essential_tool` or `compressed`.
 
-use super::{super::Inner::Fn::Fn as TransformToolResultInner, Span::Fn::Fn as ToolSpan};
 use crate::{
-	Hook::{Meta::Struct::Struct as ToolCallMeta, Outcome::Record::Fn::Fn as RecordOutcome},
+	Hook::{
+		Meta::Struct::Struct as Call,
+		Outcome::Record::Fn::Fn as RecordOutcome,
+		ToolResult::{Entry::Span::Fn::Fn as ToolSpan, Inner::Fn::Fn as Transform},
+	},
 	State::Struct::AphroditeState,
 };
 
 /// Transform tool output - full compression pipeline.
-pub fn TransformToolResult(State:&mut AphroditeState, Content:&str, ToolName:&str) -> serde_json::Value {
+///
+/// Wire contract: returns the payload Hermes receives (a marker object with
+/// `compressed`, `hash`, `type`, `size`, `preview`, or a passthrough carrying
+/// `reason`), records the decision on the `hook.tool_result` span, and mutates
+/// session state (store, telemetry ring).
+pub fn Fn(State:&mut AphroditeState, Content:&str, ToolName:&str) -> serde_json::Value {
 	let Span = ToolSpan(ToolName, Content.len());
 	let _Entered = Span.enter();
-	let Payload = TransformToolResultInner(State, Content, ToolName, None, &ToolCallMeta::default());
-	RecordOutcome(&Span, &Payload);
-	Payload
-}
-
-/// Same as [`TransformToolResult`], but a caller that has already found the
-/// "real" payload underneath a wrapper the core classifier can't see through
-/// (e.g. an agent-specific JSON envelope) may supply it via `Classify` as
-/// `(content_to_classify, type)`. Core stays agnostic to what a wrapper looks
-/// like - it only ever hashes and stores the ORIGINAL `Content`, so
-/// `AphroditeRetrieve` always returns exactly what was passed in; `Classify`
-/// affects only the reported `type` and the generated preview.
-pub fn TransformToolResultClassified(
-	State:&mut AphroditeState,
-	Content:&str,
-	ToolName:&str,
-	Classify:Option<(&str, &str)>,
-) -> serde_json::Value {
-	let Span = ToolSpan(ToolName, Content.len());
-	let _Entered = Span.enter();
-	let Payload = TransformToolResultInner(State, Content, ToolName, Classify, &ToolCallMeta::default());
-	RecordOutcome(&Span, &Payload);
-	Payload
-}
-
-/// Same as [`TransformToolResultClassified`], plus the Hermes-supplied call
-/// metadata (report 05, P2/T6) that gets recorded into the `ToolEvents`
-/// telemetry ring. This is the entry point the Hermes bridge routes to so the
-/// error/args/duration signals Hermes ships on every call stop being dropped.
-pub fn TransformToolResultWithMeta(
-	State:&mut AphroditeState,
-	Content:&str,
-	ToolName:&str,
-	Classify:Option<(&str, &str)>,
-	meta:&ToolCallMeta,
-) -> serde_json::Value {
-	let Span = ToolSpan(ToolName, Content.len());
-	let _Entered = Span.enter();
-	let Payload = TransformToolResultInner(State, Content, ToolName, Classify, meta);
+	let Payload = Transform(State, Content, ToolName, None, &Call::default());
 	RecordOutcome(&Span, &Payload);
 	Payload
 }

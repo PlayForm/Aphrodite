@@ -15,7 +15,7 @@ use crate::{
 /// reseed `ActiveDirectives` from `[directives] active`. The absence of `Directive` here
 /// IS that fix - there is nothing to snapshot and restore afterwards, because the reload
 /// path cannot reach the field at all.
-pub(crate) const Reload:&[fn(&Configuration, &mut AphroditeState)] = &[
+pub(crate) const Sequence:&[fn(&Configuration, &mut AphroditeState)] = &[
 	Engine::Apply,
 	Flow::Apply,
 	Runtime::Apply,

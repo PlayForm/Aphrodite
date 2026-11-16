@@ -8,16 +8,20 @@
 /// and URL while differing on everything else.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Struct {
-	/// Upstream API base URL inherited by proxies that do not set one.
+	/// `[defaults] api_url`; upstream API base URL inherited by proxies that do
+	/// not set one. `None` = unset.
 	#[serde(rename = "api_url")]
-	pub APIURL:Option<String>,
-	/// Model name inherited by proxies that do not set one.
+	pub URL:Option<String>,
+	/// `[defaults] model`; model name inherited by proxies that do not set one.
+	/// `None` = unset.
 	#[serde(rename = "model")]
 	pub Model:Option<String>,
-	/// CCR TTL in seconds inherited by proxies that do not set one.
+	/// `[defaults] ccr_ttl_seconds`; CCR TTL in seconds inherited by proxies
+	/// that do not set one. `None` = the compiled-in TTL.
 	#[serde(rename = "ccr_ttl_seconds")]
-	pub CCRTtlSeconds:Option<u64>,
-	/// Upstream API key inherited by proxies that do not set one.
+	pub TTL:Option<u64>,
+	/// `[defaults] api_key`; upstream API key inherited by proxies that do not
+	/// set one. `None` = unset.
 	#[serde(rename = "api_key")]
-	pub APIKey:Option<String>,
+	pub Key:Option<String>,
 }

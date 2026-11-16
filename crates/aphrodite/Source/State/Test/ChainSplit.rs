@@ -7,36 +7,36 @@ use crate::State::{
 };
 
 #[test]
-fn TestRecordChainSplitRegistersHashesAndCountsRetrievalOnce() {
+fn Once() {
 	let mut s = AphroditeState::default();
 	let Hashes = vec!["h1".into(), "h2".into(), "h3".into()];
-	s.RecordChainSplit(Hashes);
+	s.RecordSplit(Hashes);
 	assert_eq!(s.SplitEvents.len(), 1);
 	assert_eq!(s.SplitEvents[0].Produced, 3);
 	assert_eq!(s.SplitEvents[0].Retrieved, 0);
 
 	// Retrieving a segment hash attributes the consequence once.
-	assert_eq!(s.NoteSplitRetrieval("h2"), Some(1));
+	assert_eq!(s.NoteRetrieval("h2"), Some(1));
 	assert_eq!(s.SplitEvents[0].Retrieved, 1);
 	// Re-retrieving the same hash must not double-count.
-	assert_eq!(s.NoteSplitRetrieval("h2"), None);
+	assert_eq!(s.NoteRetrieval("h2"), None);
 	assert_eq!(s.SplitEvents[0].Retrieved, 1);
 	// Unknown hashes are not attributed.
-	assert_eq!(s.NoteSplitRetrieval("nope"), None);
+	assert_eq!(s.NoteRetrieval("nope"), None);
 }
 
 #[test]
-fn TestSplitEventRingIsBounded() {
+fn Ring() {
 	let mut s = AphroditeState::default();
 	(0..40).for_each(|i| {
-		s.RecordChainSplit(vec![format!("h{i}")]);
+		s.RecordSplit(vec![format!("h{i}")]);
 	});
 	assert!(s.SplitEvents.len() <= SplitEventCap);
 	assert_eq!(s.SplitEvents.len(), SplitEventCap);
 }
 
 #[test]
-fn TestEvictedSplitEventsTakeTheirHashesOutOfTheSegmentMap() {
+fn Evicted() {
 	// The ring is capped and the segment map used to be unbounded: an unretrieved
 	// segment hash stayed addressable forever. Eviction has to remove exactly the
 	// hashes of the events it drops - no more (a live event must stay attributable)
@@ -45,7 +45,7 @@ fn TestEvictedSplitEventsTakeTheirHashesOutOfTheSegmentMap() {
 	let Recorded:usize = SplitEventCap * 2;
 
 	(0..Recorded).for_each(|i| {
-		s.RecordChainSplit(vec![format!("segment-{i}")]);
+		s.RecordSplit(vec![format!("segment-{i}")]);
 	});
 
 	assert_eq!(s.SplitEvents.len(), SplitEventCap);
@@ -58,16 +58,16 @@ fn TestEvictedSplitEventsTakeTheirHashesOutOfTheSegmentMap() {
 	// The newest events stay attributable...
 	let Newest = Recorded - 1;
 	assert_eq!(
-		s.NoteSplitRetrieval(&format!("segment-{Newest}")),
+		s.NoteRetrieval(&format!("segment-{Newest}")),
 		Some(Recorded),
 		"the newest event is still live and still attributes"
 	);
 	// ...and an evicted one no longer is.
-	assert_eq!(s.NoteSplitRetrieval("segment-0"), None, "an evicted event cannot be attributed");
+	assert_eq!(s.NoteRetrieval("segment-0"), None, "an evicted event cannot be attributed");
 }
 
 #[test]
-fn TestAdaptRaisesThresholdWhenSegmentsIgnored() {
+fn Ignored() {
 	let mut s = AphroditeState {
 		ChainSplitMinimumSegments:2,
 		ChainSplitFloor:2,
@@ -76,13 +76,13 @@ fn TestAdaptRaisesThresholdWhenSegmentsIgnored() {
 	};
 	// 4 splits, all segments ignored: ratio 0/8 = 0.0 < 0.25 → raise.
 	(0..4).for_each(|i| {
-		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
+		s.RecordSplit(vec![format!("a{i}"), format!("b{i}")]);
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 3);
 }
 
 #[test]
-fn TestAdaptKeepsThresholdWhenSegmentsRetrieved() {
+fn Retrieved() {
 	let mut s = AphroditeState {
 		ChainSplitMinimumSegments:2,
 		ChainSplitFloor:2,
@@ -92,16 +92,16 @@ fn TestAdaptKeepsThresholdWhenSegmentsRetrieved() {
 	// 4 splits, all segments retrieved: ratio 8/8 = 1.0 ≥ 0.5 → floor.
 	(0..4).for_each(|i| {
 		let Hashes = vec![format!("a{i}"), format!("b{i}")];
-		s.RecordChainSplit(Hashes.clone());
+		s.RecordSplit(Hashes.clone());
 		Hashes.into_iter().for_each(|h| {
-			s.NoteSplitRetrieval(&h);
+			s.NoteRetrieval(&h);
 		});
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 2);
 }
 
 #[test]
-fn TestAdaptRespectsBounds() {
+fn Bounds() {
 	let mut s = AphroditeState {
 		ChainSplitMinimumSegments:5,
 		ChainSplitFloor:5,
@@ -110,27 +110,27 @@ fn TestAdaptRespectsBounds() {
 	};
 	// Ignored segments: threshold rises, but never past max.
 	(0..20).for_each(|i| {
-		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
+		s.RecordSplit(vec![format!("a{i}"), format!("b{i}")]);
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 6);
 
 	// Fully-retrieved segments: falls, but never below floor.
 	(20..60).for_each(|i| {
 		let Hashes = vec![format!("a{i}"), format!("b{i}")];
-		s.RecordChainSplit(Hashes.clone());
+		s.RecordSplit(Hashes.clone());
 		Hashes.into_iter().for_each(|h| {
-			s.NoteSplitRetrieval(&h);
+			s.NoteRetrieval(&h);
 		});
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 5);
 }
 
 #[test]
-fn TestAdaptRequiresMinimumEvents() {
+fn Minimum() {
 	let mut s = AphroditeState::default();
 	// Fewer than SPLIT_ADAPT_MIN_EVENTS: no adaptation.
 	(0..(SplitAdaptMinimumEvents - 1)).for_each(|i| {
-		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
+		s.RecordSplit(vec![format!("a{i}"), format!("b{i}")]);
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 2);
 }

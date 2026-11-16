@@ -10,4 +10,4 @@ use crate::Debug::Init::Ownership;
 /// runs `try_init` and stores what happened, every later caller reads the stored
 /// answer with one atomic load. `Once` plus a separate flag would be the same
 /// thing spelled twice, and the two could disagree.
-pub(crate) static INSTALL:OnceLock<Ownership::Enum::Enum> = OnceLock::new();
+pub(crate) static Install:OnceLock<Ownership::Enum::Enum> = OnceLock::new();

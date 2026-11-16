@@ -27,7 +27,7 @@ use crate::{
 /// is a boolean the caller has to interpret.
 pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<(String, Served::Enum::Enum), Failure::Enum::Enum> {
 	let InlineHit = {
-		let mut Map = State.InlineCCR.lock().map_err(|_| Failure::Enum::Enum::LockPoisoned)?;
+		let mut Map = State.InlineCCR.lock().map_err(|_| Failure::Enum::Enum::Poisoned)?;
 
 		// `get` takes `&mut self` on the cache: a hit promotes recency.
 		Map.get(hash).cloned()
@@ -35,13 +35,13 @@ pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<(String, Served::En
 
 	match InlineHit {
 		Some(Cached) => {
-			State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
+			State.InlineHits.fetch_add(1, Ordering::Relaxed);
 			State.CCRHits.fetch_add(1, Ordering::Relaxed);
 
 			Ok((Cached, Served::Enum::Enum::Inline))
 		},
 		None => {
-			State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
+			State.InlineMisses.fetch_add(1, Ordering::Relaxed);
 
 			// The guard is out of scope, so this call may await.
 			let Backend = match State.ccr.as_ref() {
@@ -53,7 +53,7 @@ pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<(String, Served::En
 				|| {
 					State.CCRMisses.fetch_add(1, Ordering::Relaxed);
 
-					Err(Failure::Enum::Enum::NotFound(hash.to_string()))
+					Err(Failure::Enum::Enum::Absent(hash.to_string()))
 				},
 				|Content| {
 					State.CCRHits.fetch_add(1, Ordering::Relaxed);

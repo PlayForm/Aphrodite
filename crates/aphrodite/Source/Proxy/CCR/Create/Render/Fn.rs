@@ -13,7 +13,7 @@ pub(crate) fn Fn(Outcome:CreateOutcome) -> Response {
 	let CompressedSize = Outcome.CompressedSize;
 
 	Json(CreateResponse {
-		TokenSavingsRatio:Outcome.TokenSavingsRatio(),
+		Ratio:Outcome.Ratio(),
 		OriginalSize:Outcome.OriginalSize,
 		CompressedSize,
 		MarkerSize:CompressedSize,

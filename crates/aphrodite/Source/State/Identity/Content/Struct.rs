@@ -11,28 +11,28 @@
 /// output.
 ///
 /// ```compile_fail
-/// use aphrodite::State::Identity::{Command::Struct::CommandID, Content::Struct::ContentHash};
+/// use aphrodite::State::Identity::{Command::Struct::Struct as Command, Content::Struct::Struct as Digest};
 ///
-/// fn store(hash: ContentHash) -> usize { hash.as_str().len() }
-/// let command: CommandID = "cargo build".into();
+/// fn store(hash: Digest) -> usize { hash.as_str().len() }
+/// let command: Command = "cargo build".into();
 /// let size = store(command);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ContentHash(String);
+pub struct Struct(String);
 
-impl ContentHash {
+impl Struct {
 	/// The identity's text.
 	pub fn as_str(&self) -> &str { &self.0 }
 }
 
-impl From<String> for ContentHash {
+impl From<String> for Struct {
 	fn from(Value:String) -> Self { Self(Value) }
 }
 
-impl From<&str> for ContentHash {
+impl From<&str> for Struct {
 	fn from(Value:&str) -> Self { Self(Value.to_string()) }
 }
 
-impl std::fmt::Display for ContentHash {
+impl std::fmt::Display for Struct {
 	fn fmt(&self, Formatter:&mut std::fmt::Formatter<'_>) -> std::fmt::Result { Formatter.write_str(&self.0) }
 }

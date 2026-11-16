@@ -3,7 +3,7 @@
 /// Hold this for the length of any test that registers a marker template.
 ///
 /// `cargo test` runs test bodies concurrently and the registration is
-/// process-wide, so `ConfigurationLoader`'s `ApplyCompression` tests and the
+/// process-wide, so `ConfigurationLoader`'s `Apply::Startup::Fn` tests and the
 /// marker template tests must not interleave. One mutex, shared by every such
 /// test, is the whole mechanism - it is compiled only under `cfg(test)`.
 pub(crate) fn Fn() -> std::sync::MutexGuard<'static, ()> {

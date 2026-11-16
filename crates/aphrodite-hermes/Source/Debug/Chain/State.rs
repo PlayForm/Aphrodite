@@ -12,4 +12,4 @@ use std::{
 /// session_id -> parent_session_id map, learned from `pre_llm_call` kwargs.
 /// Bounded: a session records its parent exactly once; the map only grows
 /// with the number of distinct sessions, which is small per process.
-pub(crate) static SESSION_PARENTS:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+pub(crate) static Parent:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();

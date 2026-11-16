@@ -19,11 +19,11 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 			.unwrap_or("");
 
 		match (!Name.is_empty()).then_some(Name) {
-			Some(Name) => Declaration::Declaration { Kind:"trait", Name, Parameters:None, Return:None },
+			Some(Name) => Declaration::Present { Kind:"trait", Name, Parameters:None, Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {
 		Some(Declaration) => Declaration,
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

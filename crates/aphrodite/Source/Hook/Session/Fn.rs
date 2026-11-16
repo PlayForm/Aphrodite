@@ -12,5 +12,5 @@ use crate::State::Struct::AphroditeState;
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	let Span = tracing::info_span!("hook.session_start", turn = State.TurnCounter);
 	let _Entered = Span.enter();
-	crate::Session::Start::Fn::OnSessionStart(State)
+	crate::Session::Start::Fn::Fn(State)
 }

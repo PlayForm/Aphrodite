@@ -11,7 +11,7 @@ use crate::State::Struct::AphroditeState;
 /// Purge expired ephemeral directives (P3/T9). Called from `PostLLMCall`
 /// AFTER `NextTurn` advances the counter, so a nudge pushed during turn N
 /// (expiring at N + ttl) renders in turn N+1's context exactly once for ttl=1.
-pub fn PurgeExpiredNudges(State:&mut AphroditeState) {
+pub fn Fn(State:&mut AphroditeState) {
 	let Counter = State.TurnCounter;
 	State
 		.EphemeralDirectives

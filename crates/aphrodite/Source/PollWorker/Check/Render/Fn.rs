@@ -8,19 +8,19 @@
 //! refuses rather than inventing a sentence for a case that has none.
 //!
 //! A finished task's hash and preview are not optional here, and there is no `?`
-//! fallback: `BgStatus::Done`/`Failed` own the stored output, so a completion nudge
+//! fallback: `Status::Done`/`Failed` own the stored output, so a completion nudge
 //! always names the content it announces.
 
 use crate::PollWorker::{
-	Check::{Plan::Struct::NudgePlan, Polled::Fn::Fn as Polled},
-	Task::{Status::Enum::BgStatus, Struct::BgTask},
+	Check::{Plan::Struct::Struct as Nudge, Polled::Fn::Fn as Polled},
+	Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 };
 
 /// The nudge for this task, or `None` when it has nothing to say.
-pub(crate) fn Fn(Task:&BgTask) -> Option<NudgePlan> {
+pub(crate) fn Fn(Task:&Record) -> Option<Nudge> {
 	let Plan = match &Task.Status {
-		BgStatus::Running => {
-			NudgePlan {
+		Status::Running => {
+			Nudge {
 				Text:format!(
 					"poll worker: `{}` still running since turn {}{}. Use process(action='poll').",
 					Task.command,
@@ -30,8 +30,8 @@ pub(crate) fn Fn(Task:&BgTask) -> Option<NudgePlan> {
 				TtlTurns:1,
 			}
 		},
-		BgStatus::Done { Output } => {
-			NudgePlan {
+		Status::Done { Output } => {
+			Nudge {
 				Text:format!(
 					"✓ poll worker: `{}` completed (exit 0). Retrieve: aphrodite_retrieve(hash={}) - {}",
 					Task.command,
@@ -42,8 +42,8 @@ pub(crate) fn Fn(Task:&BgTask) -> Option<NudgePlan> {
 				TtlTurns:2,
 			}
 		},
-		BgStatus::Failed { ExitCode, Output } => {
-			NudgePlan {
+		Status::Failed { ExitCode, Output } => {
+			Nudge {
 				Text:format!(
 					"✗ poll worker: `{}` failed (exit {}). Retrieve: aphrodite_retrieve(hash={}) - {}",
 					Task.command,
@@ -55,7 +55,7 @@ pub(crate) fn Fn(Task:&BgTask) -> Option<NudgePlan> {
 			}
 		},
 		// Don't nudge about stale tasks - they're abandoned.
-		BgStatus::Stale => return None,
+		Status::Stale => return None,
 	};
 
 	Some(Plan)

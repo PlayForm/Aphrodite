@@ -93,7 +93,7 @@ async fn Decide(
 	let Analysis = AnalyseContent(Content);
 	let Threshold = (Context.State.ThresholdFor(Analysis.Ct()).max(BaseThreshold) as f64 * BudgetMult) as usize;
 
-	match ClassifySizing(Content.len(), Threshold, Context.State.InlineCCRThreshold()) {
+	match ClassifySizing(Content.len(), Threshold, Context.State.InlineThreshold()) {
 		ContentSizing::Compress => Compress(Context, ccr, &Analysis).await,
 		ContentSizing::Inline => Inline(Context, &Analysis),
 		ContentSizing::Skip => ContentRewrite::Unchanged("below_threshold"),
@@ -140,7 +140,7 @@ async fn Compress(
 	// `hash`, so later retrievals keep working) and count nothing as compressed,
 	// because nothing was removed from the wire.
 	let AutoExpand = Context.State.AutoExpand.load(Ordering::Relaxed)
-		&& Content.len() <= Context.State.AutoExpandLimit.load(Ordering::Relaxed);
+		&& Content.len() <= Context.State.ExpandLimit.load(Ordering::Relaxed);
 
 	// The auto-expand decision yields a verdict or nothing; only its absence
 	// renders and accounts a marker.
@@ -154,7 +154,7 @@ async fn Compress(
 			// so subtracting only the hash overstated savings (report 05 F5).
 			let Accounting = ContentAccounting { OriginalBytes:Evidence.Size(), EmittedBytes:Marker.len() };
 			Context.State.RecordCompression(Analysis.Ct());
-			Context.State.UpdateCompressionRatio(Evidence.Size(), Marker.len());
+			Context.State.Update(Evidence.Size(), Marker.len());
 
 			ContentRewrite::Replaced { Content:Marker, Accounting }
 		},
@@ -177,10 +177,10 @@ fn Inline(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) -> Content
 
 	match Previous {
 		Some(Some(_)) => {
-			Context.State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
+			Context.State.InlineHits.fetch_add(1, Ordering::Relaxed);
 		},
 		Some(None) => {
-			Context.State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
+			Context.State.InlineMisses.fetch_add(1, Ordering::Relaxed);
 		},
 		None => {},
 	}

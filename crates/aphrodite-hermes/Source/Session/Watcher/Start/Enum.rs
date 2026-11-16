@@ -9,13 +9,13 @@
 /// reporting.
 ///
 /// `Running` carries nothing because the handle has exactly one owner: it is
-/// parked in `Watcher::State::RUNNING` at the moment the thread reports
+/// parked in `Watcher::State::Running` at the moment the thread reports
 /// readiness, so a caller cannot end up holding a second, unstoppable copy.
 pub(crate) enum Enum {
-	/// The thread is running, and `Watcher::State::RUNNING` owns its handle
+	/// The thread is running, and `Watcher::State::Running` owns its handle
 	/// (stop flag, wake sender and join handle).
 	Running,
 	/// It never started: no thread, no handle. The reason has already been
 	/// reported through `Debug::Warn`, so the caller has nothing to add.
-	NotRunning,
+	Failed,
 }

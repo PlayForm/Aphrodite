@@ -45,7 +45,7 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Headers:axum::http::HeaderMap
 			// path. A raw-body create carries no sample and records none.
 			std::mem::take(&mut Outcome.Estimate)
 				.into_iter()
-				.for_each(|Estimate| state.UpdateCompressionRatio(Outcome.OriginalSize, Estimate));
+				.for_each(|Estimate| state.Update(Outcome.OriginalSize, Estimate));
 			std::mem::take(&mut Outcome.Notification)
 				.into_iter()
 				.for_each(|Event| ScheduleNotification(&state, Event));

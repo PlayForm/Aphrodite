@@ -1,7 +1,7 @@
 //! The chain-split gate.
 
 use crate::{
-	ChainSplit::{Const::SegMarker, Prepared::Prepare::Fn::Fn as PrepareChain},
+	ChainSplit::{Prepared::Prepare::Fn::Fn as PrepareChain, Segment::Const::Marker},
 	Hook::Terminal::{Input::Struct::Struct as Input, Plan::Enum::Enum as Plan, Policy::Struct::Struct as Policy},
 };
 
@@ -19,7 +19,7 @@ use crate::{
 /// yields fewer than two parts answers `None`, and the caller falls through to
 /// the gates that follow.
 pub(crate) fn Fn<'a>(Policy:&Policy, Input:Input<'a>) -> Option<Plan<'a>> {
-	(Policy.ChainSplit && !Policy.AutoExpand && Input.Content.contains(SegMarker))
+	(Policy.ChainSplit && !Policy.AutoExpand && Input.Content.contains(Marker))
 		.then(|| PrepareChain(Input.Content))
 		.flatten()
 		.map(Plan::Split)

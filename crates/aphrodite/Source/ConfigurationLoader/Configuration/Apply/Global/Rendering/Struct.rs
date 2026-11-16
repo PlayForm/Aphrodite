@@ -19,10 +19,11 @@
 
 use crate::{
 	ConfigurationLoader::Configuration::Struct::Struct as Configuration,
-	State::Template::Struct::TemplatesConfiguration,
+	State::Template::Struct::Struct as Template,
 };
 #[cfg(feature = "proxy")]
-use crate::Configuration::Proxy::Multi::Struct::Struct as MultiConfiguration;
+use crate::Configuration::Proxy::Multi::Struct::Struct as Multi;
+use super::Marker;
 
 /// Everything the process-global renderers take from one configuration document.
 ///
@@ -33,38 +34,45 @@ use crate::Configuration::Proxy::Multi::Struct::Struct as MultiConfiguration;
 /// can act on.
 pub struct Struct {
 	/// `[previews] preview_max_chars`; `None` = unlimited.
-	pub PreviewMaximum:Option<u32>,
-	/// `[templates.marker] format`; `None` = the canonical fallback grammar.
-	pub MarkerFormat:Option<String>,
-	/// `[templates.marker] hint`; `None` = no hint line.
-	pub MarkerHint:Option<String>,
-	/// `[prompts] ccr_marker_hint`.
-	pub MarkerHintEnabled:bool,
+	pub Limit:Option<u32>,
+	/// `[templates.marker]` plus `[prompts] ccr_marker_hint` - the marker grammar
+	/// and its hint line, published as one registration.
+	pub Marker:Marker::Struct::Struct,
 	/// `[templates]`; `None` = the hardcoded per-arm builders stay in force.
-	pub Templates:Option<TemplatesConfiguration>,
+	pub Templates:Option<Template>,
 	/// `[previews] model_family`; `None` = the renderer's default family.
 	pub Family:Option<String>,
 }
 
 #[cfg(feature = "proxy")]
-impl From<&MultiConfiguration> for Struct {
+impl From<&Multi> for Struct {
 	/// From the engine binary's typed document.
 	///
 	/// `0` is normalised to `None` here rather than in the publisher: the document
 	/// spells "unlimited" as `0`, the publisher spells it as `None`, and this is the
 	/// boundary between the two spellings.
-	fn from(Configuration:&MultiConfiguration) -> Self {
+	fn from(Configuration:&Multi) -> Self {
 		Self {
-			PreviewMaximum:Configuration
+			Limit:Configuration
 				.Previews
 				.as_ref()
-				.and_then(|p| p.PreviewMaximumChars)
-				.filter(|Maximum| *Maximum != 0),
-			MarkerFormat:Configuration.Templates.as_ref().and_then(|t| t.Marker.get("format")).cloned(),
-			MarkerHint:Configuration.Templates.as_ref().and_then(|t| t.Marker.get("hint")).cloned(),
-			MarkerHintEnabled:Configuration.Prompts.as_ref().and_then(|p| p.CCRMarkerHint).unwrap_or(false),
+				.and_then(|Previews| Previews.Limit)
+				.filter(|Value| *Value != 0),
+			Marker:Marker::Struct::Struct {
+				Format:Configuration
+					.Templates
+					.as_ref()
+					.and_then(|Templates| Templates.Marker.get("format"))
+					.cloned(),
+				Hint:Configuration
+					.Templates
+					.as_ref()
+					.and_then(|Templates| Templates.Marker.get("hint"))
+					.cloned(),
+				Enable:Configuration.Prompts.as_ref().and_then(|Prompts| Prompts.Hint).unwrap_or(false),
+			},
 			Templates:Configuration.Templates.clone(),
-			Family:Configuration.Previews.as_ref().and_then(|p| p.ModelFamily.clone()),
+			Family:Configuration.Previews.as_ref().and_then(|Previews| Previews.Family.clone()),
 		}
 	}
 }
@@ -73,27 +81,28 @@ impl From<&Configuration> for Struct {
 	/// From the Hermes-side document, through the per-knob resolution chain.
 	///
 	/// The cap and the marker-hint switch have environment spellings and go through
-	/// `GetU64`/`GetBool` so an override outranks the file, exactly as every other
-	/// knob on that path does. The family does not: there is no env-var spelling of a
-	/// preview family, and inventing one would make the same value configurable in
-	/// two places with different precedence.
+	/// `Resolve::Number`/`Resolve::Bool` so an override outranks the file, exactly as
+	/// every other knob on that path does. The family does not: there is no env-var
+	/// spelling of a preview family, and inventing one would make the same value
+	/// configurable in two places with different precedence.
 	fn from(Configuration:&Configuration) -> Self {
-		let Templates = Configuration.GetTemplates();
+		let Templates = Configuration.Template();
 
 		Self {
-			PreviewMaximum:match Configuration.GetU64("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0)
-			{
+			Limit:match Configuration.Number("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0) {
 				0 => None,
-				Maximum => Some(Maximum.min(u32::MAX as u64) as u32),
+				Value => Some(Value.min(u32::MAX as u64) as u32),
 			},
-			MarkerFormat:Templates.as_ref().and_then(|t| t.Marker.get("format")).cloned(),
-			MarkerHint:Templates.as_ref().and_then(|t| t.Marker.get("hint")).cloned(),
-			MarkerHintEnabled:Configuration.GetBool("APHRODITE_CCR_MARKER_HINT", "prompts", "ccr_marker_hint", false),
+			Marker:Marker::Struct::Struct {
+				Format:Templates.as_ref().and_then(|Templates| Templates.Marker.get("format")).cloned(),
+				Hint:Templates.as_ref().and_then(|Templates| Templates.Marker.get("hint")).cloned(),
+				Enable:Configuration.Bool("APHRODITE_CCR_MARKER_HINT", "prompts", "ccr_marker_hint", false),
+			},
 			Templates,
 			Family:Configuration
 				.Section("previews")
-				.and_then(|s| s.get("model_family"))
-				.and_then(|v| v.as_str())
+				.and_then(|Table| Table.get("model_family"))
+				.and_then(|Value| Value.as_str())
 				.map(str::to_string),
 		}
 	}

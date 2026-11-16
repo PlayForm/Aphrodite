@@ -24,7 +24,7 @@ const SignatureShown:usize = 120;
 /// The total number of recognised declarations is exact even though only the first fifty are retained,
 /// so a file with three hundred declarations still costs fifty lines of memory. It is not a parser: a
 /// declaration split across two lines is matched on whichever half carries the prefix.
-pub fn ReduceCode(Content:&str) -> Option<String> {
+pub fn Fn(Content:&str) -> Option<String> {
 	let mut Signatures = Sample::<String, SignaturesShown>::new();
 
 	Content.lines().for_each(|Line| {
@@ -46,7 +46,7 @@ pub fn ReduceCode(Content:&str) -> Option<String> {
 	(!Signatures.IsEmpty()).then(|| {
 		let mut Result = String::from("[code structure]");
 
-		Signatures.IntoSample().into_iter().for_each(|Signature| {
+		Signatures.Take().into_iter().for_each(|Signature| {
 			Result.push('\n');
 			Result.push_str(&Signature);
 		});

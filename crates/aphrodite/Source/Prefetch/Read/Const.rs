@@ -6,4 +6,4 @@
 //! the check disagree, which reads to a caller as a bug in the reader.
 
 /// Maximum file size for prefetch (10MB).
-pub(crate) const MaximumPrefetchSize:u64 = 10 * 1024 * 1024;
+pub(crate) const Maximum:u64 = 10 * 1024 * 1024;

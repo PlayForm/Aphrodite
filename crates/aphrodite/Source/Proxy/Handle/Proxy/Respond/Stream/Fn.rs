@@ -27,21 +27,19 @@ use futures::StreamExt;
 use crate::Proxy::{
 	Log::Dev::Fn::Fn as DevLog,
 	Request::Context::Struct::Struct as RequestContext,
-	Upstream::{Head::Struct::Struct as UpstreamHead, Headers::Fn::Fn as CopyUpstreamHeaders},
+	Upstream::{Head::Struct::Struct as UpstreamHead, Headers::Fn::Fn as CopyHeaders},
 };
 
 /// Relay the upstream stream to the client.
 pub(crate) fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:reqwest::Response) -> Response {
-	let StateForStream = Context.State.clone();
+	let State = Context.State.clone();
 	let Stream = Response.bytes_stream().inspect(move |Chunk| {
 		match Chunk {
 			Ok(bytes) => {
-				StateForStream
-					.ResponseBodyBytes
-					.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+				State.ResponseBytes.fetch_add(bytes.len() as u64, Ordering::Relaxed);
 			},
 			Err(_) => {
-				StateForStream.SSEStreamErrors.fetch_add(1, Ordering::Relaxed);
+				State.StreamErrors.fetch_add(1, Ordering::Relaxed);
 			},
 		}
 	});
@@ -54,19 +52,19 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:reqwes
 	// Time to HEADERS, not the duration of the stream: the stream outlives this
 	// function, so the name is what keeps this number from being read as a
 	// whole-response latency beside the buffered path's.
-	let TimeToHeaders = Context.Started.elapsed();
+	let Elapsed = Context.Started.elapsed();
 
-	Context.State.RecordLatency(TimeToHeaders);
+	Context.State.RecordLatency(Elapsed);
 	Context.State.RecordRequest(
 		Context.ID,
 		Context.Method.as_str(),
 		Context.Path,
 		Head.Status.as_u16(),
 		false,
-		TimeToHeaders.as_millis(),
+		Elapsed.as_millis(),
 	);
 
-	let Builder = CopyUpstreamHeaders(Response::builder().status(Head.Status), &Head.Headers);
+	let Builder = CopyHeaders(Response::builder().status(Head.Status), &Head.Headers);
 	let Builder = match Head.ContentType.clone() {
 		Some(Ct) => Builder.header("Content-Type", Ct),
 		None => Builder,

@@ -32,11 +32,11 @@ use crate::State::Struct::AphroditeState;
 /// there is no backend to fall back to for a hash that says it is local. Every other hash
 /// is looked up in the same store, because the inline store is the read-through cache in
 /// front of the CCR backend.
-pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
-	let HashValue = crate::Marker::Parse::Normalize::NormalizeHash(HashValue);
+pub fn Fn(State:&mut AphroditeState, Hash:&str) -> Option<String> {
+	let Hash = crate::Marker::Parse::Normalize::Fn(Hash);
 
-	let Some(Bare) = (!HashValue.starts_with("i:")).then_some(HashValue) else {
-		return State.InlineStoreGet(HashValue);
+	let Some(Bare) = (!Hash.starts_with("i:")).then_some(Hash) else {
+		return State.Get(Hash);
 	};
 
 	// NOTE (F6): this used to check a `{hash}#stage2` key first, "for depth-aware
@@ -48,12 +48,12 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	// Wiring stage-2 up properly (a real `Depth` parameter on retrieve, only consulting
 	// `#stage2` at `depth >= 2`) is a deliberate feature decision, not a bug fix - see
 	// `.plans/05-compression-pipeline.md` §5. Deleted here rather than wired.
-	let Found = State.InlineStoreGet(Bare);
+	let Found = State.Get(Bare);
 
 	// Tier 1 teaching loop: a successful resolve of a chain-split segment hash is the
 	// consequence signal - attribute it to the split event that produced it (counts once
 	// per hash) and let the threshold adapt.
-	let _ = Found.as_ref().map(|_Content| State.NoteSplitRetrieval(Bare));
+	let _ = Found.as_ref().map(|_Content| State.NoteRetrieval(Bare));
 
 	Found
 }

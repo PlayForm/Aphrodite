@@ -3,7 +3,7 @@
 use rhai::Engine as Rhai;
 
 use crate::Scripting::{
-	Engine::Run::{Chain::Struct as Chain, Scope::Fn::Fn as SeedScope},
+	Engine::Run::{Chain::Struct::Struct as Chain, Scope::Fn::Fn as Scope},
 	Payload::Struct::Struct as HookPayload,
 	Script::{Declares, Struct::Struct as Script},
 };
@@ -23,18 +23,18 @@ use crate::Scripting::{
 /// `Run::Fn::Fn` is the loop and this leaf is one iteration of it.
 pub(crate) fn Fn(Chain:Chain, Script:&Script, Hook:&str, Payload:&HookPayload) -> Chain {
 	// Compiled per call - no AST storage, avoids Send issues.
-	let Engine = Rhai::new();
-	let Ok(Ast) = Engine.compile(&Script.Source) else {
+	let Rhai = Rhai::new();
+	let Ok(AST) = Rhai.compile(&Script.Source) else {
 		return Chain;
 	};
 
-	let Some(Hook) = Declares::Fn::Fn(&Ast, Hook) else {
+	let Some(Hook) = Declares::Fn::Fn(&AST, Hook) else {
 		return Chain;
 	};
 
-	let mut Scope = SeedScope(Payload, Hook, &Chain.Content);
+	let mut Scope = Scope(Payload, Hook, &Chain.Content);
 
-	match Engine.call_fn::<String>(&mut Scope, &Ast, Hook, ()) {
+	match Rhai.call_fn::<String>(&mut Scope, &AST, Hook, ()) {
 		Ok(Transformed) => Chain { Content:Transformed, Touched:true },
 		Err(Error) => {
 			tracing::warn!(

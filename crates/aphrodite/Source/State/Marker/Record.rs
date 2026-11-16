@@ -1,6 +1,6 @@
 //! Recording a marker into the catalog.
 
-use crate::State::{Const::RecentMarkersCap, Marker::Struct::MarkerEntry, Struct::AphroditeState};
+use crate::State::{Const::RecentMarkersCap, Marker::Struct::Struct as Entry, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a compression marker.
@@ -10,7 +10,7 @@ impl AphroditeState {
 	/// tool-event ring uses the same expression, which is what lets a reader
 	/// assume "oldest at index 0" for both without checking which convention a
 	/// ring picked.
-	pub fn RecordMarker(&mut self, Entry:MarkerEntry) {
+	pub fn RecordMarker(&mut self, Entry:Entry) {
 		// DEV-ONLY debug metrics (crate::Debug): one atomic add when the
 		// logger is on; a no-op single load when off.
 		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::MarkersCreated);

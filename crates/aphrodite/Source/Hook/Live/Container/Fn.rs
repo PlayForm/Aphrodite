@@ -1,7 +1,7 @@
 //! Store content as a live container and emit the instant marker.
 
 use super::super::{Marker, Object::Install::Fn::Fn as InstallObject};
-use crate::State::{Marker::Struct::MarkerEntry, Struct::AphroditeState};
+use crate::State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState};
 
 /// Live-container transform (pre-Rust port of `_wrap_as_live_container`):
 /// store the content as one container object, record a `Live` marker entry, and

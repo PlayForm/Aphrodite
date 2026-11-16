@@ -14,10 +14,10 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// explanation `Flow::build_turn_context` injects per turn. Default
 	// minimal = current behavior.
 	State.RetrieveGuidance =
-		Configuration.GetString("APHRODITE_RETRIEVE_GUIDANCE", "prompts", "retrieve_guidance", "minimal");
+		Configuration.Text("APHRODITE_RETRIEVE_GUIDANCE", "prompts", "retrieve_guidance", "minimal");
 	// `CatalogIntentHints`: show `intent=read` alongside the recent CCR
 	// hashes in the recall catalog output (`Session::catalog_summary`).
 	// Default off = current behavior.
 	State.CatalogIntentHints =
-		Configuration.GetBool("APHRODITE_CATALOG_INTENT_HINTS", "prompts", "catalog_intent_hints", false);
+		Configuration.Bool("APHRODITE_CATALOG_INTENT_HINTS", "prompts", "catalog_intent_hints", false);
 }

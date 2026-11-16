@@ -17,7 +17,7 @@ pub(crate) fn Fn(Configuration:&MultiConfiguration) -> anyhow::Result<Vec<(Strin
 		.iter()
 		.map(|p| {
 			let CLI = Configuration.Resolve(p)?;
-			let Name = p.name.clone().unwrap_or_else(|| format!("{}", CLI.Listen));
+			let Name = p.Name.clone().unwrap_or_else(|| format!("{}", CLI.Listen));
 
 			Ok((Name, CLI))
 		})

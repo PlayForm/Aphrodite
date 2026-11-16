@@ -23,7 +23,7 @@ pub(crate) fn Fn(Line:&str) -> bool {
 		|| t.starts_with("panicked at")
 		|| t.contains(": error[")
 		|| t.contains(": error:")
-		|| ErrorWordBeforeColon(t)
+		|| Colon(t)
 }
 
 /// Token-before-colon scan.
@@ -33,7 +33,7 @@ pub(crate) fn Fn(Line:&str) -> bool {
 /// `Exception:`). This replaces the old `\b\w+(?:Error|Exception):` regex and
 /// deliberately keeps no hardcoded exception list - an exception type nobody
 /// enumerated still matches.
-fn ErrorWordBeforeColon(t:&str) -> bool {
+fn Colon(t:&str) -> bool {
 	let bytes = t.as_bytes();
 
 	t.match_indices(':').any(|(i, _)| {

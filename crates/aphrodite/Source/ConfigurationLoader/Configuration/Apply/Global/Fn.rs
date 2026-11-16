@@ -11,7 +11,7 @@ impl Struct {
 	/// reachable: zero when every session lock was unavailable, N when several were,
 	/// and a torn pair whenever two of those N interleaved.
 	///
-	/// `ApplyCompression` and `ApplyReload` write state and nothing else; this is the
+	/// `Apply::Startup::Fn` and `Apply::Reload::Fn` write state and nothing else; this is the
 	/// separate act of telling the stateless renderers what the document says.
-	pub fn ApplyGlobals(&self) { Publish::Fn::Fn(&Rendering::Struct::Struct::from(self)) }
+	pub fn Global(&self) { Publish::Fn::Fn(&Rendering::Struct::Struct::from(self)) }
 }

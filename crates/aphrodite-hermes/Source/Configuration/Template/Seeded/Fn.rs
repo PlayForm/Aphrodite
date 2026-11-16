@@ -9,7 +9,7 @@ use aphrodite::State::Struct::AphroditeState;
 
 use crate::{
 	Debug::Warn,
-	Session::Watcher::{Fn::spawn_config_watcher, Start},
+	Session::Watcher::{self, Start},
 };
 
 /// The config-seeded template state, built once per process.
@@ -32,24 +32,24 @@ pub(crate) fn Fn() -> AphroditeState {
 	let mut State = AphroditeState::default();
 	let Configuration = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load();
 
-	Configuration.ApplyCompression(&mut State);
+	Configuration.Startup(&mut State);
 	// One publication for the whole process: the preview cap, the marker grammar
 	// and the `[templates]` + `[previews] model_family` pair. Hooks, the dylib and
 	// the poll worker have no state to read from, so this is how the document
 	// reaches them - and publishing the template pair in one critical section is
 	// what stops a reader rendering one document's family against another's
 	// templates.
-	Configuration.ApplyGlobals();
+	Configuration.Global();
 
 	// Opt-in config auto-reload (`[compression] auto_reload = true`, default
 	// off): watch aphrodite.toml and re-apply config fields on change. Only
 	// config fields are mutated - session CCR state, directive selection, and
 	// telemetry survive a reload (the dropped dylib-binary hot-reload wiped
 	// them; fa85dfa).
-	let Started = State.AutoReload.then(spawn_config_watcher);
+	let Started = State.AutoReload.then(Watcher::Fn::Fn);
 
-	matches!(Started, Some(Start::Enum::Enum::NotRunning))
-		.then_some(WATCHER_NOTICE)
+	matches!(Started, Some(Start::Enum::Enum::Failed))
+		.then_some(Notice)
 		.into_iter()
 		.for_each(Warn::Fn::Fn);
 
@@ -58,5 +58,5 @@ pub(crate) fn Fn() -> AphroditeState {
 
 /// Said when `auto_reload = true` produced no watcher, which would otherwise look
 /// exactly like `auto_reload = false` for the life of the process.
-const WATCHER_NOTICE:&str = "config auto-reload was requested (auto_reload = true) but its watcher did not start; \
-                             aphrodite.toml changes will not be picked up until this process restarts";
+const Notice:&str = "config auto-reload was requested (auto_reload = true) but its watcher did not start; \
+                     aphrodite.toml changes will not be picked up until this process restarts";

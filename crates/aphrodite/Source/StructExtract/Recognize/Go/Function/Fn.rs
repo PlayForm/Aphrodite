@@ -47,11 +47,11 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 		};
 
 		match (!Named.is_empty()).then_some(Named) {
-			Some(Name) => Declaration::Declaration { Kind:"func", Name, Parameters:Some(Parameters), Return:None },
+			Some(Name) => Declaration::Present { Kind:"func", Name, Parameters:Some(Parameters), Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {
 		Some(Declaration) => Declaration,
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

@@ -7,7 +7,7 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::Preview::{Input, Limit, Render, State::Maximum::PreviewMaximumChars, Type};
+use crate::Preview::{Input, Limit, Render, State::Maximum::Value, Type};
 use super::Dispatch;
 
 /// Build a compact, human-readable preview of compressed content.
@@ -25,7 +25,7 @@ use super::Dispatch;
 /// final, honest representation of the stored payload, so a wrong string here is a defect
 /// even when the stored bytes are intact.
 pub fn Fn(TypeStr:&str, Content:&str) -> String {
-	let Limit = Limit::Resolve::Fn::Fn(PreviewMaximumChars.load(Ordering::Relaxed) as usize);
+	let Limit = Limit::Resolve::Fn::Fn(Value.load(Ordering::Relaxed) as usize);
 
 	crate::Template::Render::Fn::Fn(TypeStr, Content)
 		.filter(|Rendered| !Rendered.is_empty())

@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::ChainSplit::ErrorHint::Fn::Fn as SegmentErrorHint;
+use crate::ChainSplit::ErrorHint::Fn::Fn as Hint;
 
 /// Decorate a preview with the segment's own error signal.
 ///
@@ -21,7 +21,7 @@ use crate::ChainSplit::ErrorHint::Fn::Fn as SegmentErrorHint;
 /// this boundary. The saving the `Cow` buys is the clean-segment case, where
 /// nothing is allocated at all.
 pub(crate) fn Fn<'a>(Preview:&'a str, Text:&str) -> Cow<'a, str> {
-	let Hint = (!Preview.contains("error[")).then(|| SegmentErrorHint(Text)).flatten();
+	let Hint = (!Preview.contains("error[")).then(|| Hint(Text)).flatten();
 
 	Hint.map_or(Cow::Borrowed(Preview), |Hint| {
 		let Inner = Preview.trim_end_matches(']');

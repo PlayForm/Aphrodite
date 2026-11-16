@@ -10,8 +10,8 @@
 /// The zero-argument check is the compatibility contract: a hook reads the seeded
 /// scope, so a function taking parameters is a different function that happens to share
 /// the name.
-pub(crate) fn Fn<'a>(Ast:&rhai::AST, Hook:&'a str) -> Option<&'a str> {
-	Ast.iter_functions()
-		.any(|Function| Function.name == Hook && Function.Params.is_empty())
+pub(crate) fn Fn<'a>(AST:&rhai::AST, Hook:&'a str) -> Option<&'a str> {
+	AST.iter_functions()
+		.any(|Function| Function.name == Hook && Function.params.is_empty())
 		.then_some(Hook)
 }

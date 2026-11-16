@@ -6,27 +6,27 @@
 
 use crate::{
 	PollWorker::{
-		Insert::Fn::InsertBgTask,
-		Task::Status::{Enum::BgStatus, Stored::Fn::Fn as Stored},
-		Update::Fn::UpdateFromPoll,
+		Insert::Fn::Fn as Insert,
+		Task::Status::{Enum::Enum as Status, Stored::Fn::Fn as Stored},
+		Update::Fn::Fn as Update,
 	},
 	State::{
-		Identity::{Command::Struct::CommandID, Execution::Struct::ExecutionID},
+		Identity::{Command::Struct::Struct as Command, Execution::Struct::Struct as Execution},
 		Struct::AphroditeState,
 	},
 };
 
 fn TwoRunning(State:&mut AphroditeState) {
-	InsertBgTask(
+	Insert(
 		State,
-		CommandID::from(headroom_core::ccr::compute_key(b"cargo build")),
+		Command::from(headroom_core::ccr::compute_key(b"cargo build")),
 		"terminal".into(),
 		"cargo build".into(),
 		1,
 	);
-	InsertBgTask(
+	Insert(
 		State,
-		CommandID::from(headroom_core::ccr::compute_key(b"npm install")),
+		Command::from(headroom_core::ccr::compute_key(b"npm install")),
 		"terminal".into(),
 		"npm install".into(),
 		2,
@@ -34,7 +34,7 @@ fn TwoRunning(State:&mut AphroditeState) {
 }
 
 #[test]
-fn TestPollNamingOneCommandFinishesOnlyThatTask() {
+fn One() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
 	TwoRunning(&mut State);
@@ -46,13 +46,13 @@ fn TestPollNamingOneCommandFinishesOnlyThatTask() {
 	})
 	.to_string();
 
-	assert!(UpdateFromPoll(&mut State, "process", &Poll));
+	assert!(Update(&mut State, "process", &Poll));
 
 	assert!(
-		matches!(State.BgTasks[0].Status, BgStatus::Done { .. }),
+		matches!(State.BgTasks[0].Status, Status::Done { .. }),
 		"the polled task completes"
 	);
-	assert_eq!(State.BgTasks[1].Status, BgStatus::Running, "the other task keeps running");
+	assert_eq!(State.BgTasks[1].Status, Status::Running, "the other task keeps running");
 	assert!(
 		Stored(&State.BgTasks[1].Status).is_none(),
 		"the other task records no stored output"
@@ -65,7 +65,7 @@ fn TestPollNamingOneCommandFinishesOnlyThatTask() {
 }
 
 #[test]
-fn TestPollNamingAnUntrackedCommandAppliesToNothing() {
+fn Untracked() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
 	TwoRunning(&mut State);
@@ -77,46 +77,43 @@ fn TestPollNamingAnUntrackedCommandAppliesToNothing() {
 	})
 	.to_string();
 
-	assert!(
-		!UpdateFromPoll(&mut State, "process", &Poll),
-		"an untracked process is not consumed"
-	);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
-	assert_eq!(State.BgTasks[1].Status, BgStatus::Running);
+	assert!(!Update(&mut State, "process", &Poll), "an untracked process is not consumed");
+	assert_eq!(State.BgTasks[0].Status, Status::Running);
+	assert_eq!(State.BgTasks[1].Status, Status::Running);
 }
 
 #[test]
-fn TestPollWithoutIdentityFallsBackToOldestRunning() {
+fn Fallback() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
 	TwoRunning(&mut State);
 
 	// A bare text poll names no command and no session - the only attribution it
 	// supports is the oldest running task.
-	assert!(UpdateFromPoll(&mut State, "process", "building...\nexit code: 2\n"));
+	assert!(Update(&mut State, "process", "building...\nexit code: 2\n"));
 
 	assert!(
-		matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 2),
+		matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2),
 		"the oldest running task takes the failure"
 	);
-	assert_eq!(State.BgTasks[1].Status, BgStatus::Running);
+	assert_eq!(State.BgTasks[1].Status, Status::Running);
 }
 
 #[test]
-fn TestPollExecutionIdentitySticksToTheTaskItNamed() {
+fn Execution() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
 	TwoRunning(&mut State);
 
 	// First poll names the process only; it is attributed to the oldest running
 	// task and the identity is recorded there.
-	UpdateFromPoll(
+	Update(
 		&mut State,
 		"process",
 		&serde_json::json!({"session_id": "proc-7", "output": "a", "exit_code": null}).to_string(),
 	);
 	assert_eq!(
-		State.BgTasks[0].ExecutionID.as_ref().map(ExecutionID::as_str),
+		State.BgTasks[0].Execution.as_ref().map(Execution::as_str),
 		Some("proc-7"),
 		"the execution identity is recorded on the task it was attributed to"
 	);
@@ -124,11 +121,11 @@ fn TestPollExecutionIdentitySticksToTheTaskItNamed() {
 	// A later poll naming the same process reaches the same task even though the
 	// oldest running task is still that one - the identity, not the position, is
 	// what matched.
-	UpdateFromPoll(
+	Update(
 		&mut State,
 		"process",
 		&serde_json::json!({"session_id": "proc-7", "output": "b", "exit_code": 0}).to_string(),
 	);
-	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
-	assert_eq!(State.BgTasks[1].Status, BgStatus::Running);
+	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
+	assert_eq!(State.BgTasks[1].Status, Status::Running);
 }

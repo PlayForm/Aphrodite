@@ -1,6 +1,6 @@
 //! The three configurations that must be rejected rather than degraded.
 
-use super::super::{Guard::EnvironmentGuard, MultiConfigurationFromToml};
+use super::super::{Guard::EnvironmentGuard, Toml};
 
 #[test]
 fn TestResolveMissingAPIKeyErrors() {
@@ -8,7 +8,7 @@ fn TestResolveMissingAPIKeyErrors() {
 	unsafe { std::env::remove_var("APHRODITE_API_KEY") };
 	unsafe { std::env::remove_var("DEEPSEEK_API_KEY") };
 	unsafe { std::env::remove_var("HEADROOM_DEEPSEEK_KEY") };
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "no_key"
@@ -20,7 +20,7 @@ fn TestResolveMissingAPIKeyErrors() {
 
 #[test]
 fn TestResolveInvalidListenAddressErrors() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "bad_listen"
@@ -34,7 +34,7 @@ fn TestResolveInvalidListenAddressErrors() {
 
 #[test]
 fn TestResolveMaximumOutputMustBeLessThanMaximumContext() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "bad_budget"

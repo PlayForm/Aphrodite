@@ -26,13 +26,13 @@ use crate::Marker::Format::{
 ///
 /// The whole value is published under one write, which is what makes "a render
 /// sees a format from one registration and a hint from another" impossible.
-pub fn Fn(Format:Option<&str>, Hint:Option<&str>, HintEnabled:bool) {
+pub fn Fn(Format:Option<&str>, Hint:Option<&str>, Enabled:bool) {
 	let Published = Struct {
 		Grammar:match Format {
 			Some(Format) => Grammar::Template(Format.to_string()),
 			None => Grammar::Canonical,
 		},
-		Hint:Hint.filter(|Hint| HintEnabled && !Hint.is_empty()).map(str::to_string),
+		Hint:Hint.filter(|Hint| Enabled && !Hint.is_empty()).map(str::to_string),
 	};
 
 	*Registration.write().unwrap_or_else(std::sync::PoisonError::into_inner) = Published;

@@ -11,7 +11,7 @@
 
 use crate::{
 	PollWorker::{
-		Apply::Applied::Enum::Applied,
+		Apply::Applied::Enum::Enum as Outcome,
 		Completion::Build::Fn::Fn as Build,
 		Update::Interpret::Store::Fn::Fn as Store,
 	},
@@ -19,13 +19,13 @@ use crate::{
 };
 
 /// Store and announce a completed poll, or do nothing.
-pub(crate) fn Fn(State:&mut AphroditeState, Applied:Applied) {
-	let Finished = match Applied {
-		Applied::Completed(Finished) => Finished,
+pub(crate) fn Fn(State:&mut AphroditeState, Outcome:Outcome) {
+	let Finished = match Outcome {
+		Outcome::Completed(Finished) => Finished,
 		// A progress poll's whole effect is inside the task: nothing is stored and
 		// nothing is announced. The task it moved is named at debug level so a
 		// long-running command's polls are visible in the stream.
-		Applied::Progressed(Subject) => {
+		Outcome::Progressed(Subject) => {
 			tracing::debug!(Task = %Subject.ID, Index = Subject.Index, "poll worker: progress accumulated");
 
 			return;

@@ -6,12 +6,9 @@
 //! value > compiled-in default, the same order the listen-port override uses.
 
 use crate::{
-	Configuration::{
-		Environment::Warn::Fn::EnvironmentParseWarn,
-		Proxy::Compression::Struct::Struct as CompressionConfiguration,
-	},
+	Configuration::{Environment::Warn::Fn::Fn as Warn, Proxy::Compression::Struct::Struct as Table},
 	Proxy::Threshold::{
-		Const::{AutoExpandLimitDefault, CacheCompressThreshold, InlineCCRThreshold, TokenCompressThreshold},
+		Const::{Cache, InitialExpand, Inline, Token},
 		Struct::Struct as ResolvedThresholds,
 	},
 };
@@ -20,42 +17,41 @@ use crate::{
 /// the TOML `[compression]` table (if any), and the compiled-in defaults,
 /// in that precedence order.
 ///
-/// `CodeMultiplier` defaults to `3.0`, not the old free-function's `2`: the
-/// prior default only existed because `APHRODITE_CODE_MULTIPLIER=3.0`
-/// silently failed a `usize` parse (report 07 F10) - every shipped TOML and
-/// doc has always said `3.0`, so `2` was a masked bug, not an intentional
-/// value, and this restores the value the project's own config always
-/// claimed.
-pub fn Fn(Compression:Option<&CompressionConfiguration>) -> ResolvedThresholds {
+/// `Multiplier` (`[compression] code_multiplier`) defaults to `3.0`, not the old
+/// free-function's `2`: the prior default only existed because
+/// `APHRODITE_CODE_MULTIPLIER=3.0` silently failed a `usize` parse (report 07
+/// F10) - every shipped TOML and doc has always said `3.0`, so `2` was a masked
+/// bug, not an intentional value, and this restores the value the project's own
+/// config always claimed.
+pub fn Fn(Compression:Option<&Table>) -> ResolvedThresholds {
 	ResolvedThresholds {
-		Cache:EnvironmentParseWarn::<usize>("APHRODITE_TOOL_THRESHOLD_CACHE")
-			.or_else(|| Compression.and_then(|c| c.ToolThresholdCache).map(|v| v as usize))
-			.unwrap_or(CacheCompressThreshold),
-		Token:EnvironmentParseWarn::<usize>("APHRODITE_TOOL_THRESHOLD_TOKEN")
-			.or_else(|| Compression.and_then(|c| c.ToolThresholdToken).map(|v| v as usize))
-			.unwrap_or(TokenCompressThreshold),
-		inline:EnvironmentParseWarn::<usize>("APHRODITE_INLINE_THRESHOLD")
-			.or_else(|| Compression.and_then(|c| c.InlineThreshold).map(|v| v as usize))
-			.unwrap_or(InlineCCRThreshold),
-		CodeMultiplier:EnvironmentParseWarn::<f64>("APHRODITE_CODE_MULTIPLIER")
-			.or_else(|| Compression.and_then(|c| c.CodeMultiplier))
+		Cache:Warn::<usize>("APHRODITE_TOOL_THRESHOLD_CACHE")
+			.or_else(|| Compression.and_then(|Table| Table.Cache).map(|Value| Value as usize))
+			.unwrap_or(Cache),
+		Token:Warn::<usize>("APHRODITE_TOOL_THRESHOLD_TOKEN")
+			.or_else(|| Compression.and_then(|Table| Table.Token).map(|Value| Value as usize))
+			.unwrap_or(Token),
+		inline:Warn::<usize>("APHRODITE_INLINE_THRESHOLD")
+			.or_else(|| Compression.and_then(|Table| Table.Inline).map(|Value| Value as usize))
+			.unwrap_or(Inline),
+		CodeMultiplier:Warn::<f64>("APHRODITE_CODE_MULTIPLIER")
+			.or_else(|| Compression.and_then(|Table| Table.Multiplier))
 			.unwrap_or(3.0),
 		// Presence-aware env read: `APHRODITE_AUTO_EXPAND=0`/`false` must
-		// override a TOML `auto_expand = true`, so a bare `EnvironmentBool`
+		// override a TOML `auto_expand = true`, so a bare `Environment::Bool`
 		// (absent => false) would be wrong here - absent must fall through
 		// to the TOML value.
 		AutoExpand:match std::env::var("APHRODITE_AUTO_EXPAND") {
-			Ok(v) => matches!(v.to_lowercase().as_str(), "1" | "true"),
-			Err(_) => Compression.and_then(|c| c.AutoExpand).unwrap_or(false),
+			Ok(Value) => matches!(Value.to_lowercase().as_str(), "1" | "true"),
+			Err(_) => Compression.and_then(|Table| Table.Expand).unwrap_or(false),
 		},
-		AutoExpandLimit:EnvironmentParseWarn::<usize>("APHRODITE_AUTO_EXPAND_LIMIT")
-			.or_else(|| Compression.and_then(|c| c.AutoExpandLimit).map(|v| v as usize))
-			.unwrap_or(AutoExpandLimitDefault),
+		ExpandLimit:Warn::<usize>("APHRODITE_AUTO_EXPAND_LIMIT")
+			.or_else(|| Compression.and_then(|Table| Table.Limit).map(|Value| Value as usize))
+			.unwrap_or(InitialExpand),
 		// Presence-aware: `APHRODITE_MAX_REQUEST_BODY_SIZE=0` is a legitimate
 		// "reject every non-empty body" configuration, so absent-env must
 		// fall through to TOML then to None (no cap) rather than parse 0.
-		MaximumRequestBodySize:EnvironmentParseWarn::<usize>("APHRODITE_MAX_REQUEST_BODY_SIZE")
-			.or_else(|| Compression.and_then(|c| c.MaximumRequestBodySize)),
+		BodyLimit:Warn::<usize>("APHRODITE_MAX_REQUEST_BODY_SIZE").or_else(|| Compression.and_then(|Table| Table.Body)),
 	}
 }
 

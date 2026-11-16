@@ -13,21 +13,21 @@ use crate::Hook::{Call::Input::Struct::Struct, PostTool, Replacement};
 
 /// Compress one terminal result and return the value Hermes substitutes.
 pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value {
-	let TermContent = Input.TermContent();
+	let Output = Input.Output();
 	let Parsed = &Input.Parsed;
 
-	let Classify = crate::Tool::Unwrap::Fn::Fn(TermContent);
+	let Classify = crate::Tool::Unwrap::Fn::Fn(Output);
 	// 05-P2/T8: thread the terminal `command`/`returncode` into
 	// the telemetry ring so terminal failures feed error-loop
 	// detection.
 	let Command = Parsed.get("command").and_then(|v| v.as_str());
-	let ReturnCode = Parsed.get("returncode").and_then(|v| v.as_i64());
-	let Result = aphrodite::Hook::Terminal::Entry::Fn::TransformTerminalOutputWithMeta(
+	let Code = Parsed.get("returncode").and_then(|v| v.as_i64());
+	let Result = aphrodite::Hook::Terminal::Entry::Meta::Fn::Fn(
 		State,
-		TermContent,
+		Output,
 		Classify.as_ref().map(|(Body, Kind)| (Body.as_str(), Kind.as_str())),
 		Command,
-		ReturnCode,
+		Code,
 	);
 	// Hermes does NOT thread session_id through transform_terminal_output -
 	// fall back to the current turn's session so terminal output keeps the
@@ -45,7 +45,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	Started.into_iter().for_each(|Started| {
 		let Micros = Started.elapsed().as_micros() as u64;
 		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, Micros);
-		PostTool::Fn::Fn(State, &Session, &Result, TermContent.len(), Micros);
+		PostTool::Fn::Fn(State, &Session, &Result, Output.len(), Micros);
 	});
 
 	Replacement::Fn::Fn(&Result, &Session)

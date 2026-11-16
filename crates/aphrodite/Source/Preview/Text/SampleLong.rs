@@ -8,14 +8,15 @@
 
 use std::num::NonZeroUsize;
 
-/// Longest line that is shown as a plain head: one hundred characters.
-const LongLineMaximum:usize = 100;
+/// Longest line shown as a plain head: one hundred characters. A line of exactly this
+/// length is short; one character more is sampled.
+const Threshold:usize = 100;
 
-/// Characters kept from each end of a long line: twenty-eight.
-const HeadTailLength:usize = 28;
+/// Characters kept from each end of a sampled line: twenty-eight.
+const Length:usize = 28;
 
 /// Characters a short line is cut to: sixty.
-const ShortLineMaximum:usize = 60;
+const Cap:usize = 60;
 
 /// Render a content hint line, sampling head+tail when the line is very long.
 ///
@@ -33,16 +34,16 @@ pub(crate) fn Fn(Line:&str) -> String {
 	let Total = Line.chars().count();
 
 	// `NonZeroUsize` makes "it is a long line" a value instead of a boolean, and the subtraction
-	// states the boundary directly: a line of exactly `LongLineMaximum` characters is short, one
-	// character more is long. The previous `checked_sub(LongLineMaximum + 1)` spelled the same
+	// states the boundary directly: a line of exactly `Threshold` characters is short, one
+	// character more is long. The previous `checked_sub(Threshold + 1)` spelled the same
 	// boundary with a `+ 1` that read like an off-by-one.
-	match NonZeroUsize::new(Total.saturating_sub(LongLineMaximum)) {
+	match NonZeroUsize::new(Total.saturating_sub(Threshold)) {
 		Some(_) => {
-			let Head:String = Line.chars().take(HeadTailLength).collect();
-			let Tail:String = Line.chars().skip(Total - HeadTailLength).collect();
+			let Head:String = Line.chars().take(Length).collect();
+			let Tail:String = Line.chars().skip(Total - Length).collect();
 
 			format!("{Head}...{Tail}")
 		},
-		None => Line.chars().take(ShortLineMaximum).collect(),
+		None => Line.chars().take(Cap).collect(),
 	}
 }

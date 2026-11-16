@@ -7,7 +7,7 @@ use headroom_core::transforms;
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
 	Guard::{
-		Content::Fn::Fn as CheckContent,
+		Content::Fn::Fn as Check,
 		Cstr::{Fn::Fn as Cstr, Required::Fn::Fn as Required},
 	},
 };
@@ -32,12 +32,12 @@ pub unsafe extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char
 	Run(move || {
 		let Content = Required(Content)?;
 
-		CheckContent(&Content)?;
+		Check(&Content)?;
 
-		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
+		let Type = transforms::content_detector::detect_content_type(&Content).content_type;
 
 		Ok(Answer::JSON(
-			serde_json::json!({"type":Ct.as_str(),"lines":Content.lines().count(),"bytes":Content.len()}),
+			serde_json::json!({"type":Type.as_str(),"lines":Content.lines().count(),"bytes":Content.len()}),
 		))
 	})
 }

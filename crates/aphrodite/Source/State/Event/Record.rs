@@ -1,6 +1,6 @@
 //! Recording a tool event into the bounded ring.
 
-use crate::State::{Const::ToolEventCap, Event::Struct::ToolEvent, Struct::AphroditeState};
+use crate::State::{Const::ToolEventCap, Event::Struct::Struct as Call, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a per-call tool event into the bounded ring (P2/T6). Caps at
@@ -11,7 +11,7 @@ impl AphroditeState {
 	/// (`len - cap`), not a pop loop: one append can overfill the ring by at most
 	/// one, and `drain` removes exactly the excess from the front, where the
 	/// oldest events sit.
-	pub fn RecordToolEvent(&mut self, Event:ToolEvent) {
+	pub fn RecordEvent(&mut self, Event:Call) {
 		self.ToolEvents.push_back(Event);
 
 		let Excess = self.ToolEvents.len().saturating_sub(ToolEventCap);

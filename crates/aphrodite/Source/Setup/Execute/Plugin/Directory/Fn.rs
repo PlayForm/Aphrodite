@@ -19,7 +19,7 @@ use crate::Setup::Plan::{self, Ownership};
 ///   Report-only, and it says so rather than skipping silently.
 /// - `Uninspectable` - the path is there and setup could not tell what it is. Also
 ///   report-only: the alternative is writing into a directory setup does not own.
-/// - `DevStaleSymlink` - an older install's link into the runtime home. Removed first,
+/// - `Stale` - an older install's link into the runtime home. Removed first,
 ///   so the loader files land as real files and never through the link.
 /// - `Dev` - nothing there. Created.
 pub(crate) fn Fn(Plan:&Plan::Struct::Struct) -> anyhow::Result<()> {
@@ -44,7 +44,7 @@ pub(crate) fn Fn(Plan:&Plan::Struct::Struct) -> anyhow::Result<()> {
 
 			Ok(())
 		},
-		Ownership::Enum::Enum::DevStaleSymlink => {
+		Ownership::Enum::Enum::Stale => {
 			println!("removing stale plugin symlink -> {}", Plan.Context.PluginDirectory.display());
 
 			fs::remove_file(&Plan.Context.PluginDirectory).with_context(|| {

@@ -6,7 +6,7 @@ use crate::{
 	Directive,
 	Guard::{
 		Fn::{cstr_to_string, guarded},
-		ToJSON::Fn::Fn as to_json,
+		ToJSON,
 	},
 };
 
@@ -27,9 +27,9 @@ use crate::{
 ///   with `aphrodite_hermes_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char) -> *mut c_char {
-	let home = unsafe { cstr_to_string(home_dir) };
+	let Home = unsafe { cstr_to_string(home_dir) };
 	guarded(std::panic::AssertUnwindSafe(move || {
-		let result = Directive::Into::Fn::Fn(&home);
-		to_json(&result)
+		let Payload = Directive::Into::Fn::Fn(&Home);
+		ToJSON::Fn::Fn(&Payload)
 	}))
 }

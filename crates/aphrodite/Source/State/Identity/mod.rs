@@ -13,7 +13,7 @@
 //! - `Content/` - the CCR hash of stored content: what a marker resolves.
 //!
 //! None of the three is display text. A command LINE is display text and stays a
-//! `String` (`BgTask::command`); a preview is display text and stays a `String`.
+//! `String` (`Record::command`); a preview is display text and stays a `String`.
 //! The distinction is the point: an identity is compared, a label is read.
 
 pub mod Command;

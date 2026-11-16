@@ -24,9 +24,7 @@ use crate::Proxy::Handle::Proxy::Forward::{
 pub(crate) fn Fn(Policy:&ForwardPolicy, Attempt:u32, Error:&reqwest::Error, Jitter:f64) -> RetryDecision {
 	(Attempt < Policy.MaximumAttempts && Error.is_connect())
 		.then(|| {
-			let BaseMs = Policy
-				.BaseBackoffMs
-				.saturating_mul(2u64.saturating_pow(Attempt.saturating_sub(1)));
+			let BaseMs = Policy.Backoff.saturating_mul(2u64.saturating_pow(Attempt.saturating_sub(1)));
 			let Ms = (BaseMs as f64 * (Policy.JitterFloor + Jitter * Policy.JitterSpan)) as u64;
 
 			Duration::from_millis(Ms)

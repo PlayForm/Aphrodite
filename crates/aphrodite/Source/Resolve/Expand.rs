@@ -31,7 +31,7 @@ use crate::{
 /// byte-identical to what the hash names, so an expanded result is returned and forgotten.
 /// Writing it back breaks the content-address invariant and destroys the pristine original
 /// irrecoverably - including any marker-shaped text the original merely contained.
-pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
+pub fn Fn(State:&mut AphroditeState, Hash:&str) -> Option<String> {
 	// DEV-ONLY debug instrumentation (crate::Debug): retrieval metrics + one structured line
 	// per retrieval request (hash, found, depth cap, elapsed). Captured only when the logger
 	// is on.
@@ -44,10 +44,10 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	let Out = {
 		let mut Traversal = Traversal::New(State);
 
-		Recursive::Fn(&mut Traversal, HashValue, 0)
+		Recursive::Fn(&mut Traversal, Hash, 0)
 	}
 	.ok()
-	.map(Expansion::Enum::Enum::IntoText);
+	.map(Expansion::Enum::Enum::Owned);
 
 	// `inspect` runs only when the timing gate was taken, which is the whole reason the gate
 	// is an `Option` rather than a boolean: a disabled logger must not pay for a clock read, a
@@ -59,7 +59,7 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 			State.DebugLevel,
 			"retrieve",
 			&[
-				("hash", HashValue.to_string()),
+				("hash", Hash.to_string()),
 				("found", Out.is_some().to_string()),
 				("depth_cap", State.RecursiveDepth.to_string()),
 				("elapsed_us", Us.to_string()),

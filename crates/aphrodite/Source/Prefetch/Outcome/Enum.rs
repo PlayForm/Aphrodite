@@ -7,7 +7,7 @@
 //! able to report - a silent skip would look identical to a missing file.
 
 /// Outcome of reading one path, before any state mutation.
-pub enum ReadOutcome {
+pub enum Enum {
 	/// The path is absent, unreadable, or not a file the reader could stat -
 	/// nothing was read and nothing will be stored.
 	Missing,

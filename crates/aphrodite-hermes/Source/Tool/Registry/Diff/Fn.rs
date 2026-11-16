@@ -1,16 +1,16 @@
 //! `aphrodite_diff` - the archived per-turn compression history.
 
-use crate::Tool::Dispatch::Fn::ToolHandler;
+use crate::Tool::Dispatch::Fn::Handler;
 
 /// The `aphrodite_diff` handler.
 ///
 /// Reads the conversation index only - it does not walk the inline store, so a
 /// marker that was never archived by `post_llm_call` does not appear here even
 /// though `aphrodite_retrieve` can still resolve it.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_diff", |_Args| {
 		crate::Session::With::Fn::with_shared(|State| {
-			let Turns = aphrodite::Session::Index::Fn::GetConvIndex(State);
+			let Turns = aphrodite::Session::Index::Fn::Fn(State);
 
 			serde_json::json!({"total": Turns.len(), "turns": Turns})
 		})

@@ -6,13 +6,18 @@
 //! used whenever no `[templates.marker] format` is registered, which is the
 //! shipped configuration.
 
-use super::Bracket::IsSelfBracketedPreview;
+use super::Bracket::Fn as Bracketed;
 
 /// Render the canonical marker grammar (fallback when `[templates.marker]
 /// format` is unconfigured).
 ///
-/// Doubling-bug fix (report 09 §5): `BuildPreview` already returns a
-/// self-describing, fully bracketed preview like `[text:53L 1913B]` or
+/// External contract: the rendered bytes are the wire format the model reads and
+/// `Marker::Parse` reads back - `<<<CCR:{hash}|{type}|{size}>>>`, a newline, the
+/// preview line, then `Hint` and `[meta:...]` when they are non-empty. An empty
+/// `Meta` drops the `[meta:...]` line entirely; an empty `Hint` appends nothing.
+///
+/// Doubling-bug fix (report 09 §5): `Preview::Builder::Entry::Fn` already returns
+/// a self-describing, fully bracketed preview like `[text:53L 1913B]` or
 /// `[git:5M 2A | src/x.rs]`. Re-wrapping that in `[{center_str}:{preview}]`
 /// produced the visible `[text:[text:53L 1913B]]` doubling. When the preview
 /// is already a `[label:...]`-shaped string, emit it verbatim on the preview
@@ -20,27 +25,19 @@ use super::Bracket::IsSelfBracketedPreview;
 /// `[{center_str}:...]` frame. A preview is thus produced exactly once.
 ///
 /// The `Hint` text is appended to the preview line only when the
-/// `CCRMarkerHint` knob is enabled (opt-in; empty = byte-identical to the
-/// pre-knob output).
-pub(super) fn RenderMarkerFallback(
-	Preview:&str,
-	CCRType:&str,
-	meta:&str,
-	Center:Option<&str>,
-	hash:&str,
-	Size:usize,
-	Hint:&str,
-) -> String {
-	let CenterStr = Center.unwrap_or(CCRType);
-	let MetaPart = match meta.is_empty() {
+/// `[prompts] ccr_marker_hint` knob is enabled (opt-in; empty = byte-identical
+/// to the pre-knob output).
+pub(super) fn Fn(Preview:&str, Type:&str, Meta:&str, Center:Option<&str>, Hash:&str, Size:usize, Hint:&str) -> String {
+	let Frame = Center.unwrap_or(Type);
+	let Trailer = match Meta.is_empty() {
 		true => String::new(),
-		false => format!("\n[meta:{}]", meta),
+		false => format!("\n[meta:{}]", Meta),
 	};
 
-	let PreviewLine = match IsSelfBracketedPreview(Preview) {
+	let Line = match Bracketed(Preview) {
 		true => Preview.to_string(),
-		false => format!("[{}:{}]", CenterStr, Preview),
+		false => format!("[{}:{}]", Frame, Preview),
 	};
 
-	format!("<<<CCR:{}|{}|{}>>>\n{}{}{}", hash, CCRType, Size, PreviewLine, Hint, MetaPart)
+	format!("<<<CCR:{}|{}|{}>>>\n{}{}{}", Hash, Type, Size, Line, Hint, Trailer)
 }

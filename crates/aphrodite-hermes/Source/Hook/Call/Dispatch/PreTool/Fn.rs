@@ -28,7 +28,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	// args byte size, effective thresholds, and the expected compression path
 	// (the transform arms log the actual outcome).
 	let Tool = Input.Parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-	let ArgsBytes = Input.Parsed.get("args").map(|Args| Args.to_string().len()).unwrap_or(0);
+	let Bytes = Input.Parsed.get("args").map(|Args| Args.to_string().len()).unwrap_or(0);
 	let Expected = crate::Configuration::Path::Fn::Fn(State, Tool, &Input.Parsed);
 	crate::Debug::Log::Bridge::Fn::Fn(
 		State,
@@ -36,7 +36,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 		"pre_tool",
 		&[
 			("tool", Tool.to_string()),
-			("args_bytes", ArgsBytes.to_string()),
+			("args_bytes", Bytes.to_string()),
 			("tool_threshold", State.ToolThreshold.to_string()),
 			("terminal_threshold", State.TerminalThreshold.to_string()),
 			("auto_expand_limit", State.AutoExpandLimit.to_string()),
@@ -55,7 +55,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 				.and_then(|Args| Args.get("command"))
 				.and_then(|v| v.as_str());
 			// For `process(action='poll')`, don't background - it's a check call.
-			let IsPoll = Tool == "process"
+			let Poll = Tool == "process"
 				&& Input
 					.Parsed
 					.get("args")
@@ -64,8 +64,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 					.map(|Action| Action == "poll")
 					.unwrap_or(false);
 
-			(!IsPoll)
-				.then(|| aphrodite::PollWorker::Should::Entry::Fn::ShouldBackgroundPre(Command))
+			(!Poll)
+				.then(|| aphrodite::PollWorker::Should::Entry::Fn::Before(Command))
 				.flatten()
 				.map(|(_, Summary)| {
 					// We don't create a BgTask here - Hermes handles the

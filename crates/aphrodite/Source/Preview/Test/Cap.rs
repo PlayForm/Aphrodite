@@ -1,4 +1,4 @@
-//! `PreviewMaximumChars` cap, end to end.
+//! `State::Maximum::Value` cap, end to end.
 //!
 //! The cap is the one guarantee every arm shares, so it is tested against a
 //! generic arm, a structured arm and multibyte content: a cap that only works on

@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use crate::Prefetch::{
-	Outcome::Enum::ReadOutcome,
-	Read::{Content::Fn::Fn as ReadContent, Refuse::Fn::RefuseReason},
+	Outcome::Enum::Enum as Outcome,
+	Read::{Content::Fn::Fn as ReadContent, Refuse::Fn::Fn as Refuse},
 };
 
 /// Classify one path: refused, missing, oversize, unreadable, or loaded.
@@ -15,12 +15,12 @@ use crate::Prefetch::{
 /// stat'ed, a non-file is missing before its size is read, and an unreadable path
 /// falls through to `Error` - which is also the answer when `metadata` fails, so
 /// the chain's default is the error case rather than a fabricated success.
-pub(crate) fn Fn(PathStr:&str) -> ReadOutcome {
+pub(crate) fn Fn(PathStr:&str) -> Outcome {
 	let path = Path::new(PathStr);
 
-	RefuseReason(path)
-		.map(|Reason| ReadOutcome::Refused { Reason })
-		.or_else(|| (!path.is_file()).then_some(ReadOutcome::Missing))
+	Refuse(path)
+		.map(|Reason| Outcome::Refused { Reason })
+		.or_else(|| (!path.is_file()).then_some(Outcome::Missing))
 		.or_else(|| ReadContent(path))
-		.unwrap_or(ReadOutcome::Error)
+		.unwrap_or(Outcome::Error)
 }

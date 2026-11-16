@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString};
 
 use crate::{
 	ABI::{CallHook::aphrodite_hermes_call_hook, FreeString::aphrodite_hermes_free_string},
-	Session::Registry::Struct::session_state,
+	Session::Registry::Get,
 };
 
 // ── Wedged-lock degrade probe (gateway shared-plugin fix): simulate an
@@ -16,7 +16,7 @@ use crate::{
 fn probe_wedged_session_lock_degrades_fail_open() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 	// Simulate the abandoned worker: hold this session's lock.
-	let state = session_state("probe-wedged");
+	let state = Get::Fn::Fn("probe-wedged");
 	let _wedged_guard = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
 	// pre_tool_call for the wedged session -> null (no directive; the

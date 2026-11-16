@@ -10,4 +10,4 @@
 ///
 /// The distinction this keeps is the one that matters to a resolution chain: "the
 /// operator named a value" versus "the variable exists and says nothing".
-pub fn EnvironmentText(Var:&str) -> Option<String> { std::env::var(Var).ok().filter(|Value| !Value.is_empty()) }
+pub fn Fn(Var:&str) -> Option<String> { std::env::var(Var).ok().filter(|Value| !Value.is_empty()) }

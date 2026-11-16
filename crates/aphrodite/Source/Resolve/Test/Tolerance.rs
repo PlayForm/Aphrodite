@@ -10,7 +10,7 @@
 //! - unresolved - the original marker text stays in place.
 
 use crate::{
-	Resolve::{Expand::Fn as Expand, Parse::Find::Fn as FindMarkers},
+	Resolve::{Expand::Fn as Expand, Parse::Find::Fn as Find},
 	State::Struct::AphroditeState,
 };
 
@@ -18,15 +18,15 @@ use crate::{
 // is not a marker either. ──
 #[test]
 fn TestUnterminatedPrefixIsSteppedOver() {
-	assert!(FindMarkers("<<<CCR:").is_empty());
-	assert!(FindMarkers("text <<<CCR:abc|t|1").is_empty());
+	assert!(Find("<<<CCR:").is_empty());
+	assert!(Find("text <<<CCR:abc|t|1").is_empty());
 }
 
 #[test]
 fn TestUnterminatedPrefixDoesNotHideAnEarlierReference() {
 	// The unterminated prefix comes LAST, so it is stepped over and the complete reference
 	// before it is still found.
-	let Markers = FindMarkers("<<<CCR:ok|t|1>>> and then <<<CCR:unfinished");
+	let Markers = Find("<<<CCR:ok|t|1>>> and then <<<CCR:unfinished");
 
 	assert_eq!(Markers.len(), 1);
 	assert_eq!(Markers[0].Hash, "ok");
@@ -35,13 +35,13 @@ fn TestUnterminatedPrefixDoesNotHideAnEarlierReference() {
 // ── Hashless: a complete marker that names no hash is not an occurrence. ──
 #[test]
 fn TestHashlessMarkerIsNotAnOccurrence() {
-	assert!(FindMarkers("<<<CCR:>>>").is_empty());
-	assert!(FindMarkers("<<<CCR:|text|1>>>").is_empty());
+	assert!(Find("<<<CCR:>>>").is_empty());
+	assert!(Find("<<<CCR:|text|1>>>").is_empty());
 }
 
 #[test]
 fn TestHashlessMarkerDoesNotHideItsNeighbour() {
-	let Markers = FindMarkers("<<<CCR:>>> <<<CCR:real|t|1>>>");
+	let Markers = Find("<<<CCR:>>> <<<CCR:real|t|1>>>");
 
 	assert_eq!(Markers.len(), 1);
 	assert_eq!(Markers[0].Hash, "real");
@@ -51,8 +51,8 @@ fn TestHashlessMarkerDoesNotHideItsNeighbour() {
 #[test]
 fn TestReferenceIsResolved() {
 	let mut s = AphroditeState::default();
-	s.InlineStorePut("doc".into(), "before <<<CCR:real|t|1>>> after".into());
-	s.InlineStorePut("real".into(), "RESOLVED".into());
+	s.Put("doc".into(), "before <<<CCR:real|t|1>>> after".into());
+	s.Put("real".into(), "RESOLVED".into());
 
 	assert_eq!(Expand(&mut s, "doc"), Some("before RESOLVED after".to_string()));
 }
@@ -63,7 +63,7 @@ fn TestReferenceIsResolved() {
 fn TestUnresolvedReferenceKeepsItsOriginalText() {
 	let mut s = AphroditeState::default();
 	let Marker = "<<<CCR:missing|text|10>>>";
-	s.InlineStorePut("doc".into(), format!("before {Marker} after"));
+	s.Put("doc".into(), format!("before {Marker} after"));
 
 	assert_eq!(Expand(&mut s, "doc"), Some(format!("before {Marker} after")));
 }

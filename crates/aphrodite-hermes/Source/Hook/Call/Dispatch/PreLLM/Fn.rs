@@ -21,13 +21,13 @@ use crate::{
 /// Build this turn's model-visible context, or `null` when there is none.
 pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value {
 	let Parsed = &Input.Parsed;
-	let ArgsLength = Input.ArgsLength;
+	let Length = Input.Length;
 
 	// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes actually calls
 	// in production - through the single shared `Flow::build_turn_context`
 	// assembler. This makes the G1 bug class (bridge reimplements the hook
 	// body and forks on every core improvement) unrepresentable.
-	// `ArgsLength` is the request-size proxy for the P9 telemetry line (Hermes
+	// `Length` is the request-size proxy for the P9 telemetry line (Hermes
 	// serializes conversation_history into the kwargs JSON).
 	//
 	// Per-session debug: pre_llm_call is the ONE hook Hermes threads
@@ -53,14 +53,14 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 			&[
 				("turn", State.TurnCounter.to_string()),
 				("session", Session.to_string()),
-				("est_request_bytes", ArgsLength.to_string()),
+				("est_request_bytes", Length.to_string()),
 				("pending_markers", State.RecentMarkers.len().to_string()),
 			],
 		);
 		Log::Fn::Fn(State, Session);
 	});
 
-	let Context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(State, Some(ArgsLength));
+	let Context = aphrodite::Flow::TurnContext::Fn::Fn(State, Some(Length));
 
 	(!Context.is_empty())
 		.then(|| serde_json::json!({ "context": Context }))

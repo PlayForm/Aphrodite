@@ -13,7 +13,7 @@ use crate::Flow::{Hash::Fn::Fnv1a, Signature::Const::VolatileKeys};
 /// keys stripped, so the same logical call hashes stably; a different file path
 /// yields a different signature. Terminal calls (args carrying a `command`
 /// string) normalize to the trimmed command string.
-pub fn NormalizeArgsSig(Tool:&str, Args:Option<&serde_json::Value>) -> u64 {
+pub fn Fn(Tool:&str, Args:Option<&serde_json::Value>) -> u64 {
 	let mut Buffer = String::new();
 	Buffer.push_str(Tool);
 	Buffer.push('\u{1}');

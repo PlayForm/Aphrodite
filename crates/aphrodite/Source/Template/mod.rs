@@ -8,14 +8,14 @@
 //! builder). `{variable}` substitution mirrors the pre-Rust variable set;
 //! unknown variables degrade to empty string - never a panic.
 //!
-//! Registration mirrors the `preview/state.rs` `SetPreviewMaximumChars`
+//! Registration mirrors the `Preview::State` `Set`
 //! pattern: a process-global registry set by `ConfigurationLoader::apply_templates`
 //! (dylib path), `main.rs` (engine binary), and the proxy `/reload` handler
 //! (hot-reload).
 //!
 //! The tree follows the render itself: `State/` is the registry (the singleton,
 //! its storage, its accessor), `Set/`/`Get/` write and read the `[templates]`
-//! section, `Family/` does the same for the `ModelFamily` selector,
+//! section, `Family/` does the same for the model-family selector,
 //! `Render/` is the one public entry point, `Vars/` builds the variable set
 //! (one file per variable family), `Extract/` derives the values from content,
 //! `Substitute/` performs the `{name}` replacement and `Guard/` serialises the

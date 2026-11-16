@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::super::Guard::{CwdGuard, GuardedApplyCompression};
+use super::super::Guard::{CwdGuard, Guarded};
 use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 
 // ── 05-T2 (P1/G3): directives load whenever a `directives/` dir exists,
@@ -34,7 +34,7 @@ fn TestDirectivesLoadedEvenWhenActiveEmpty() {
 		ParseFailure:None,
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
-	GuardedApplyCompression(&cfg, &mut State);
+	Guarded(&cfg, &mut State);
 
 	std::env::set_current_dir(&Original).unwrap();
 	let _ = std::fs::remove_dir_all(&Temporary);
@@ -76,7 +76,7 @@ fn TestDirectivesEnvironmentOverrideWinsOverCwd() {
 	unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", &EnvironmentDirectory) };
 
 	let mut State = crate::State::Struct::AphroditeState::default();
-	GuardedApplyCompression(&Configuration::default(), &mut State);
+	Guarded(&Configuration::default(), &mut State);
 
 	unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 	std::env::set_current_dir(&Original).unwrap();

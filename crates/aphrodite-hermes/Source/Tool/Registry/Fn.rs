@@ -24,7 +24,7 @@ use super::{
 };
 #[cfg(debug_assertions)]
 use super::Debug;
-use crate::Tool::Dispatch::Fn::ToolHandler;
+use crate::Tool::Dispatch::Fn::Handler;
 
 /// Build the name -> handler table for every registered tool.
 ///
@@ -43,7 +43,7 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// tool - it is an internal hook handler registered via
 /// `ctx.register_context_engine`, and the schema/registry consistency test
 /// excludes it by name for that reason.
-pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
+pub(crate) fn Fn() -> HashMap<&'static str, Handler> {
 	let Production = [
 		Compress::Fn::Fn(),
 		Retrieve::Fn::Fn(),
@@ -63,10 +63,10 @@ pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
 	.into_iter();
 
 	#[cfg(debug_assertions)]
-	let DebugOnly = std::iter::once(Debug::Fn::Fn());
+	let Development = std::iter::once(Debug::Fn::Fn());
 
 	#[cfg(not(debug_assertions))]
-	let DebugOnly = std::iter::empty::<(&'static str, ToolHandler)>();
+	let Development = std::iter::empty::<(&'static str, Handler)>();
 
-	Production.chain(DebugOnly).collect()
+	Production.chain(Development).collect()
 }

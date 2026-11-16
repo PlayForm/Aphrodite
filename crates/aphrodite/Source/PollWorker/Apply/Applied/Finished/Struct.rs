@@ -4,7 +4,7 @@ use crate::PollWorker::Apply::Applied::Subject::Struct::Subject;
 
 /// A completion, before its output has been hashed and stored.
 ///
-/// This type is the whole point of the `Applied` split: it can only be built by the
+/// This type is the whole point of the `Outcome` split: it can only be built by the
 /// poll that moved an accumulator out, so a function that prepares a completion takes
 /// `Finished` and a progress result cannot reach it - that is a compile error, not a
 /// runtime check. The output is OWNED here because it was moved out of the task's

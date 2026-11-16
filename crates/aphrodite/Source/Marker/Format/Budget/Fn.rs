@@ -12,8 +12,8 @@ use super::Enum::Enum as Limit;
 /// `None` (no budget configured) and a budget at or above 75 are the same
 /// outcome, and that is deliberate rather than an accident of the last arm: both
 /// mean the preview is not truncated at all.
-pub(crate) fn Fn(HeadroomBudget:Option<u32>) -> Limit {
-	match HeadroomBudget {
+pub(crate) fn Fn(Percent:Option<u32>) -> Limit {
+	match Percent {
 		None | Some(75..) => Limit::Unlimited,
 		Some(0..=24) => Limit::At(30),
 		Some(25..=49) => Limit::At(60),

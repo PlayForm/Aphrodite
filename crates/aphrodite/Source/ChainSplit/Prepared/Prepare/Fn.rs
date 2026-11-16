@@ -1,7 +1,7 @@
 //! Prepare a whole chain's artifacts with no session access.
 
 use crate::ChainSplit::{
-	Marked::Output::Fn::Fn as SplitMarkedOutput,
+	Marked::Output::Fn::Fn as Output,
 	Prepared::{Segment::Fn::Fn as PrepareSegment, Struct::Struct as Prepared},
 };
 
@@ -22,7 +22,7 @@ use crate::ChainSplit::{
 /// rendering configuration), which is what makes the apply phase the only
 /// mutating step.
 pub(crate) fn Fn(Content:&str) -> Option<Prepared> {
-	let Parts = SplitMarkedOutput(Content);
+	let Parts = Output(Content);
 	let Segments:Vec<_> = Parts.into_iter().map(|Part| PrepareSegment(Part.Index, Part.Text)).collect();
 
 	Prepared::Assemble(Segments)

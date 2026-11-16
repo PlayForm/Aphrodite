@@ -8,10 +8,10 @@
 //! The flag arrives as a `bool`, not as the session: this renderer reads one setting
 //! and one task, and taking the state would let it grow a dependency on anything else.
 
-use crate::PollWorker::Task::Struct::BgTask;
+use crate::PollWorker::Task::Struct::Struct as Record;
 
 /// The task line, plus the live-container line when the feature is enabled.
-pub(crate) fn Fn(Live:bool, Task:&BgTask) -> Vec<String> {
+pub(crate) fn Fn(Live:bool, Task:&Record) -> Vec<String> {
 	let Polled = match Task.PollCount {
 		0 => String::from("not polled yet"),
 		Count => format!("polled {Count}×"),

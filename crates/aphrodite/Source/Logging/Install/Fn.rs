@@ -2,7 +2,7 @@
 
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::Logging::Level::Fn::Fn as ResolveFilter;
+use crate::Logging::Level::Fn::Fn as Resolve;
 
 /// Build the registry and install it as the global dispatcher.
 ///
@@ -15,7 +15,7 @@ use crate::Logging::Level::Fn::Fn as ResolveFilter;
 /// the structured format is the default because a log a machine reads needs
 /// its fields and its time.
 pub(crate) fn Fn(Compact:bool, Configured:Option<tracing::Level>) -> anyhow::Result<()> {
-	let Filter = ResolveFilter(Configured);
+	let Filter = Resolve(Configured);
 	let Subscriber = tracing_subscriber::registry().with(Filter);
 	match Compact {
 		true => {

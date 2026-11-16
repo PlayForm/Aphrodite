@@ -17,19 +17,19 @@ use crate::{
 		Completion::Struct::Completion,
 		Registry::{Complete::Fn::Fn as Complete, From::Fn::Fn as Registry},
 	},
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Struct::Struct as Entry, Struct::AphroditeState},
 };
 
 /// Put the output in the store, record the marker, complete the task.
 pub(crate) fn Fn(State:&mut AphroditeState, Index:usize, Completion:Completion) {
 	let Completion { Stored, Output, Command, ExitCode } = Completion;
 
-	State.InlineStorePut(Stored.Hash.as_str().to_string(), Output);
+	State.Put(Stored.Hash.as_str().to_string(), Output);
 
 	// The store decides whether the completion is still there: an entry the budget
 	// evicted immediately is a listed hash that cannot resolve, so the size it lost
 	// is what the warning reports.
-	(!State.InlineStoreContains(Stored.Hash.as_str()))
+	(!State.Contains(Stored.Hash.as_str()))
 		.then_some(Stored.Size)
 		.into_iter()
 		.for_each(|Size| {
@@ -40,7 +40,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Index:usize, Completion:Completion) 
 			);
 		});
 
-	State.RecordMarker(MarkerEntry {
+	State.RecordMarker(Entry {
 		hash:Stored.Hash.as_str().to_string(),
 		CCRType:"terminal".to_string(),
 		Size:Stored.Size,

@@ -1,4 +1,4 @@
-//! `RuntimeHomeOpt`: the runtime home precedence chain.
+//! `Opt`: the runtime home precedence chain.
 
 use std::path::PathBuf;
 

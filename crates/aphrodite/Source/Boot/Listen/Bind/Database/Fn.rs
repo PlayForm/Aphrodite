@@ -3,7 +3,7 @@
 use anyhow::Context;
 use aphrodite::Configuration::CLI::Struct::Struct as CLI;
 
-/// Make `CLI.CCRDatabasePath` absolute and create its parent directory.
+/// Make `CLI.Database` absolute and create its parent directory.
 ///
 /// A relative `ccr_db_path` is resolved against the **binary's** directory, not the
 /// process's current directory, so the database lands in the same place regardless of
@@ -21,7 +21,7 @@ use aphrodite::Configuration::CLI::Struct::Struct as CLI;
 /// store cannot be opened answers every request while silently dropping every marker,
 /// which is worse than refusing to start.
 pub(crate) fn Fn(CLI:&mut CLI) -> anyhow::Result<()> {
-	let Some(Configured) = CLI.CCRDatabasePath.clone() else {
+	let Some(Configured) = CLI.Database.clone() else {
 		return Ok(());
 	};
 
@@ -45,13 +45,13 @@ pub(crate) fn Fn(CLI:&mut CLI) -> anyhow::Result<()> {
 				Resolved.display()
 			);
 
-			CLI.CCRDatabasePath = Some(Resolved);
+			CLI.Database = Some(Resolved);
 		});
 
 	// The parent of whatever path is now in force, when there is one. Named in the error
 	// because "create the database directory" without a path leaves the operator to guess
 	// which of the two paths (configured or resolved) was wrong.
-	CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()).map_or(Ok(()), |Parent| {
+	CLI.Database.as_ref().and_then(|p| p.parent()).map_or(Ok(()), |Parent| {
 		std::fs::create_dir_all(Parent).with_context(|| format!("create the database directory {}", Parent.display()))
 	})?;
 

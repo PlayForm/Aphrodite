@@ -17,9 +17,9 @@ use crate::{
 	Flow::{
 		Section::Join::Fn::Fn as JoinSections,
 		TurnContext::{
-			Budget::{Fn::DropToBudget, Outcome::Enum::Enum as BudgetOutcome},
-			Collect::Fn::CollectSections,
-			Log::Fn::LogPreTurn,
+			Budget::{Fn::Fn as Trim, Outcome::Enum::Enum as BudgetOutcome},
+			Collect::Fn::Fn as Gather,
+			Log::Fn::Fn as Trace,
 		},
 	},
 	State::Struct::AphroditeState,
@@ -50,11 +50,11 @@ use crate::{
 /// oversized and reported, because silently truncating the text the session is
 /// following would be worse than a large turn.
 ///
-/// `EstRequestBytes` is reserved for the P9 telemetry line (chars/4 estimate)
+/// `Estimate` is reserved for the P9 telemetry line (chars/4 estimate)
 /// and is accepted now so callers don't have to change signature later; T1
 /// itself does not render a telemetry line.
-pub fn BuildTurnContext(State:&mut AphroditeState, EstRequestBytes:Option<usize>) -> String {
-	let _ = EstRequestBytes; // reserved for P9/T27 telemetry line
+pub fn Fn(State:&mut AphroditeState, Estimate:Option<usize>) -> String {
+	let _ = Estimate; // reserved for P9/T27 telemetry line
 	// DEV-ONLY debug instrumentation (crate::debug): pre-turn timing
 	// (captured only when the logger is on - one atomic load when off).
 	let T0 = crate::Debug::Level::Enabled::Fn::Fn().then(std::time::Instant::now);
@@ -63,7 +63,7 @@ pub fn BuildTurnContext(State:&mut AphroditeState, EstRequestBytes:Option<usize>
 
 	// Gather every candidate section in fixed order, then drop the optional ones
 	// from the bottom until the joined string fits the budget.
-	let (Measured, Overflow) = match DropToBudget(CollectSections(State), Budget) {
+	let (Measured, Overflow) = match Trim(Gather(State), Budget) {
 		BudgetOutcome::Fits(Measured) => (Measured, None),
 		BudgetOutcome::ProtectedOverflow { Surviving, Limit, Excess } => (Surviving, Some((Limit, Excess))),
 	};
@@ -78,6 +78,6 @@ pub fn BuildTurnContext(State:&mut AphroditeState, EstRequestBytes:Option<usize>
 	});
 
 	let Joined = JoinSections(&Measured.Sections);
-	LogPreTurn(State, T0, Budget, Measured.Floor, &Measured.Sections);
+	Trace(State, T0, Budget, Measured.Floor, &Measured.Sections);
 	Joined
 }

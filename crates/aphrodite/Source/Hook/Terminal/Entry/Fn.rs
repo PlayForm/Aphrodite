@@ -1,49 +1,29 @@
-//! The terminal-output entry points.
+//! The terminal-output entry point.
 //!
-//! Three signatures, one pipeline - the same shape as the tool-result entry
-//! points, plus the `command`/`Returncode` pair Hermes reports for a terminal
-//! call. `Returncode` is what makes the error-loop breaker work: a failing
-//! command is a signal even when the output is too small to compress.
+//! One pipeline, three signatures: this leaf is the plain form, `Classify/`
+//! accepts a caller-supplied classification and `Meta/` also carries the
+//! `command`/`Returncode` pair Hermes reports for a terminal call. `Returncode`
+//! is what makes the error-loop breaker work: a failing command is a signal even
+//! when the output is too small to compress.
 
-use super::{super::Inner::Fn::Fn as TransformTerminalOutputInner, Span::Fn::Fn as TerminalSpan};
-use crate::{Hook::Outcome::Record::Fn::Fn as RecordOutcome, State::Struct::AphroditeState};
+use crate::{
+	Hook::{
+		Outcome::Record::Fn::Fn as RecordOutcome,
+		Terminal::{Entry::Span::Fn::Fn as TerminalSpan, Inner::Fn::Fn as Transform},
+	},
+	State::Struct::AphroditeState,
+};
 
 /// Transform terminal output - exit code aware.
-pub fn TransformTerminalOutput(State:&mut AphroditeState, Content:&str) -> serde_json::Value {
+///
+/// Wire contract: returns the payload Hermes receives (a marker object with
+/// `compressed`, `hash`, `type`, `size`, `preview`, or a passthrough carrying
+/// `reason`), records the decision on the `hook.terminal_output` span, and
+/// mutates session state (store, telemetry ring).
+pub fn Fn(State:&mut AphroditeState, Content:&str) -> serde_json::Value {
 	let Span = TerminalSpan(Content.len(), None, None);
 	let _Entered = Span.enter();
-	let Payload = TransformTerminalOutputInner(State, Content, None, None, None);
-	RecordOutcome(&Span, &Payload);
-	Payload
-}
-
-/// Same as [`TransformTerminalOutput`], with the same `Classify` contract
-/// as [`crate::Hook::transform_tool_result_classified`].
-pub fn TransformTerminalOutputClassified(
-	State:&mut AphroditeState,
-	Content:&str,
-	Classify:Option<(&str, &str)>,
-) -> serde_json::Value {
-	let Span = TerminalSpan(Content.len(), None, None);
-	let _Entered = Span.enter();
-	let Payload = TransformTerminalOutputInner(State, Content, Classify, None, None);
-	RecordOutcome(&Span, &Payload);
-	Payload
-}
-
-/// Same as [`TransformTerminalOutputClassified`], plus the Hermes-supplied
-/// `command` and `Returncode` (report 05, P2/T6/T8) recorded into the
-/// `ToolEvents` telemetry ring. `returncode == 0` (or absent) is `Okay`.
-pub fn TransformTerminalOutputWithMeta(
-	State:&mut AphroditeState,
-	Content:&str,
-	Classify:Option<(&str, &str)>,
-	command:Option<&str>,
-	Returncode:Option<i64>,
-) -> serde_json::Value {
-	let Span = TerminalSpan(Content.len(), command, Returncode);
-	let _Entered = Span.enter();
-	let Payload = TransformTerminalOutputInner(State, Content, Classify, command, Returncode);
+	let Payload = Transform(State, Content, None, None, None);
 	RecordOutcome(&Span, &Payload);
 	Payload
 }

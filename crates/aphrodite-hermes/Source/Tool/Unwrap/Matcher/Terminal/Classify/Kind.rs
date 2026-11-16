@@ -11,7 +11,7 @@ pub(crate) enum Enum {
 	/// A shell failure trace (`exit code:` / `Error:`).
 	Failure,
 	/// Cargo/test/install output, and whether the compiler actually failed.
-	Build { CompilerError:bool },
+	Build { Error:bool },
 	/// No build or failure marker: the shared classifier decides.
 	Detected,
 }

@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 
-use crate::PollWorker::{Registry::Reader::Struct::Reader, Task::Struct::BgTask};
+use crate::PollWorker::{Registry::Reader::Struct::Reader, Task::Struct::Struct as Record};
 
 /// The read-only view of `Tasks`.
-pub(crate) fn Fn(Tasks:&VecDeque<BgTask>) -> Reader<'_> { Reader { Tasks } }
+pub(crate) fn Fn(Tasks:&VecDeque<Record>) -> Reader<'_> { Reader { Tasks } }

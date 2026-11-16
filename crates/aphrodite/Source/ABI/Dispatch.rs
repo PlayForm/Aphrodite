@@ -6,8 +6,8 @@ use std::os::raw::c_char;
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, Handle::Fn::Fn as HandleID, Run::Fn::Fn as Run},
 	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
-	Handle::Lookup::WithState,
-	Route::{Decode::Fn::Fn as Decode, Prepare::Fn::Fn as Prepare, Run::Fn::Fn as RunRoute},
+	Handle::Lookup::Guarded,
+	Route::{Decode::Fn::Fn as Decode, Prepare::Fn::Fn as Prepare, Run::Fn::Fn as Execute},
 };
 
 /// Universal hook dispatcher. Python calls this for every hook handler.
@@ -31,34 +31,34 @@ use crate::ABI::{
 /// order is the error precedence: a bad handle wins over bad args, bad args win
 /// over oversize content, and an oversize payload never reaches the filesystem.
 /// # Safety
-/// `Handle`, `HookName` and `ArgsJSON` must each be null or point to a valid,
+/// `Handle`, `Hook` and `Args` must each be null or point to a valid,
 /// NUL-terminated C string that stays readable and unmoved for the duration of
 /// this call. The returned pointer is owned by the caller and must be released
 /// with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn AphroditeDispatch(
 	Handle:*const c_char,
-	HookName:*const c_char,
-	ArgsJSON:*const c_char,
+	Hook:*const c_char,
+	Args:*const c_char,
 ) -> *mut c_char {
-	let Hid = unsafe { HandleID(Handle) };
-	let Name = unsafe { Cstr(HookName) };
-	let ArgsStr = unsafe { Cstr(ArgsJSON) };
+	let Identity = unsafe { HandleID(Handle) };
+	let Name = unsafe { Cstr(Hook) };
+	let Text = unsafe { Cstr(Args) };
 
 	Run(move || {
-		let Hid = Hid.ok_or_else(|| anyhow::anyhow!("invalid handle"))?;
+		let Identity = Identity.ok_or_else(|| anyhow::anyhow!("invalid handle"))?;
 		let Name = Optional(Name)?;
-		let ArgsStr = Optional(ArgsStr)?;
+		let Text = Optional(Text)?;
 
-		let Args:serde_json::Value =
-			serde_json::from_str(&ArgsStr).map_err(|Error| anyhow::anyhow!("invalid args: {}", Error))?;
+		let Payload:serde_json::Value =
+			serde_json::from_str(&Text).map_err(|Error| anyhow::anyhow!("invalid args: {}", Error))?;
 
 		// Decode enforces the payload cap, so an oversize request is refused
 		// before the span is opened and before any file is read.
-		let Command = Decode(&Name, &Args)?;
+		let Command = Decode(&Name, &Payload)?;
 
-		let Tool = Args.get("tool_name").and_then(|Value| Value.as_str()).unwrap_or("unknown");
-		let Content = Args.get("content").and_then(|Value| Value.as_str()).unwrap_or("");
+		let Tool = Payload.get("tool_name").and_then(|Value| Value.as_str()).unwrap_or("unknown");
+		let Content = Payload.get("content").and_then(|Value| Value.as_str()).unwrap_or("");
 
 		// One span per host call. The hook name is the routing key and the handle
 		// is the session, so a trace line answers "which session asked for what";
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn AphroditeDispatch(
 			"abi.dispatch",
 			hook = %Name,
 			tool = %Tool,
-			handle = Hid,
+			handle = Identity,
 			content_bytes = Content.len(),
 			ok = tracing::field::Empty,
 		);
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn AphroditeDispatch(
 		// this one's (possibly slow/cold-mount) disk reads.
 		let Prepared = Prepare(Command);
 
-		let Outcome = WithState(Hid, |s| Ok(RunRoute(s, Prepared)));
+		let Outcome = Guarded(Identity, |s| Ok(Execute(s, Prepared)));
 
 		Span.record("ok", Outcome.is_ok());
 

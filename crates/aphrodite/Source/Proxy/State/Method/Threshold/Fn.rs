@@ -23,22 +23,22 @@ use crate::{
 impl AppState {
 	pub(crate) fn CompressThreshold(&self) -> usize {
 		match self.Mode {
-			ProxyMode::Cache => self.CacheCompressThreshold.load(Ordering::Relaxed),
-			ProxyMode::Token => self.TokenCompressThreshold.load(Ordering::Relaxed),
+			ProxyMode::Cache => self.CacheThreshold.load(Ordering::Relaxed),
+			ProxyMode::Token => self.TokenThreshold.load(Ordering::Relaxed),
 		}
 	}
 
 	/// Inline-vs-durable storage cutoff (report 07 F2/T15) - was the
-	/// `InlineCCRThreshold` const; now live-configurable via
+	/// `InlineThreshold` const; now live-configurable via
 	/// `compression.inline_threshold`.
-	pub(crate) fn InlineCCRThreshold(&self) -> usize { self.InlineCCRThreshold.load(Ordering::Relaxed) }
+	pub(crate) fn InlineThreshold(&self) -> usize { self.InlineThreshold.load(Ordering::Relaxed) }
 
 	/// How many times the base threshold for code content (report 07
 	/// F2/F10/T11/T15) - was a free fn parsing `APHRODITE_CODE_MULTIPLIER` as
 	/// `usize` (silently truncating the documented `3.0` to a parse failure →
 	/// default 2); now live-configurable via `compression.code_multiplier` and
 	/// re-resolved as `f64` on every hot-reload.
-	pub(crate) fn CodeMultiplier(&self) -> f64 { self.CodeMultiplierX100.load(Ordering::Relaxed) as f64 / 100.0 }
+	pub(crate) fn CodeMultiplier(&self) -> f64 { self.CodeMultiplier.load(Ordering::Relaxed) as f64 / 100.0 }
 
 	/// Per-type threshold - code stays in context longer, logs compressed
 	/// aggressively.
@@ -54,7 +54,7 @@ impl AppState {
 		let Tune = match Family {
 			ContentFamily::Linter | ContentFamily::BuildOutput | ContentFamily::Log => 1.0,
 			_ => {
-				let Ratio = self.CompressionRatioEma.load(Ordering::Relaxed) as f64 / 100.0;
+				let Ratio = self.RatioEma.load(Ordering::Relaxed) as f64 / 100.0;
 
 				(Ratio > 20.0)
 					.then_some(2.0)

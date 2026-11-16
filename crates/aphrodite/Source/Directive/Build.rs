@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::{Cap::MaximumCombinedChars::Const::Const as MaximumCombinedChars, Model::Struct};
+use super::{Cap::Combined::Const::Const as Maximum, Model::Struct};
 
 /// Build the context string injected into `PreLLMCall`.
 ///
@@ -49,7 +49,7 @@ pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
 	// T19: the cap is compared as a CHARACTER count. `Out.len()` is a byte length, so multibyte
 	// content (em-dashes etc.) tripped the truncation on text that never exceeded the char
 	// budget, silently cutting directives that fit.
-	match Out.char_indices().nth(MaximumCombinedChars) {
+	match Out.char_indices().nth(Maximum) {
 		Some((Offset, _Char)) => format!("{}...\n", &Out[..Offset]),
 		None => Out,
 	}

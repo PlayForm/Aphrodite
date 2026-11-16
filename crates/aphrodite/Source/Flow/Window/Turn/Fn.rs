@@ -1,4 +1,4 @@
-//! Compute `WindowStats` over the last `n` turns.
+//! Compute the window aggregate over the last `n` turns.
 //!
 //! The window is open at the floor: an event counts while `turn >
 //! turn_counter - n`. Off-by-one here changes every telemetry number
@@ -6,16 +6,16 @@
 //! re-reading files") rather than as diagnostics, so the boundary has to be
 //! exactly what the caller means.
 
-use crate::{Flow::Window::Stats::Struct::WindowStats, State::Struct::AphroditeState};
+use crate::{Flow::Window::Stats::Struct::Struct as Window, State::Struct::AphroditeState};
 
-/// Compute `WindowStats` over the last `n` turns (P2/T7).
-pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {
+/// Compute `Window::Stats::Struct` over the last `n` turns (P2/T7).
+pub fn Fn(State:&AphroditeState, n:usize) -> Window {
 	let Floor = State.TurnCounter.saturating_sub(n);
-	let mut Stats = WindowStats::default();
+	let mut Stats = Window::default();
 	let mut ErrorSigs = std::collections::HashSet::new();
 	let mut SeenPaths = std::collections::HashSet::new();
 	State.ToolEvents.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
-		Stats.TotalCalls += 1;
+		Stats.Total += 1;
 		// A failed call is one count and (maybe) one signature; a successful one
 		// contributes neither, so the boolean is the quantity rather than a gate.
 		Stats.Errors += (!Event.Okay) as usize;
@@ -41,7 +41,7 @@ pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {
 		}
 	});
 
-	Stats.DistinctErrorSigs = ErrorSigs.len();
+	Stats.Distinct = ErrorSigs.len();
 
 	Stats
 }

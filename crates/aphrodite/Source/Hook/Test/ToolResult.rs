@@ -2,14 +2,14 @@
 
 use super::StoreNested;
 use crate::{
-	Hook::{Hash::Fn::Fn as ComputeHash, ToolResult::Entry::Fn::TransformToolResult},
+	Hook::{Hash::Fn::Fn as ComputeHash, ToolResult::Entry::Fn::Fn as Transform},
 	State::Struct::AphroditeState,
 };
 
 #[test]
-fn TestEssentialToolSkip() {
+fn Essential() {
 	let mut s = AphroditeState::default();
-	let r = TransformToolResult(&mut s, "some content", "skill_view");
+	let r = Transform(&mut s, "some content", "skill_view");
 	assert_eq!(r["compressed"], false);
 	assert_eq!(r["reason"], "essential_tool");
 }
@@ -21,9 +21,9 @@ fn TestEssentialToolSkip() {
 // most common file reference (reading a file) was silently never
 // recorded in `ReferencedFiles`.
 #[test]
-fn TestEssentialToolReadFileStillRecordsFileReference() {
+fn Tracked() {
 	let mut s = AphroditeState::default();
-	let r = TransformToolResult(&mut s, "/tmp/some/file.rs\nfn main() {}\n", "read_file");
+	let r = Transform(&mut s, "/tmp/some/file.rs\nfn main() {}\n", "read_file");
 	assert_eq!(r["compressed"], false, "read_file must never be compressed");
 	assert_eq!(r["reason"], "essential_tool");
 	assert_eq!(
@@ -35,39 +35,39 @@ fn TestEssentialToolReadFileStillRecordsFileReference() {
 }
 
 // ── T9 (F10): `search_files` reaches the file-reference tracker (it's
-// listed in `state.file_tools`) but `ExtractFilePath` had no arm for
+// listed in `state.file_tools`) but `Path::Output` had no arm for
 // it, so search results were never recorded despite being tracked tools.
 #[test]
-fn TestSearchFilesRecordsFileReference() {
+fn Search() {
 	let mut s = AphroditeState::default();
 	s.ToolThreshold = 0; // always compress, to also exercise the non-essential path
 	let Content = "/tmp/some/file.rs:42:    let x = 1;\n/tmp/other/file.rs:7:    let y = 2;\n";
-	let _ = TransformToolResult(&mut s, Content, "search_files");
+	let _ = Transform(&mut s, Content, "search_files");
 	assert_eq!(s.ReferencedFiles.len(), 1);
 	assert_eq!(s.ReferencedFiles[0].0, "/tmp/some/file.rs");
 }
 
 #[test]
-fn TestEmptySkip() {
+fn Empty() {
 	let mut s = AphroditeState::default();
-	let r = TransformToolResult(&mut s, "", "terminal");
+	let r = Transform(&mut s, "", "terminal");
 	assert_eq!(r["compressed"], false);
 }
 
 #[test]
-fn TestBelowThreshold() {
+fn Below() {
 	let mut s = AphroditeState::default();
 	s.ToolThreshold = 10000;
-	let r = TransformToolResult(&mut s, "short", "terminal");
+	let r = Transform(&mut s, "short", "terminal");
 	assert_eq!(r["compressed"], false);
 }
 
 #[test]
-fn TestTransformSuccess() {
+fn Success() {
 	let mut s = AphroditeState::default();
 	s.ToolThreshold = 0; // always compress
 	let Content = "fn main() {\n    println!(\"hello world\");\n}\n";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["compressed"], true);
 	let hash = r["hash"].as_str().unwrap();
 	assert!(hash.len() >= 40);
@@ -84,7 +84,7 @@ fn TestTransformSuccess() {
 // or disabled, today's marker payload is byte-identical. ──
 
 #[test]
-fn TestAutoExpandReturnsExpandedContent() {
+fn Expand() {
 	let mut s = AphroditeState::default();
 	s.AutoExpand = true;
 	s.AutoExpandLimit = 102400;
@@ -95,7 +95,7 @@ fn TestAutoExpandReturnsExpandedContent() {
 	let Nested = "nested payload\nsecond line\n";
 	let NestedHash = StoreNested(&mut s, Nested);
 	let Content = format!("<<<CCR:{NestedHash}|text|{}>>>", Nested.len());
-	let r = TransformToolResult(&mut s, &Content, "terminal");
+	let r = Transform(&mut s, &Content, "terminal");
 	assert_eq!(r["compressed"], true);
 	assert_eq!(r["auto_expanded"], true, "auto-expand must flag the payload");
 	assert_eq!(r["expanded"], Nested, "expanded must be the resolved nested content");
@@ -109,13 +109,13 @@ fn TestAutoExpandReturnsExpandedContent() {
 }
 
 #[test]
-fn TestAutoExpandOverLimitEmitsMarker() {
+fn OverLimit() {
 	let mut s = AphroditeState::default();
 	s.AutoExpand = true;
 	s.AutoExpandLimit = 8;
 	s.ToolThreshold = 0;
 	let Content = "this content is far longer than eight bytes";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["compressed"], true);
 	assert!(
 		r.get("auto_expanded").is_none(),
@@ -131,11 +131,11 @@ fn TestAutoExpandOverLimitEmitsMarker() {
 // Default (auto_expand = false): the payload must be byte-identical to
 // the pre-auto-expand shape - same field set, same marker grammar.
 #[test]
-fn TestAutoExpandDisabledPayloadIsByteIdentical() {
+fn Identical() {
 	let mut s = AphroditeState::default(); // auto_expand = false
 	s.ToolThreshold = 0;
 	let Content = "fn main() {\n    println!(\"hello\");\n}\n";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["status"], "ok");
 	assert_eq!(r["compressed"], true);
 	assert!(r.get("auto_expanded").is_none());
@@ -160,13 +160,13 @@ fn TestAutoExpandDisabledPayloadIsByteIdentical() {
 }
 
 #[test]
-fn TestAutoExpandBypassesToolThresholdGate() {
+fn Bypass() {
 	let mut s = AphroditeState::default();
 	s.AutoExpand = true;
 	s.AutoExpandLimit = 102400;
 	s.ToolThreshold = 10000; // content below the threshold
 	let Content = "tiny tool output";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(
 		r["auto_expanded"], true,
 		"auto-expand must store+expand below-threshold content so no marker leaks"

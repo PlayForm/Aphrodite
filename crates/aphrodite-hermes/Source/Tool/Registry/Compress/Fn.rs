@@ -1,13 +1,13 @@
 //! `aphrodite_compress` - store content, return a resolvable marker.
 
-use crate::Tool::{Arg, Compress, Dispatch::Fn::ToolHandler};
+use crate::Tool::{Arg, Compress, Dispatch::Fn::Handler};
 
 /// The `aphrodite_compress` handler.
 ///
 /// An empty `content` is rejected rather than stored: a zero-byte entry would
 /// hash to the same value as every other empty payload and shadow it in the
 /// inline store.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_compress", |Args| {
 		let Content = Arg::Fn::Fn(Args, "content");
 

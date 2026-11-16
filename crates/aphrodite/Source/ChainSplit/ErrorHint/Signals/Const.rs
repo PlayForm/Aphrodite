@@ -7,7 +7,7 @@
 /// content-level and never names a mechanism. `exit code:` is checked
 /// separately and case-sensitively, because that exact spelling is what a
 /// shell prints.
-pub(crate) const Signals:&[&str] = &[
+pub(crate) const Vocabulary:&[&str] = &[
 	"error",
 	"failed",
 	"failure",

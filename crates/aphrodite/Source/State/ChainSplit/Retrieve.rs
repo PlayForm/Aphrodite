@@ -12,7 +12,7 @@ impl AphroditeState {
 	/// A hash counts at most once - removed from `SplitSegmentMap` after
 	/// attribution, so re-retrieving the same marker never double-counts.
 	/// Returns the event id when the hash belonged to a chain split.
-	pub fn NoteSplitRetrieval(&mut self, hash:&str) -> Option<usize> {
+	pub fn NoteRetrieval(&mut self, hash:&str) -> Option<usize> {
 		let Eid = self.SplitSegmentMap.remove(hash)?;
 		// The linear scan below is bounded by SPLIT_EVENT_CAP (16) events -
 		// deliberately not restructured (fix 7): an id→event map would need
@@ -24,7 +24,7 @@ impl AphroditeState {
 		self.SplitEvents.iter_mut().find(|e| e.ID == Eid).into_iter().for_each(|Event| {
 			Event.Retrieved = Event.Retrieved.saturating_add(1);
 		});
-		self.AdaptChainSplitThreshold();
+		self.Adapt();
 		Some(Eid)
 	}
 }

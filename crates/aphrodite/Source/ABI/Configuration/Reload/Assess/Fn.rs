@@ -33,11 +33,7 @@ pub(crate) fn Fn(Path:&str) -> Assessment {
 			// "config not set". Warn on a real log surface (stderr fallback when
 			// no tracing subscriber exists) and record the failure on the state
 			// + response so `AphroditeStats` can self-diagnose.
-			crate::ConfigurationLoader::Warn::Fn::WarnParseFailure(
-				std::path::Path::new(Path),
-				&Error,
-				"keeping previous value",
-			);
+			crate::ConfigurationLoader::Warn::Fn::Fn(std::path::Path::new(Path), &Error, "keeping previous value");
 
 			Assessment::Invalid { Diagnostic:format!("{Path}: {Error}") }
 		},

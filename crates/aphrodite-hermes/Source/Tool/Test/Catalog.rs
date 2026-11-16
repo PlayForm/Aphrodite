@@ -11,7 +11,7 @@ fn test_catalog_and_search_see_compressions() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 	// Reset shared state so `total` reflects only this test's compression,
 	// making the previously-loosened `>= 1` assertions exact.
-	crate::Session::With::Fn::with_shared(aphrodite::Session::Start::Fn::OnSessionStart);
+	crate::Session::With::Fn::with_shared(aphrodite::Session::Start::Fn::Fn);
 	dispatch(
 		"aphrodite_compress",
 		&serde_json::json!({"content": "needle_xyz in a haystack\n".repeat(5), "type": "log"}).to_string(),

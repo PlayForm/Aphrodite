@@ -1,8 +1,8 @@
 //! Live-container retrieval: the stored envelope, its reassembly and its progress.
 //!
 //! A live container is not a second store - it is the inline store's naming
-//! convention read back (`Hook::Live::Key::Fn::LiveMetaKey` for the envelope,
-//! `Hook::Live::Key::Fn::LiveChunkKey` per chunk), so `Container/` is the
+//! convention read back (`Hook::Live::Key::Meta::Fn::Fn` for the envelope,
+//! `Hook::Live::Key::Chunk::Fn::Fn` per chunk), so `Container/` is the
 //! envelope's shape, `Lookup/` reassembles content from it, and `Advance/`
 //! reports and persists how much of it a retrieve has delivered.
 //!

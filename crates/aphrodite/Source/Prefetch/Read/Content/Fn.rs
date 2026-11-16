@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::Prefetch::{Outcome::Enum::ReadOutcome, Read::Const::MaximumPrefetchSize};
+use crate::Prefetch::{Outcome::Enum::Enum as Outcome, Read::Const::Maximum};
 
 /// The size check, then the read.
 ///
@@ -15,13 +15,9 @@ use crate::Prefetch::{Outcome::Enum::ReadOutcome, Read::Const::MaximumPrefetchSi
 /// The read is a fallback: a file over the cap is never opened, which is the whole
 /// point of the cap - prefetching a huge file would evict everything already
 /// stored for content nobody asked to see yet.
-pub(crate) fn Fn(path:&Path) -> Option<ReadOutcome> {
+pub(crate) fn Fn(path:&Path) -> Option<Outcome> {
 	let Size = std::fs::metadata(path).ok()?.len();
-	let Over = (Size > MaximumPrefetchSize).then_some(ReadOutcome::SkippedSize { Size });
+	let Over = (Size > Maximum).then_some(Outcome::SkippedSize { Size });
 
-	Over.or_else(|| {
-		std::fs::read_to_string(path)
-			.ok()
-			.map(|Content| ReadOutcome::Loaded { Content })
-	})
+	Over.or_else(|| std::fs::read_to_string(path).ok().map(|Content| Outcome::Loaded { Content }))
 }

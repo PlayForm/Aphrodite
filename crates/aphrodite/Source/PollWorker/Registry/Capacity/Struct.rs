@@ -2,7 +2,7 @@
 
 use std::num::NonZeroUsize;
 
-use crate::PollWorker::Task::Const::MaximumBgTasks;
+use crate::PollWorker::Task::Const::Maximum;
 
 /// How many tasks the registry may hold.
 ///
@@ -13,10 +13,10 @@ use crate::PollWorker::Task::Const::MaximumBgTasks;
 pub(crate) struct Capacity(NonZeroUsize);
 
 impl Capacity {
-	/// The shipped policy bound (`MaximumBgTasks`), as a non-zero value.
-	pub(crate) const Policy:Capacity = match NonZeroUsize::new(MaximumBgTasks) {
+	/// The shipped policy bound (`Maximum`), as a non-zero value.
+	pub(crate) const Policy:Capacity = match NonZeroUsize::new(Maximum) {
 		Some(Value) => Capacity(Value),
-		None => panic!("MaximumBgTasks must be non-zero"),
+		None => panic!("Maximum must be non-zero"),
 	};
 
 	/// The bound as a plain count.

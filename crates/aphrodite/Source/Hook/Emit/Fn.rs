@@ -5,8 +5,8 @@ use crate::{
 		AutoExpand::Content::Fn::Fn as ResolveInline,
 		Classification::{Fn::Fn as Classification, Hint::Enum::Enum as Hint},
 	},
-	Marker::Format::Entry::CCRMarker,
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	Marker::Format::Entry::Fn as CCRMarker,
+	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// Store the content, record the marker, and build the payload the bridge hands
@@ -36,7 +36,7 @@ pub(crate) fn Fn(
 	let Resolved = Classification(Content, Classify, Hint);
 
 	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
-	State.InlineStorePut(hash.clone(), Content.to_string());
+	State.Put(hash.clone(), Content.to_string());
 
 	let Preview = crate::Preview::Builder::Entry::Fn(&Resolved.Type, Resolved.Content);
 	let Marker = CCRMarker(&hash, &Resolved.Type, Content.len(), &Preview, None, None, None);

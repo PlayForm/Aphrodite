@@ -13,5 +13,5 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// Hard cap for ALL per-turn injected context assembled by
 	// `Flow::build_turn_context`; kept well below Hermes's 10k-char spill
 	// threshold so the catalog never gets spill-mangled.
-	State.FlowBudgetChars = Configuration.GetUsize("APHRODITE_FLOW_BUDGET_CHARS", "flow", "budget_chars", 4000);
+	State.FlowBudgetChars = Configuration.Size("APHRODITE_FLOW_BUDGET_CHARS", "flow", "budget_chars", 4000);
 }

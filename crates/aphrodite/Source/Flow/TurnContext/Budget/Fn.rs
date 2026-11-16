@@ -37,7 +37,7 @@ use crate::Flow::{
 /// A `Required` section stops the drop: the search only ever shortens the list
 /// from the end and only over sections that are `Optional`, so the protected text
 /// at the top of the list can never be trimmed away by a budget decision.
-pub(crate) fn DropToBudget(mut Sections:Vec<Section>, Budget:usize) -> Outcome {
+pub(crate) fn Fn(mut Sections:Vec<Section>, Budget:usize) -> Outcome {
 	debug_assert_eq!(
 		JoinedBytes(&Sections),
 		JoinSections(&Sections).len(),

@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::Retrieve::Progress::Struct::Struct as LiveProgress;
+use crate::Retrieve::Progress::Struct::Struct as Progress;
 
 /// Response body for `/retrieve`. `Source` reports which backend served the
 /// content (e.g. `"inline_ccr"`, `"ccr"`, `"none"`) for observability.
@@ -36,8 +36,9 @@ pub struct Struct {
 	pub Truncated:bool,
 	/// Live-container progress; present only when the resolved entry is a
 	/// live container. Skipped when absent so non-container responses stay
-	/// byte-identical to the pre-live shape.
+	/// byte-identical to the pre-live shape, and `None` is exactly "this entry
+	/// is not a container" - not "the container made no progress".
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[serde(rename = "live")]
-	pub Live:Option<LiveProgress>,
+	pub Progress:Option<Progress>,
 }

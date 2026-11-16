@@ -6,7 +6,7 @@ use crate::State::Struct::AphroditeState;
 ///
 /// Keeps its historical JSON shape (`directives`/`context`/`compressed_count`)
 /// for proxy/FFI consumers, but ALSO returns the unified `Context` string built
-/// by `Flow::TurnContext::Fn::BuildTurnContext` (report 05, P1) so this path and
+/// by `Flow::TurnContext::Fn::Fn` (report 05, P1) so this path and
 /// the Hermes bridge path can never fork on what the model actually sees. The
 /// bridge and `context_engine_pre_llm` return only `{"context": ...}`; core keeps
 /// the richer shape for back-compat.
@@ -25,14 +25,12 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	let _Entered = Span.enter();
 	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
 	// (only when the master flag is enabled).
-	let _ = State
-		.PollWorkerEnabled
-		.then(|| crate::PollWorker::Check::Fn::CheckBgTasks(State));
+	let _ = State.PollWorkerEnabled.then(|| crate::PollWorker::Check::Fn::Fn(State));
 
 	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
 	// catalog_summary is called inside build_turn_context - not separately
 	// (04-F3: a double call skipped delta tracking every other turn).
-	let Context = crate::Flow::TurnContext::Fn::BuildTurnContext(State, None);
+	let Context = crate::Flow::TurnContext::Fn::Fn(State, None);
 	let DirectivesField = (!Directives.is_empty()).then_some(Directives);
 	let ContextField = (!Context.is_empty()).then_some(Context);
 	let Payload = serde_json::json!({

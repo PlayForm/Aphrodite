@@ -36,17 +36,17 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 
 	let Archive = Largest.map(|Marker| (Marker.hash.clone(), Marker.Preview.clone(), Marker.Size));
 	Archive.into_iter().for_each(|(Hash, Summary, Size)| {
-		crate::Session::Archive::Fn::ArchiveTurn(State, &Hash, &Summary, Size);
+		crate::Session::Archive::Fn::Fn(State, &Hash, &Summary, Size);
 	});
 
-	crate::Session::Turn::Fn::NextTurn(State);
+	crate::Session::Turn::Fn::Fn(State);
 	// P3/T9: purge expired ephemeral nudges AFTER advancing the turn, so a
 	// one-shot pushed during turn N renders in turn N+1's context exactly once
 	// and is gone by turn N+2.
-	crate::Flow::Nudge::Purge::Fn::PurgeExpiredNudges(State);
+	crate::Flow::Nudge::Purge::Fn::Fn(State);
 	// Poll-worker: expire stale tasks (not polled in >STALE_TURN_AGE turns) and
 	// drop completed/failed tasks older than 16 turns.
-	crate::PollWorker::Expire::Fn::ExpireStaleTasks(State);
+	crate::PollWorker::Expire::Fn::Fn(State);
 
 	serde_json::json!({ "status": "ok", "turn": State.TurnCounter })
 }

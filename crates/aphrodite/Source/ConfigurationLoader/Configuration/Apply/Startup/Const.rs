@@ -17,7 +17,7 @@ use crate::{
 /// This list is the whole difference between a startup pass and a reload: `Reload/Const`
 /// is this list without `Directive`. The order is data so the two can be compared, and so
 /// a section cannot be applied in one pass and silently skipped in the other by accident.
-pub(crate) const Startup:&[fn(&Configuration, &mut AphroditeState)] = &[
+pub(crate) const Sequence:&[fn(&Configuration, &mut AphroditeState)] = &[
 	Engine::Apply,
 	Flow::Apply,
 	Runtime::Apply,

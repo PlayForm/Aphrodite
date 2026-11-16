@@ -3,7 +3,7 @@
 use super::Struct::{Session, Struct};
 
 impl Struct {
-	/// Drop the session named by `Hid` from the table.
+	/// Drop the session named by `Identity` from the table.
 	///
 	/// What removal means, precisely: it prevents every future lookup, and it
 	/// does **not** cancel a call already in flight. A caller that resolved the
@@ -11,5 +11,5 @@ impl Struct {
 	/// safely against state that is still alive; the state itself is freed when
 	/// the last `Arc` drops. A destroyed handle therefore never revives the
 	/// session, and never truncates a concurrent one.
-	pub(crate) fn Remove(&self, Hid:usize) -> Option<Session> { self.With(|Map| Map.remove(&Hid)) }
+	pub(crate) fn Remove(&self, Identity:usize) -> Option<Session> { self.With(|Map| Map.remove(&Identity)) }
 }

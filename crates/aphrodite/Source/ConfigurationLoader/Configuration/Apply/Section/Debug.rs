@@ -20,6 +20,6 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// state at session start; the process-global level mirror lets
 	// stateless render points gate on the same flag. This is temporary
 	// dev-only compute - never a release path.
-	State.DebugLevel = Configuration.GetU64("APHRODITE_DEBUG", "compression", "debug_level", 0).min(2) as u8;
+	State.DebugLevel = Configuration.Number("APHRODITE_DEBUG", "compression", "debug_level", 0).min(2) as u8;
 	crate::Debug::Level::Set::Fn::Fn(State.DebugLevel);
 }

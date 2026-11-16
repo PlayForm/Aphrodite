@@ -13,17 +13,17 @@ impl Struct {
 	/// `Option<String>` keeps the empty case distinct from the absent one for free:
 	/// `Some("")` is a winner and only `None` continues the chain, so no emptiness
 	/// test is needed anywhere.
-	pub fn GetString(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:&str) -> String {
+	pub fn Text(&self, EnvironmentKey:&str, Section:&str, Key:&str, Fallback:&str) -> String {
 		self.Overrides
 			.get(EnvironmentKey)
 			.cloned()
 			.or_else(|| std::env::var(EnvironmentKey).ok())
 			.unwrap_or_else(|| {
 				self.Section(Section)
-					.and_then(|s| s.get(Key))
-					.and_then(|v| v.as_str())
-					.map(|v| v.to_string())
-					.unwrap_or_else(|| default.to_string())
+					.and_then(|Table| Table.get(Key))
+					.and_then(|Value| Value.as_str())
+					.map(|Value| Value.to_string())
+					.unwrap_or_else(|| Fallback.to_string())
 			})
 	}
 }

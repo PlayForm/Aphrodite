@@ -5,9 +5,9 @@ use std::sync::Arc;
 use axum::http::{HeaderMap, Method};
 
 use crate::Proxy::{
-	Compress::Chat::Fn::Fn as CompressChatCompletion,
-	Format::Fn::Fn as ProxyFormatCCROutput,
-	Test::Support::{Chat::Fn::ChatCompletionBody, Context::Fn::Fn as TestContext, State::Fn::TestStateWithCCR},
+	Compress::Chat::Fn::Fn as Chat,
+	Format::Fn::Fn as Format,
+	Test::Support::{Chat::Fn::Payload, Context::Fn::Fn as TestContext, State::Fn::WithCCR},
 };
 
 /// Compress `body` against `State`.
@@ -18,7 +18,7 @@ fn Compress(State:&Arc<crate::Proxy::State::Struct::Struct>, body:&[u8]) -> Opti
 
 	tokio::runtime::Runtime::new()
 		.unwrap()
-		.block_on(CompressChatCompletion(&Context, body, None))
+		.block_on(Chat(&Context, body, None))
 		.map(|Outcome| Outcome.Response)
 }
 
@@ -29,10 +29,10 @@ fn Compress(State:&Arc<crate::Proxy::State::Struct::Struct>, body:&[u8]) -> Opti
 /// this pin moves with it: compression must still produce a rewritten body, and
 /// that body must be shorter than the original.
 #[test]
-fn Regression07TokensSavedIncrementsOnCompress() {
+fn Case07() {
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
-	let body = ChatCompletionBody(&Content);
-	let State = Arc::new(TestStateWithCCR());
+	let body = Payload(&Content);
+	let State = Arc::new(WithCCR());
 
 	let Rewritten = Compress(&State, &body).expect("content above threshold must compress");
 	let NewContent = Rewritten["choices"][0]["message"]["content"].as_str().unwrap();
@@ -46,10 +46,10 @@ fn Regression07TokensSavedIncrementsOnCompress() {
 /// Corpus 11_should_compress.py: threshold gating must actually skip compression
 /// below threshold, not compress unconditionally.
 #[test]
-fn Regression11BelowThresholdSkipsCompressionAndCounter() {
+fn Case11() {
 	let Content = "short reply below any threshold";
-	let body = ChatCompletionBody(Content);
-	let State = Arc::new(TestStateWithCCR());
+	let body = Payload(Content);
+	let State = Arc::new(WithCCR());
 
 	assert!(Compress(&State, &body).is_none(), "below-threshold content must not compress");
 	assert_eq!(
@@ -64,11 +64,11 @@ fn Regression11BelowThresholdSkipsCompressionAndCounter() {
 /// contain a complete `<<<CCR:hash|type|size>>>` line, regardless of how long
 /// the preview or metadata are.
 #[test]
-fn Regression13MarkerTerminatorNeverTruncated() {
+fn Case13() {
 	let hash = "abc123def456abc123def456abc123def456";
 	let HugePreview = "x".repeat(10_000);
 	let HugeMetadata = "y".repeat(10_000);
-	let Out = ProxyFormatCCROutput(&HugePreview, "text", &HugeMetadata, None, hash, 123456);
+	let Out = Format(&HugePreview, "text", &HugeMetadata, None, hash, 123456);
 	let ExpectedTerminator = format!("<<<CCR:{hash}|text|123456>>>");
 
 	assert!(

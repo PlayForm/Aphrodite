@@ -6,11 +6,11 @@
 //! original inline renderer; when on, ready entries additionally carry the
 //! live-container arrival surface (arrived_at / bytes_arrived / eta_s).
 
-use crate::Tool::Dispatch::Fn::ToolHandler;
+use crate::Tool::Dispatch::Fn::Handler;
 
 /// The `aphrodite_prefetch_status` handler.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_prefetch_status", |_Args| {
-		crate::Session::With::Fn::with_shared(|State| aphrodite::Prefetch::Status::Fn::PrefetchStatus(State))
+		crate::Session::With::Fn::with_shared(|State| aphrodite::Prefetch::Status::Fn::Fn(State))
 	})
 }

@@ -17,15 +17,20 @@
 //! `⫷` opener (previously accepted `⫸` as a closer but never `⫷` as an opener)
 //! meant the Unicode-glyph marker style was silently never extracted at all.
 
-static HashRe:std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+static Pattern:std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
 	regex::Regex::new(r"(?:<<<|\[|\u{2af7})CCR:([0-9a-fA-F:i]{6,64})(?:\|[^\]>\n]*?)?(?:\]|>>>|\u{2af8})").unwrap()
 });
 
 /// Extract all CCR hashes from text.
-pub fn ExtractHashes(Text:&str) -> Vec<String> {
-	HashRe
+///
+/// External contract: `Text` is any content the caller already holds - a tool
+/// output, a prompt, a whole transcript - and the answer is every hash it
+/// contains, in the order they appear, with the `i:` inline prefix kept as part
+/// of the hash. Text with no marker yields an empty `Vec`, never an error.
+pub fn Fn(Text:&str) -> Vec<String> {
+	Pattern
 		.captures_iter(Text)
-		.filter_map(|Cap| Cap.get(1))
-		.map(|m| m.as_str().to_string())
+		.filter_map(|Capture| Capture.get(1))
+		.map(|Matched| Matched.as_str().to_string())
 		.collect()
 }

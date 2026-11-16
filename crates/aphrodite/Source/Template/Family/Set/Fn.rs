@@ -1,4 +1,4 @@
-//! `SetPreviewFamily`: register the model family.
+//! `Template::Family::Set::Fn`: register the model family.
 
 use crate::Template::State::Fn::Fn as State;
 

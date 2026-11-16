@@ -14,6 +14,6 @@ pub(crate) fn Fn(Route:Route::Enum) -> &'static str {
 		Route::Enum::AutoExpand => "auto_expand",
 		Route::Enum::ChainSplit => "chain_split",
 		Route::Enum::LiveContainer => "live_container",
-		Route::Enum::CompressOrPassthrough => "compress_or_passthrough",
+		Route::Enum::Threshold => "compress_or_passthrough",
 	}
 }

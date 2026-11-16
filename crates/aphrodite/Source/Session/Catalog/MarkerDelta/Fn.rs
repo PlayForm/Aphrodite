@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::State::Marker::Struct::Struct as Entry;
 
 /// The marker half of the catalog summary: what this turn added, or a stable
 /// "no change" line.
@@ -19,7 +19,7 @@ use crate::State::Marker::Struct::MarkerEntry;
 /// `New` can never exceed `Current` (it is a saturating subtraction), so the
 /// first rule's `Current > 0` is a guard against reporting a delta on an empty
 /// ring rather than a second condition worth its own branch.
-pub(crate) fn Fn(Markers:&VecDeque<MarkerEntry>, New:usize, Current:usize) -> Option<String> {
+pub(crate) fn Fn(Markers:&VecDeque<Entry>, New:usize, Current:usize) -> Option<String> {
 	let Delta = (New > 0 && Current > 0).then(|| {
 		let Previews = Markers
 			.iter()

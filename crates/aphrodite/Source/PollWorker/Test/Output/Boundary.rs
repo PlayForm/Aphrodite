@@ -11,7 +11,7 @@ use crate::PollWorker::Output::{
 };
 
 #[test]
-fn TestTheSeparatorIsChargedToTheBound() {
+fn Separator() {
 	let mut Acc = Accumulator::NewWithin(10);
 
 	assert_eq!(AppendTo(&mut Acc, "abcdef"), Append::Complete);
@@ -24,7 +24,7 @@ fn TestTheSeparatorIsChargedToTheBound() {
 }
 
 #[test]
-fn TestAFullAccumulatorTakesNothing() {
+fn Full() {
 	let mut Acc = Accumulator::NewWithin(4);
 	assert_eq!(AppendTo(&mut Acc, "abcd"), Append::Complete);
 
@@ -36,7 +36,7 @@ fn TestAFullAccumulatorTakesNothing() {
 }
 
 #[test]
-fn TestThePrefixIsCutOnACharacterBoundary() {
+fn Utf8() {
 	let mut Acc = Accumulator::NewWithin(5);
 
 	// Six bytes of three two-byte characters: five would split the third.
@@ -47,7 +47,7 @@ fn TestThePrefixIsCutOnACharacterBoundary() {
 }
 
 #[test]
-fn TestTheFirstPollIsNotChargedASeparator() {
+fn First() {
 	let mut Acc = Accumulator::NewWithin(3);
 
 	assert_eq!(AppendTo(&mut Acc, "abc"), Append::Complete);
@@ -55,7 +55,7 @@ fn TestTheFirstPollIsNotChargedASeparator() {
 }
 
 #[test]
-fn TestTakeLeavesAnEmptyAccumulatorAtTheSameBound() {
+fn Empty() {
 	let mut Acc = Accumulator::NewWithin(10);
 	AppendTo(&mut Acc, "abc");
 

@@ -25,7 +25,7 @@
 //!
 //! Logging is `tracing` (§4.5): `Init/` installs the one process-wide
 //! `EnvFilter` subscriber and RECORDS who ended up owning the dispatcher
-//! (`Ownership/` - `Installed` when this crate won, `HostOwned` when the host
+//! (`Ownership/` - `Installed` when this crate won, `Host` when the host
 //! got there first), `Log/Bridge` emits each bridge event as a `tracing` event
 //! and appends the same fields to the per-session debug file, and `Warn/` is the
 //! warning that still lands when the dispatcher belongs to a host that may drop

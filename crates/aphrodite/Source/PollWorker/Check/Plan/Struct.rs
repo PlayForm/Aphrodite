@@ -7,7 +7,7 @@
 
 /// One nudge, ready to queue.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NudgePlan {
+pub(crate) struct Struct {
 	/// The sentence the model reads.
 	pub Text:String,
 	/// Turns the nudge survives in the directive queue.

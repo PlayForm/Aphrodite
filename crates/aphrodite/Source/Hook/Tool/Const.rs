@@ -7,7 +7,7 @@
 /// them with a marker would force a retrieval before every edit. `read_file`
 /// is also a tracked file tool - skipping compression and recording the file
 /// reference are independent decisions, and it is in both lists on purpose.
-pub(crate) const EssentialTools:&[&str] = &[
+pub(crate) const Essential:&[&str] = &[
 	"skill_view",
 	"skills_list",
 	"skill_manage",

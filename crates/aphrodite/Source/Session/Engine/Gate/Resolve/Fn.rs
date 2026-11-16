@@ -17,13 +17,13 @@ pub(crate) fn Fn(State:&AphroditeState, Total:usize, FillPct:u64, MiddleN:usize)
 	let Disabled = !State.ContextEngineEnabled || State.EngineThresholdPct == 0 || State.EngineThresholdPct >= 100;
 	let BelowMinimum = Total < State.EngineMinimumMsgs;
 	let BelowThreshold = FillPct < State.EngineThresholdPct;
-	let MiddleTooSmall = MiddleN < 3;
+	let Small = MiddleN < 3;
 
 	[
 		(Disabled, Gate::Disabled),
 		(BelowMinimum, Gate::BelowMinimum),
 		(BelowThreshold, Gate::BelowThreshold),
-		(MiddleTooSmall, Gate::MiddleTooSmall),
+		(Small, Gate::Small),
 	]
 	.into_iter()
 	.find(|(Hit, _)| *Hit)

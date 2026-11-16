@@ -12,10 +12,10 @@ use crate::ChainSplit::Segment::Struct::Struct as Segment;
 /// characters are significant, so it belongs in the pattern. Two booleans
 /// (`in_single`, `in_double`) carry a third state - both set - that the shell
 /// cannot reach, and every arm had to re-derive the same fact from them.
-pub fn Fn(command:&str) -> Option<Vec<Segment>> {
+pub fn Fn(Command:&str) -> Option<Vec<Segment>> {
 	let mut Segments:Vec<Segment> = Vec::new();
 	let mut Current = String::new();
-	let mut Chars = command.chars().peekable();
+	let mut Chars = Command.chars().peekable();
 	let mut Quoting = Quoting::None;
 	let mut SegIndex = 0usize;
 
@@ -63,9 +63,9 @@ pub fn Fn(command:&str) -> Option<Vec<Segment>> {
 	// Require at least 2 non-empty segments to be worth rewriting, and refuse
 	// chains containing a heredoc marker or a `for`/`while` loop spanning
 	// segments - rewriting those would corrupt control flow.
-	let Segments:Vec<Segment> = Segments.into_iter().filter(|s| !s.command.trim().is_empty()).collect();
+	let Segments:Vec<Segment> = Segments.into_iter().filter(|s| !s.Command.trim().is_empty()).collect();
 	let Unrewritable = Segments.iter().any(|s| {
-		let Lower = s.command.to_lowercase();
+		let Lower = s.Command.to_lowercase();
 
 		Lower.contains("<<") || Lower.contains("for ") || Lower.contains("while ")
 	});

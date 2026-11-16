@@ -8,10 +8,10 @@
 
 use anyhow::Context;
 
-use super::Const::MAX_PATH_READ;
+use super::Const::CAP;
 
 /// Read a file requested via `aphrodite_retrieve(path=...)`, confined to the
-/// current workspace and capped at [`MAX_PATH_READ`]. Returns an error if
+/// current workspace and capped at [`CAP`]. Returns an error if
 /// the path escapes the workspace, is too large, or can't be read - so the tool
 /// can't be coerced into exfiltrating arbitrary files (e.g. /etc/passwd,
 /// ~/.ssh).
@@ -40,7 +40,7 @@ pub(crate) fn Fn(Path:&str) -> anyhow::Result<String> {
 
 	let Size = std::fs::metadata(&Canon).map(|Metadata| Metadata.len()).unwrap_or(0);
 
-	anyhow::ensure!(Size <= MAX_PATH_READ, "file exceeds {MAX_PATH_READ}-byte read cap: {Path}");
+	anyhow::ensure!(Size <= CAP, "file exceeds {CAP}-byte read cap: {Path}");
 
 	std::fs::read_to_string(&Canon).with_context(|| format!("read {Path}"))
 }

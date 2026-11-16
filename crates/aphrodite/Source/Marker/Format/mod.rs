@@ -10,11 +10,14 @@
 //!   as one value.
 //! - `Grammar/` - which of the two grammars is in force.
 //! - `Budget/` - the headroom budget's percentage as a truncation.
-//! - `Entry.rs` - `CCRMarker`, the public entry point.
-//! - `Block.rs` - configured-template vs fallback dispatch.
-//! - `Fallback.rs` - the canonical `<<<CCR:...>>>` grammar.
-//! - `Bracket.rs` - "is this preview already self-describing?".
-//! - `Vars.rs` - `{name}` substitution for TOML templates.
+//! - `Entry.rs` - `Fn`, the public entry point.
+//! - `Block.rs` - `Fn`, configured-template vs fallback dispatch.
+//! - `Fallback.rs` - `Fn`, the canonical `<<<CCR:...>>>` grammar.
+//! - `Bracket.rs` - `Fn`, "is this preview already self-describing?".
+//! - `Vars.rs` - `Fn`, `{name}` substitution for TOML templates.
+//!
+//! Every leaf exports one `Fn`, because the directory already names what it acts
+//! on; the kind is the name, the path is the namespace.
 
 pub mod Block;
 pub mod Bracket;

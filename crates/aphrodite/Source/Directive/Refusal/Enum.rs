@@ -15,7 +15,7 @@
 /// deliberate row of this table, not an oversight - see [`super::super::Verb::Add::Fn::Fn`].
 pub(crate) enum Enum {
 	/// The action vocabulary has no such verb.
-	UnknownAction,
+	Action,
 	/// A verb that needs a loaded directive was given a name that is not loaded.
-	UnknownDirective,
+	Name,
 }

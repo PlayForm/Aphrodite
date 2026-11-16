@@ -12,23 +12,29 @@
 //! stamp, and says in `identifies` whether that stamp names a revision or only a
 //! version.
 
-use crate::Health::{Build, Port::Fn::configured_ports};
+use crate::Health::{Build, Port};
 
 /// Probe whether the cache and token proxies are listening, and stamp the build
 /// that answered.
+///
+/// `proxy_health` is the name every caller outside this partition uses
+/// (`ABI::ProxyHealth`, `Tool::Registry::{Stats,Rebuild}`, `Hook::Log`), so it
+/// keeps the qualifier until those rows repoint; the leaf path is
+/// `Health::Proxy::Fn`, and the bare `Fn` is the name this leaf wants.
 pub(crate) fn proxy_health() -> serde_json::Value {
 	use std::{net::TcpStream, time::Duration};
-	let timeout = Duration::from_millis(400);
-	let alive = |addr:String| {
-		addr.parse()
+	let Timeout = Duration::from_millis(400);
+	let Alive = |Address:String| {
+		Address
+			.parse()
 			.ok()
-			.and_then(|a| TcpStream::connect_timeout(&a, timeout).ok())
+			.and_then(|Socket| TcpStream::connect_timeout(&Socket, Timeout).ok())
 			.is_some()
 	};
-	let (cache_port, token_port) = configured_ports();
+	let (Cache, Token) = Port::Fn::Fn();
 	serde_json::json!({
 		"build": Build::Fn::Fn().json(),
-		"token": {"port": token_port, "alive": alive(format!("127.0.0.1:{token_port}"))},
-		"cache": {"port": cache_port, "alive": alive(format!("127.0.0.1:{cache_port}"))},
+		"token": {"port": Token, "alive": Alive(format!("127.0.0.1:{Token}"))},
+		"cache": {"port": Cache, "alive": Alive(format!("127.0.0.1:{Cache}"))},
 	})
 }

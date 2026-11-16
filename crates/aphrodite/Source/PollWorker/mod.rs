@@ -25,7 +25,7 @@
 //! produced), `Completion` (the storeable form) and `Registry` (the set and the
 //! operations allowed to change it).
 //!
-//! There is no `Transition` value: what a poll did to a task is the `Applied` it
+//! There is no `Transition` value: what a poll did to a task is the `Outcome` it
 //! produced, and "it applied to no task" is `Apply::Fn`'s `None`. The old three-variant
 //! transition carried an `Ignored` arm that no caller could reach, because only a
 //! running task is ever selected.

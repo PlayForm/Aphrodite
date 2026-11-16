@@ -50,13 +50,13 @@ async fn Retrieve(State:&AppState, Params:&serde_json::Value) -> anyhow::Result<
 	// 05 F3) - an LLM sometimes echoes the full marker body back as the hash
 	// argument instead of the bare hash, and the lookups below are exact-match
 	// only.
-	let hash = crate::Marker::Parse::Normalize::NormalizeHash(HashRaw);
+	let hash = crate::Marker::Parse::Normalize::Fn(HashRaw);
 
 	// The inline map needs no round-trip for tiny entries. One lock, and the hit
 	// is a clone out of it - the guard must not outlive this statement.
 	let Inline = State.InlineCCR.lock().ok().and_then(|mut Map| Map.get(hash).cloned());
 	let Some(Content) = Inline else {
-		State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
+		State.InlineMisses.fetch_add(1, Ordering::Relaxed);
 
 		return match &State.ccr {
 			Some(ccr) => {
@@ -69,7 +69,7 @@ async fn Retrieve(State:&AppState, Params:&serde_json::Value) -> anyhow::Result<
 		};
 	};
 
-	State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
+	State.InlineHits.fetch_add(1, Ordering::Relaxed);
 
 	Ok(serde_json::json!({"found": true, "content": Content}))
 }
@@ -88,7 +88,7 @@ async fn Compress(State:&AppState, Params:&serde_json::Value) -> anyhow::Result<
 	// still counted from this content, which is what `New` guarantees.
 	let Analysis = ContentAnalysis::New(Content, "compress");
 
-	match ClassifyTarget(Size, State.InlineCCRThreshold()) {
+	match ClassifyTarget(Size, State.InlineThreshold()) {
 		StorageTarget::Inline => {
 			// Tiny content: store inline for the fast path, AND to the durable
 			// backend when one is configured (report 06 F5) - the inline map is

@@ -5,24 +5,24 @@
 //! arbitrary text without panicking on the malformed ones - including the position each
 //! reference occupies, which is what the walk substitutes by.
 
-use crate::Resolve::Parse::{Find::Fn as FindMarkers, Hash::Fn as ParseMarkerHash};
+use crate::Resolve::Parse::{Find::Fn as Find, Hash::Fn as Hash};
 
 #[test]
 fn TestParseMarkerHash() {
-	assert_eq!(ParseMarkerHash("<<<CCR:abc123def456|text|100>>>"), Some("abc123def456"));
-	assert_eq!(ParseMarkerHash("<<<CCR:abc|code_rust|5000>>>"), Some("abc"));
+	assert_eq!(Hash("<<<CCR:abc123def456|text|100>>>"), Some("abc123def456"));
+	assert_eq!(Hash("<<<CCR:abc|code_rust|5000>>>"), Some("abc"));
 }
 
 #[test]
 fn TestParseMarkerInvalid() {
-	assert_eq!(ParseMarkerHash("not a marker"), None);
-	assert_eq!(ParseMarkerHash("<<<CCR:"), None);
+	assert_eq!(Hash("not a marker"), None);
+	assert_eq!(Hash("<<<CCR:"), None);
 }
 
 #[test]
 fn TestFindMarkersSingle() {
 	let Content = "hello <<<CCR:abc|text|100>>> world";
-	let Markers = FindMarkers(Content);
+	let Markers = Find(Content);
 
 	assert_eq!(Markers.len(), 1);
 	assert_eq!(Markers[0].Marker, "<<<CCR:abc|text|100>>>");
@@ -33,12 +33,12 @@ fn TestFindMarkersSingle() {
 #[test]
 fn TestFindMarkersMultiple() {
 	let Content = "<<<CCR:a|t|1>>> middle <<<CCR:b|t|2>>>";
-	assert_eq!(FindMarkers(Content).len(), 2);
+	assert_eq!(Find(Content).len(), 2);
 }
 
 #[test]
 fn TestFindMarkersNone() {
-	assert!(FindMarkers("plain text").is_empty());
+	assert!(Find("plain text").is_empty());
 }
 
 // ── T7: negative-path tests ──────────────────────────────────
@@ -47,7 +47,7 @@ fn TestFindMarkersNestedUnclosedIsSkipped() {
 	// A marker prefix inside another marker's body: the grammar has no nesting, so the first
 	// closing delimiter ends the marker and the inner prefix is part of the hash field.
 	let Content = "<<<CCR:a<<<CCR:b|t|1>>>";
-	let Markers = FindMarkers(Content);
+	let Markers = Find(Content);
 
 	assert_eq!(Markers.len(), 1);
 	assert_eq!(Markers[0].Hash, "a<<<CCR:b");
@@ -55,8 +55,8 @@ fn TestFindMarkersNestedUnclosedIsSkipped() {
 
 #[test]
 fn TestFindMarkersUnterminatedNoPanic() {
-	assert!(FindMarkers("<<<CCR:").is_empty());
-	assert!(FindMarkers("text <<<CCR:abc|t|1").is_empty());
+	assert!(Find("<<<CCR:").is_empty());
+	assert!(Find("text <<<CCR:abc|t|1").is_empty());
 }
 
 // ── The tolerance policy: a complete marker naming no hash is not a reference, so it is not
@@ -64,6 +64,6 @@ fn TestFindMarkersUnterminatedNoPanic() {
 // was reported as an unresolved reference - the wrong reason for the wrong thing. ──
 #[test]
 fn TestParseMarkerHashEmptyHash() {
-	assert_eq!(ParseMarkerHash("<<<CCR:>>>"), None);
-	assert_eq!(ParseMarkerHash("<<<CCR:|text|1>>>"), None);
+	assert_eq!(Hash("<<<CCR:>>>"), None);
+	assert_eq!(Hash("<<<CCR:|text|1>>>"), None);
 }

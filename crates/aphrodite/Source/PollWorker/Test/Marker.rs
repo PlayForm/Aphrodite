@@ -1,11 +1,11 @@
 //! The poll marker's shape: it must be a resolvable CCR marker typed `Poll`
 //! and must embed the task hash, never an output hash.
 
-use crate::{PollWorker::Marker::Fn::CreatePollMarker, State::Identity::Command::Struct::CommandID};
+use crate::{PollWorker::Marker::Fn::Fn as Marker, State::Identity::Command::Struct::Struct as Command};
 
 #[test]
-fn TestCreatePollMarkerFormat() {
-	let Marker = CreatePollMarker(&CommandID::from("abc123def456"), "cargo build", 5);
+fn Shape() {
+	let Marker = Marker(&Command::from("abc123def456"), "cargo build", 5);
 	assert!(Marker.contains("<<<CCR:"));
 	assert!(Marker.contains("poll"));
 	assert!(Marker.contains("cargo build"));
@@ -13,9 +13,9 @@ fn TestCreatePollMarkerFormat() {
 }
 
 #[test]
-fn TestCreatePollMarkerIsValidCCRFormat() {
-	let Marker = CreatePollMarker(
-		&CommandID::from("abc123def456abc123def456abc123def456abc123"),
+fn Valid() {
+	let Marker = Marker(
+		&Command::from("abc123def456abc123def456abc123def456abc123"),
 		"cargo build --release",
 		5,
 	);

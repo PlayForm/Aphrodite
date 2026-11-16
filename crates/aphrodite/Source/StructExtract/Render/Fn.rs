@@ -17,8 +17,8 @@ use crate::StructExtract::{
 /// declaration it is handed borrows the source line, so the rendered line is the only allocation.
 pub(crate) fn Fn(Declaration:Declaration<'_>) -> Option<String> {
 	let (Kind, Name, Parameters, Return) = match Declaration {
-		Declaration::Declaration { Kind, Name, Parameters, Return } => (Kind, Name, Parameters, Return),
-		Declaration::NotDeclaration | Declaration::Malformed { .. } => return None,
+		Declaration::Present { Kind, Name, Parameters, Return } => (Kind, Name, Parameters, Return),
+		Declaration::Absent | Declaration::Malformed { .. } => return None,
 	};
 
 	match Parameters {

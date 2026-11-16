@@ -16,15 +16,15 @@
 #[derive(Debug, Clone)]
 pub struct Struct {
 	/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
-	pub APIKey:Option<String>,
+	pub Key:Option<String>,
 	/// Upstream API base URL.
-	pub APIURL:String,
+	pub URL:String,
 	/// Model name to forward.
 	pub Model:String,
 	/// Cache proxy listen port.
-	pub CachePort:u16,
+	pub Cache:u16,
 	/// Token proxy listen port.
-	pub TokenPort:u16,
+	pub Token:u16,
 	/// Skip launching the proxy after setup.
 	pub NoLaunch:bool,
 	/// Force re-setup even if already installed.

@@ -1,6 +1,6 @@
 //! Resolve the cache/token proxy port pair from a supplied lookup.
 
-use crate::Health::Port::Fn::{DEFAULT_CACHE_PORT, DEFAULT_TOKEN_PORT};
+use crate::Health::Port::Fn::{Cache, Token};
 
 /// Resolve the cache/token proxy ports from `Lookup`, falling back to the
 /// historical 9797/9798 defaults.
@@ -40,8 +40,5 @@ pub(crate) fn Fn(Lookup:impl Fn(&str) -> Option<String>) -> (u16, u16) {
 		}
 	};
 
-	(
-		Port("APHRODITE_CACHE_PORT", DEFAULT_CACHE_PORT),
-		Port("APHRODITE_TOKEN_PORT", DEFAULT_TOKEN_PORT),
-	)
+	(Port("APHRODITE_CACHE_PORT", Cache), Port("APHRODITE_TOKEN_PORT", Token))
 }

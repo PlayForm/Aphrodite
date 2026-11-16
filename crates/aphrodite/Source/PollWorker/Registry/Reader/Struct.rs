@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::PollWorker::Task::Struct::BgTask;
+use crate::PollWorker::Task::Struct::Struct as Record;
 
 /// A read-only view of the task set.
 ///
@@ -12,5 +12,5 @@ use crate::PollWorker::Task::Struct::BgTask;
 /// and "which task makes room" from being able to mutate the set they inspect.
 pub(crate) struct Reader<'a> {
 	/// The storage, borrowed immutably.
-	pub(crate) Tasks:&'a VecDeque<BgTask>,
+	pub(crate) Tasks:&'a VecDeque<Record>,
 }

@@ -9,12 +9,12 @@ use std::path::PathBuf;
 
 use crate::Home::{
 	Configuration::Fn::Fn as ConfigurationPath,
-	Database::Fn::Fn as CCRDatabasePath,
+	Database::Fn::Fn as DatabasePath,
 	Directive::Fn::Fn as DirectivesDirectory,
 	Environment::Guard::Fn::Fn as EnvironmentGuard,
 	Hermes::Fn::Fn as HermesHome,
 	Plugin::Fn::Fn as PluginDirectory,
-	Runtime::{Fn::Fn as RuntimeHome, Opt::Fn::Fn as RuntimeHomeOpt},
+	Runtime::{Fn::Fn as RuntimeHome, Opt::Fn::Fn as RuntimeOpt},
 };
 
 fn ClearAll() {
@@ -33,7 +33,7 @@ fn PrecedenceAphroditeHomeWins() {
 	unsafe { std::env::set_var("HERMES_HOME", "/tmp/hermes-home") };
 	unsafe { std::env::set_var("HOME", "/tmp/plain-home") };
 	assert_eq!(RuntimeHome(), PathBuf::from("/tmp/aph-override"));
-	assert_eq!(RuntimeHomeOpt(), Some(PathBuf::from("/tmp/aph-override")));
+	assert_eq!(RuntimeOpt(), Some(PathBuf::from("/tmp/aph-override")));
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn DerivedPathsFollowRuntimeHome() {
 	let Root = PathBuf::from("/opt/data/aphrodite");
 	assert_eq!(ConfigurationPath(), Root.join("aphrodite.toml"));
 	assert_eq!(DirectivesDirectory(), Root.join("directives"));
-	assert_eq!(CCRDatabasePath(), Root.join("ccr.db"));
+	assert_eq!(DatabasePath(), Root.join("ccr.db"));
 }
 
 #[test]
@@ -101,6 +101,6 @@ fn DegradedReturnsNoneAndDot() {
 	// HOME/HERMES_HOME/APHRODITE_HOME cleared; dirs::home_dir() still
 	// resolves on a real machine, so runtime_home() must keep working.
 	assert!(RuntimeHome().is_absolute() || RuntimeHome() == PathBuf::from("."));
-	assert_eq!(RuntimeHomeOpt().is_some(), dirs::home_dir().is_some());
+	assert_eq!(RuntimeOpt().is_some(), dirs::home_dir().is_some());
 	assert!(HermesHome().is_absolute() || HermesHome() == PathBuf::from("."));
 }

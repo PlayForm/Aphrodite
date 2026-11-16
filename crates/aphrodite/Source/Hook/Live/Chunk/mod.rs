@@ -5,5 +5,6 @@
 //! produces the chunks without collecting them. The container enumerates, stores
 //! and counts in one pass, so no descriptor vector is built and thrown away.
 
+pub mod Const;
 pub mod Iter;
 pub mod Policy;

@@ -1,4 +1,4 @@
-//! `TemplatesTestGuard`: serialise tests over the registry.
+//! `Template::Guard::Fn`: serialise tests over the registry.
 
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 

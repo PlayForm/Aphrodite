@@ -14,13 +14,13 @@ use axum::{
 use tracing::Instrument;
 
 use super::Route::Fn::Fn as Route;
-use crate::Proxy::{Relay::Request::Struct::Struct as ToolRelayRequest, State::Struct::Struct as AppState};
+use crate::Proxy::{Relay::Request::Struct::Struct as RelayRequest, State::Struct::Struct as AppState};
 
 /// `POST /tool_relay` - dispatches a Hermes-side tool call (see
 /// [`crate::Proxy::Relay::Execute::Fn::Fn`]). Runs synchronously unless the
 /// request carries an `https://` `CallbackURL`, in which case it is spawned onto
 /// `TaskTracker` and the result is POSTed back later instead of returned inline.
-pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<ToolRelayRequest>) -> impl IntoResponse {
+pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RelayRequest>) -> impl IntoResponse {
 	// The tool name identifies the work; `callback` says which answer path will
 	// be taken. Neither the parameters nor the result enters the span - a tool
 	// call carries content and can carry a credential.

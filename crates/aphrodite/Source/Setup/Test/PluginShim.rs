@@ -7,44 +7,44 @@
 
 use std::{fs, path::Path};
 
-use crate::Setup::Write::PluginShim::Const as HermesPluginShim;
+use crate::Setup::Write::PluginShim::Const as Shim;
 
 // ── T8 (F14): the setup-embedded shim is now `include_str!`'d directly
 // from the live plugin, so it can't drift - these pin the specific bugs
 // the old hand-copied `templates/__init__.py` had regrown. ──
 #[test]
-fn TestHermesPluginShimHasNoStderrDevnull() {
+fn TestShimHasNoStderrDevnull() {
 	assert!(
-		!HermesPluginShim.contains("stderr=subprocess.DEVNULL"),
+		!Shim.contains("stderr=subprocess.DEVNULL"),
 		"stderr must go to a log file, not DEVNULL (re-introduces the v1.2.1 silent-startup bug)"
 	);
 }
 
 #[test]
-fn TestHermesPluginShimReadsNoAutoLaunch() {
+fn TestShimReadsNoAutoLaunch() {
 	assert!(
-		HermesPluginShim.contains(r#"os.environ.get("APHRODITE_NO_AUTO_LAUNCH""#),
+		Shim.contains(r#"os.environ.get("APHRODITE_NO_AUTO_LAUNCH""#),
 		"the guard must be read, not just set"
 	);
 }
 
 #[test]
-fn TestHermesPluginShimReadsPortEnvironmentVars() {
-	assert!(HermesPluginShim.contains("APHRODITE_CACHE_PORT"));
-	assert!(HermesPluginShim.contains("APHRODITE_TOKEN_PORT"));
+fn TestShimReadsPortEnvironmentVars() {
+	assert!(Shim.contains("APHRODITE_CACHE_PORT"));
+	assert!(Shim.contains("APHRODITE_TOKEN_PORT"));
 }
 
 #[test]
-fn TestHermesPluginShimGatesContextEngineOptIn() {
-	assert!(HermesPluginShim.contains("APHRODITE_CONTEXT_ENGINE"));
+fn TestShimGatesContextEngineOptIn() {
+	assert!(Shim.contains("APHRODITE_CONTEXT_ENGINE"));
 }
 
 #[test]
-fn TestHermesPluginShimRegistersToolsWithToolsetArgument() {
+fn TestShimRegistersToolsWithToolsetArgument() {
 	// The old template called `ctx.register_tool(schema, handler)` (2
 	// args) while the real Hermes API + live plugin use
 	// `register_tool(name, toolset, schema, handler)` (4 args).
-	assert!(HermesPluginShim.contains(r#"ctx.register_tool(name, "aphrodite", schema, "#));
+	assert!(Shim.contains(r#"ctx.register_tool(name, "aphrodite", schema, "#));
 }
 
 // ── T8 (F10): drift guard. The embedded `templates/__init__.py` is a copy
@@ -54,7 +54,7 @@ fn TestHermesPluginShimRegistersToolsWithToolsetArgument() {
 // and early-return when the live file is absent so a published-crate build
 // (no submodule checkout) still passes. ──
 #[test]
-fn TestHermesPluginShimTemplateMatchesLive() {
+fn TestShimTemplateMatchesLive() {
 	let LivePath = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("..")
 		.join("..")
@@ -69,7 +69,7 @@ fn TestHermesPluginShimTemplateMatchesLive() {
 	let Normalize = |s:&str| s.replace("\r\n", "\n");
 	assert_eq!(
 		Normalize(&Live),
-		Normalize(HermesPluginShim),
+		Normalize(Shim),
 		"templates/__init__.py has drifted from the live plugins/aphrodite/__init__.py - re-copy the live plugin into \
 		 crates/aphrodite/templates/__init__.py to keep the setup-embedded shim in sync"
 	);

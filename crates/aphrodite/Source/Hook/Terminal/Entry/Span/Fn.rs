@@ -10,11 +10,11 @@
 /// without putting a shell command into a log line, and a command is the most
 /// likely place for a credential to be typed. `returncode` is the signal the
 /// error-loop breaker keys on, so it belongs in the trace.
-pub(crate) fn Fn(ContentBytes:usize, command:Option<&str>, Returncode:Option<i64>) -> tracing::Span {
+pub(crate) fn Fn(ContentBytes:usize, Command:Option<&str>, Returncode:Option<i64>) -> tracing::Span {
 	tracing::info_span!(
 		"hook.terminal",
 		content_bytes = ContentBytes,
-		command_length = command.map(str::len).unwrap_or(0),
+		command_length = Command.map(str::len).unwrap_or(0),
 		returncode = Returncode.unwrap_or(0),
 		compressed = tracing::field::Empty,
 		outcome = tracing::field::Empty,

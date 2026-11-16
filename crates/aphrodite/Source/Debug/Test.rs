@@ -14,7 +14,7 @@ use crate::Debug::{
 };
 
 #[test]
-fn TestIsoTimestampShape() {
+fn Stamp() {
 	let s = IsoTimestamp();
 	// YYYY-MM-DDTHH:MM:SS.ffffffZ
 	assert_eq!(s.len(), 27, "timestamp: {s}");
@@ -24,7 +24,7 @@ fn TestIsoTimestampShape() {
 }
 
 #[test]
-fn TestLevelGateOffIsQuiet() {
+fn Quiet() {
 	SetLevel(0);
 	assert!(!Enabled());
 	// level 0 must short-circuit before any file I/O: log_at(0, ...)
@@ -33,12 +33,12 @@ fn TestLevelGateOffIsQuiet() {
 }
 
 #[test]
-fn TestSanitizeKvFlattensNewlines() {
+fn Flatten() {
 	assert_eq!(&*SanitizeKv("a\nb\r c"), "a b  c");
 }
 
 #[test]
-fn TestSanitizeKvBorrowsAValueThatIsAlreadyOneLine() {
+fn Borrow() {
 	// The common case allocates nothing: the sanitiser only builds a string when it
 	// has a newline to replace.
 	assert!(matches!(SanitizeKv("one line"), std::borrow::Cow::Borrowed(_)));
@@ -46,7 +46,7 @@ fn TestSanitizeKvBorrowsAValueThatIsAlreadyOneLine() {
 }
 
 #[test]
-fn TestCountersStayStillWhenTheGateIsOff() {
+fn Gate() {
 	// The counter gate is what makes the instrumentation safe in a release build:
 	// with the logger off, a bump must cost one atomic load and no write. Asserting
 	// the snapshot is unchanged after a bump is the observable form of that.
@@ -64,7 +64,7 @@ fn TestCountersStayStillWhenTheGateIsOff() {
 }
 
 #[test]
-fn TestCountersResetByDefault() {
+fn Reset() {
 	SetLevel(0);
 	let m = MetricsJSON();
 	assert_eq!(m["markers_created"], 0);

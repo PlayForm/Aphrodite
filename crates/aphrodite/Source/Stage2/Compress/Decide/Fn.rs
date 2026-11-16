@@ -1,17 +1,12 @@
 //! The three gates, as a value.
 
-use crate::Stage2::{
-	Const::MinimumStage2Size,
-	Outcome::Enum::Enum as Outcome,
-	Reduction::Accept::Fn::Fn as Accept,
-	Registry::Fn::ReducerRegistry,
-};
+use crate::Stage2::{Const::Minimum, Outcome::Enum::Enum as Outcome, Reduction::Accept::Fn::Fn as Accept, Registry};
 
 /// Decide what Stage 2 does with a piece of content.
 ///
 /// Three gates, in this order, and the order matters:
 ///
-/// 1. **Size.** Content under `MinimumStage2Size` is never reduced - the marker and header overhead
+/// 1. **Size.** Content under `Minimum` is never reduced - the marker and header overhead
 ///    would outweigh any saving.
 /// 2. **Type.** A CCR type with no registered reducer is not an error; it is the answer "this content
 ///    family is already dense" (previews, listings).
@@ -23,9 +18,9 @@ use crate::Stage2::{
 /// acceptance. The size gate is a `let ... else` on `checked_sub` because "there is headroom" is a
 /// value, not a branch worth spelling.
 pub(crate) fn Fn(Content:&str, CCRType:&str) -> Outcome {
-	let Some(_) = Content.len().checked_sub(MinimumStage2Size) else { return Outcome::TooSmall };
+	let Some(_) = Content.len().checked_sub(Minimum) else { return Outcome::TooSmall };
 
-	let Reducers = ReducerRegistry();
+	let Reducers = Registry::Fn::Fn();
 	let Reducer = match Reducers.get(CCRType) {
 		Some(Reducer) => Reducer,
 		None => return Outcome::NoReducer,

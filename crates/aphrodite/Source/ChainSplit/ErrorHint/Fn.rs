@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use super::{Signals::Const::Signals, Truncate::Fn::Fn as Truncate};
+use super::{Signals::Const::Vocabulary, Truncate::Fn::Fn as Truncate};
 
 /// Extract a compact error hint from a segment's output, when it carries an
 /// error signal (exit code, error:/Error:, FAILED/failed, panic, Traceback,
@@ -23,7 +23,8 @@ pub fn Fn(Content:&str) -> Option<Cow<'_, str>> {
 		.lines()
 		.filter_map(|Line| {
 			let Line = Line.trim();
-			let Signal = Line.contains("exit code:") || Signals.iter().any(|Word| Line.to_lowercase().contains(Word));
+			let Signal =
+				Line.contains("exit code:") || Vocabulary.iter().any(|Word| Line.to_lowercase().contains(Word));
 
 			(!Line.is_empty() && Signal).then_some(Line)
 		})

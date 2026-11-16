@@ -7,21 +7,21 @@
 use crate::{
 	PollWorker::{
 		Output::Struct::Accumulator,
-		Task::{Status::Enum::BgStatus, Struct::BgTask},
+		Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 	},
-	State::Identity::Command::Struct::CommandID,
+	State::Identity::Command::Struct::Struct as Command,
 };
 
 /// A running task, started at `Turn`, first observed at `ObservedAtUnix`.
-pub(crate) fn Fn(TaskID:CommandID, Tool:String, command:String, Turn:usize, ObservedAtUnix:u64) -> BgTask {
-	BgTask {
+pub(crate) fn Fn(TaskID:Command, Tool:String, command:String, Turn:usize, ObservedAtUnix:u64) -> Record {
+	Record {
 		ID:TaskID,
 		Tool,
 		command,
 		StartedTurn:Turn,
 		LastPollTurn:Turn,
-		ExecutionID:None,
-		Status:BgStatus::Running,
+		Execution:None,
+		Status:Status::Running,
 		PollCount:0,
 		AccumulatedOutput:Accumulator::New(),
 		LiveBytesArrived:0,

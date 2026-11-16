@@ -6,19 +6,19 @@
 //! cannot start with a non-empty prefix.
 
 use crate::{
-	PollWorker::Should::{Command::Prefix::Const::SlowCommandPrefixes, Plan::Struct::BackgroundPlan},
-	State::Identity::Command::Struct::CommandID,
+	PollWorker::Should::{Command::Prefix::Const::Slow, Plan::Struct::Struct as Background},
+	State::Identity::Command::Struct::Struct as Command,
 };
 
 /// The identity and label for `command`, when it is a known-slow one.
-pub(crate) fn Fn(command:Option<&str>) -> Option<BackgroundPlan> {
+pub(crate) fn Fn(command:Option<&str>) -> Option<Background> {
 	let Command = command?.trim();
 	let Lower = Command.to_lowercase();
 
-	SlowCommandPrefixes.iter().find(|Prefix| Lower.starts_with(**Prefix))?;
+	Slow.iter().find(|Prefix| Lower.starts_with(**Prefix))?;
 
-	Some(BackgroundPlan {
-		Identity:CommandID::from(headroom_core::ccr::compute_key(Command.as_bytes())),
+	Some(Background {
+		Identity:Command::from(headroom_core::ccr::compute_key(Command.as_bytes())),
 		Label:Command.chars().take(60).collect(),
 	})
 }

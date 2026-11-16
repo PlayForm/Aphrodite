@@ -1,12 +1,12 @@
 //! The Go extractor: functions and methods, including the receiver-paren fix that
 //! keeps a method's real parameters in the reported signature.
 
-use crate::StructExtract::Extract::Fn as ExtractCodeStructure;
+use crate::StructExtract::Extract::Fn as Structure;
 
 #[test]
 fn TestExtractGo() {
 	let Code = "func main() {\n}\n\nfunc (s *Server) Start(addr string) error {\n}\n";
-	let r = ExtractCodeStructure(Code, "go");
+	let r = Structure(Code, "go");
 	assert!(r.contains_key("fns"));
 }
 
@@ -17,7 +17,7 @@ fn TestExtractGo() {
 #[test]
 fn TestExtractGoMethodReportsRealParamsNotReceiver() {
 	let Code = "func (s *Server) Start(addr string) error {\n}\n";
-	let r = ExtractCodeStructure(Code, "go");
+	let r = Structure(Code, "go");
 	let Fns = &r["fns"];
 	let Sig = Fns
 		.iter()

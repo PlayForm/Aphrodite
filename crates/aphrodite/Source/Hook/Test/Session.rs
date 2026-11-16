@@ -2,13 +2,13 @@
 
 use crate::{
 	Hook::LLM::{Post::Fn::Fn as PostLLMCall, Pre::Fn::Fn as PreLLMCall},
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 // ── T13 (F11): post_llm_call must archive the turn's last marker into
 // conv_index so aphrodite_diff returns non-zero results.
 #[test]
-fn TestPostLLMCallArchivesTurn() {
+fn Archive() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 2;
 	// Record a marker on the current turn.
@@ -32,7 +32,7 @@ fn TestPostLLMCallArchivesTurn() {
 // find picked the least informative marker (e.g. a tiny confirm echo
 // recorded after a big tool dump).
 #[test]
-fn TestPostLLMCallArchivesLargestSameTurnMarker() {
+fn Largest() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 7;
 	let Record = |s:&mut AphroditeState, hash:&str, Size:usize| {
@@ -64,10 +64,10 @@ fn TestPostLLMCallArchivesLargestSameTurnMarker() {
 // aphrodite-hermes.
 
 #[test]
-fn TestPreLLMCallPushesPollNudges() {
+fn Nudge() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 3;
-	crate::PollWorker::Insert::Fn::InsertBgTask(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
+	crate::PollWorker::Insert::Fn::Fn(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 	let _ = PreLLMCall(&mut s);
 	// The nudge should have been pushed into ephemeral_directives.
 	assert!(!s.EphemeralDirectives.is_empty(), "pre_llm_call should push poll-worker nudge");
@@ -79,10 +79,10 @@ fn TestPreLLMCallPushesPollNudges() {
 }
 
 #[test]
-fn TestPostLLMCallExpiresStalePollTasks() {
+fn Expire() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 20;
-	crate::PollWorker::Insert::Fn::InsertBgTask(
+	crate::PollWorker::Insert::Fn::Fn(
 		&mut s,
 		"old-task".into(),
 		"terminal".into(),
@@ -94,18 +94,18 @@ fn TestPostLLMCallExpiresStalePollTasks() {
 	// Should be marked stale.
 	assert_eq!(
 		s.BgTasks[0].Status,
-		crate::PollWorker::Task::Status::Enum::BgStatus::Stale,
+		crate::PollWorker::Task::Status::Enum::Enum::Stale,
 		"unpolled task should be expired as stale after {} turns",
-		crate::PollWorker::Task::Const::StaleTurnAge
+		crate::PollWorker::Task::Const::Age
 	);
 }
 
 #[test]
-fn TestPreLLMCallSkipsNudgesWhenPollWorkerDisabled() {
+fn Disabled() {
 	let mut s = AphroditeState::default();
 	s.PollWorkerEnabled = false;
 	s.TurnCounter = 3;
-	crate::PollWorker::Insert::Fn::InsertBgTask(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
+	crate::PollWorker::Insert::Fn::Fn(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 	let Before = s.EphemeralDirectives.len();
 	let _ = PreLLMCall(&mut s);
 	assert_eq!(
@@ -116,17 +116,17 @@ fn TestPreLLMCallSkipsNudgesWhenPollWorkerDisabled() {
 }
 
 #[test]
-fn TestPostLLMCallStillExpiresWhenPollWorkerDisabled() {
+fn Cleanup() {
 	let mut s = AphroditeState::default();
 	s.PollWorkerEnabled = false;
 	s.TurnCounter = 20;
-	crate::PollWorker::Insert::Fn::InsertBgTask(&mut s, "old-task".into(), "terminal".into(), "old-build".into(), 10);
+	crate::PollWorker::Insert::Fn::Fn(&mut s, "old-task".into(), "terminal".into(), "old-build".into(), 10);
 	s.BgTasks[0].LastPollTurn = 10;
 	let _ = PostLLMCall(&mut s);
 	// Expiry is a cleanup concern - should still run even when disabled.
 	assert_eq!(
 		s.BgTasks[0].Status,
-		crate::PollWorker::Task::Status::Enum::BgStatus::Stale,
+		crate::PollWorker::Task::Status::Enum::Enum::Stale,
 		"expire_stale_tasks must still run when disabled (cleanup)"
 	);
 }

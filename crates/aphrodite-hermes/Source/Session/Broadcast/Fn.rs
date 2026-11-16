@@ -6,8 +6,8 @@ use aphrodite::State::Struct::AphroditeState;
 
 use crate::Session::{
 	Broadcast::Report,
-	Lock::{Fn::lock_bounded, Outcome},
-	Registry::Struct::SESSIONS,
+	Lock::{self, Outcome},
+	Registry::State::Store,
 };
 
 /// Apply `f` to EVERY registered session under a BOUNDED lock, skipping
@@ -25,7 +25,7 @@ use crate::Session::{
 /// so the scope is the thing that has to be right.
 pub(crate) fn Fn(f:impl Fn(&mut AphroditeState)) -> Report::Struct::Struct {
 	let Sessions:Vec<Arc<Mutex<AphroditeState>>> = {
-		let Map = SESSIONS
+		let Map = Store
 			.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -34,14 +34,14 @@ pub(crate) fn Fn(f:impl Fn(&mut AphroditeState)) -> Report::Struct::Struct {
 	};
 
 	Sessions.into_iter().fold(
-		Report::Struct::Struct { Applied:0, Skipped:0, WantsReload:0 },
+		Report::Struct::Struct { Applied:0, Skipped:0, Reload:0 },
 		|mut Report, State| {
-			match lock_bounded(&State) {
+			match Lock::Fn::Fn(&State) {
 				Outcome::Enum::Enum::Held(mut Guard) => {
 					f(&mut Guard);
 
 					Report.Applied += 1;
-					Report.WantsReload += usize::from(Guard.AutoReload);
+					Report.Reload += usize::from(Guard.AutoReload);
 				},
 				// Wedged session: count it and move on (fail-open - it stays
 				// degraded, and the caller decides whether that is a reason to

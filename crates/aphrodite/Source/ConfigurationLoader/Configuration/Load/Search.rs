@@ -3,7 +3,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use super::super::Struct::Struct;
-use crate::ConfigurationLoader::Warn::Fn::WarnParseFailure;
+use crate::ConfigurationLoader::Warn::Fn::Fn as Warn;
 
 impl Struct {
 	/// Load from TOML file. Returns defaults on any failure.
@@ -31,7 +31,7 @@ impl Struct {
 							// `ParseFailure` is only recorded when the search
 							// ends on defaults (a later path may still yield a
 							// valid config).
-							WarnParseFailure(path, &Error, "skipping");
+							Warn(path, &Error, "skipping");
 
 							ParseFailure = Some(format!("{}: {Error}", path.display()));
 							None

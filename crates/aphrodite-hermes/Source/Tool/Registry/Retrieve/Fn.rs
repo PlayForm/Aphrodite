@@ -2,7 +2,7 @@
 
 use crate::Tool::{
 	Arg,
-	Dispatch::Fn::ToolHandler,
+	Dispatch::Fn::Handler,
 	Read,
 	Registry::Retrieve::{Narrow, Target},
 };
@@ -21,7 +21,7 @@ use crate::Tool::{
 ///
 /// The `query` narrowing runs on the RESOLVED body, so it narrows what reaches
 /// context without changing what is stored.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_retrieve", |Args| {
 		let Some(Resolved) = Target::Resolve::Fn::Fn(Args) else {
 			return serde_json::json!({ "error": "hash or path is required" });

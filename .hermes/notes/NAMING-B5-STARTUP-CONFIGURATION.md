@@ -10,12 +10,12 @@ No build was run (the card forbids it). What was verified instead is listed unde
 
 ### `Configuration::Proxy::Previews::Struct` - `[previews]`
 
-| Was                   | Now         | Key (pinned)        |
-| --------------------- | ----------- | ------------------- |
-| `ModelFamily`         | `Family`    | `model_family`      |
-| `CodeStructureMap`    | `Structure` | `code_structure_map`|
-| `PreviewMaximumChars` | `Limit`     | `preview_max_chars` |
-| `RustPreviewLines`    | `Lines`     | `rust_preview_lines`|
+| Was                   | Now         | Key (pinned)         |
+| --------------------- | ----------- | -------------------- |
+| `ModelFamily`         | `Family`    | `model_family`       |
+| `CodeStructureMap`    | `Structure` | `code_structure_map` |
+| `PreviewMaximumChars` | `Limit`     | `preview_max_chars`  |
+| `RustPreviewLines`    | `Lines`     | `rust_preview_lines` |
 
 `Structure` rather than the doctrine table's `Map`: the table assumes a `Previews::Structure` path
 exists to carry the noun. A `[previews]` key set cannot be re-nested without changing the emitted
@@ -24,11 +24,11 @@ the same constraint; its doc line names `[previews] rust_preview_lines`.
 
 ### `Configuration::Proxy::Prompts::Struct` - `[prompts]`
 
-| Was                  | Now        | Key (pinned)          |
-| -------------------- | ---------- | --------------------- |
-| `RetrieveGuidance`   | `Guidance` | `retrieve_guidance`   |
-| `CCRMarkerHint`      | `Hint`     | `ccr_marker_hint`     |
-| `CatalogIntentHints` | `Intent`   | `catalog_intent_hints`|
+| Was                  | Now        | Key (pinned)           |
+| -------------------- | ---------- | ---------------------- |
+| `RetrieveGuidance`   | `Guidance` | `retrieve_guidance`    |
+| `CCRMarkerHint`      | `Hint`     | `ccr_marker_hint`      |
+| `CatalogIntentHints` | `Intent`   | `catalog_intent_hints` |
 
 ### `Configuration::Proxy::Compression::Struct` - `[compression]`
 
@@ -57,21 +57,21 @@ sibling `First`/`Last`/`Minimum` and the doc line names `engine_threshold_pct`.
 
 ### `Configuration::Proxy::Proxy::Struct` - one `[[proxies]]` entry
 
-| Was                | Now        | Key (pinned)       |
-| ------------------ | ---------- | ------------------ |
-| `name`             | `Name`     | `name`             |
-| `APIKey`           | `Key`      | `api_key`          |
-| `APIURL`           | `URL`      | `api_url`          |
-| `ToolRelay`        | `Relay`    | `tool_relay`       |
-| `CCRTtlSeconds`    | `TTL`      | `ccr_ttl_seconds`  |
-| `CCRDatabasePath`  | `Database` | `ccr_db_path`      |
-| `NotifyURL`        | `Callback` | `notify_url`       |
-| `NotifyKey`        | `Auth`     | `notify_key`       |
-| `MaximumContext`   | `Context`  | `max_context`      |
-| `MaximumOutput`    | `Output`   | `max_output`       |
+| Was               | Now        | Key (pinned)      |
+| ----------------- | ---------- | ----------------- |
+| `name`            | `Name`     | `name`            |
+| `APIKey`          | `Key`      | `api_key`         |
+| `APIURL`          | `URL`      | `api_url`         |
+| `ToolRelay`       | `Relay`    | `tool_relay`      |
+| `CCRTtlSeconds`   | `TTL`      | `ccr_ttl_seconds` |
+| `CCRDatabasePath` | `Database` | `ccr_db_path`     |
+| `NotifyURL`       | `Callback` | `notify_url`      |
+| `NotifyKey`       | `Auth`     | `notify_key`      |
+| `MaximumContext`  | `Context`  | `max_context`     |
+| `MaximumOutput`   | `Output`   | `max_output`      |
 
 `name` was the only field in the whole partition with **no** `#[serde(rename)]`; renaming it
-required *adding* the pin (`#[serde(rename = "name")]`). Every other field above already carried
+required _adding_ the pin (`#[serde(rename = "name")]`). Every other field above already carried
 its pin, which was kept in place unchanged.
 
 `NotifyURL`/`NotifyKey` became `Callback`/`Auth` rather than `Notify`/`NotifyKey`: two fields may
@@ -79,29 +79,29 @@ not share a word, and `Key` is already the upstream credential.
 
 ### `Configuration::Proxy::Defaults::Struct` - `[defaults]`
 
-| Was               | Now   | Key (pinned)       |
-| ----------------- | ----- | ------------------ |
-| `APIURL`          | `URL` | `api_url`          |
-| `CCRTtlSeconds`   | `TTL` | `ccr_ttl_seconds`  |
-| `APIKey`          | `Key` | `api_key`          |
+| Was             | Now   | Key (pinned)      |
+| --------------- | ----- | ----------------- |
+| `APIURL`        | `URL` | `api_url`         |
+| `CCRTtlSeconds` | `TTL` | `ccr_ttl_seconds` |
+| `APIKey`        | `Key` | `api_key`         |
 
 ### `Configuration::CLI::Struct` - the parsed command line (clap)
 
-| Was                      | Now        | Flag (pinned)          | Value name (pinned)      |
-| ------------------------ | ---------- | ---------------------- | ------------------------ |
-| `command`                | `Command`  | - (subcommand)         | -                        |
-| `APIURL`                 | `URL`      | `apiurl`               | `APIURL`                 |
-| `APIKey`                 | `Key`      | `api-key`              | `API_KEY`                |
-| `MaximumContext`         | `Context`  | `maximum-context`      | `MAXIMUM_CONTEXT`        |
-| `MaximumOutput`          | `Output`   | `maximum-output`       | `MAXIMUM_OUTPUT`         |
-| `CCRDatabasePath`        | `Database` | `ccr-database-path`    | `CCR_DATABASE_PATH`      |
-| `CCRTtlSeconds`          | `TTL`      | `ccr-ttl-seconds`      | `CCR_TTL_SECONDS`        |
-| `StoreMaximumEntries`    | `Entries`  | `store-maximum-entries`| `STORE_MAXIMUM_ENTRIES`  |
-| `StoreMaximumBytes`      | `Bytes`    | `store-maximum-bytes`  | `STORE_MAXIMUM_BYTES`    |
-| `NoCCRMarker`            | `NoMarker` | `no-ccr-marker`        | - (flag)                 |
-| `ToolRelay`              | `Relay`    | `tool-relay`           | - (flag)                 |
-| `NotifyURL`              | `Callback` | `notify-url`           | `NOTIFY_URL`             |
-| `NotifyKey`              | `Auth`     | `notify-key`           | `NOTIFY_KEY`             |
+| Was                   | Now        | Flag (pinned)           | Value name (pinned)     |
+| --------------------- | ---------- | ----------------------- | ----------------------- |
+| `command`             | `Command`  | - (subcommand)          | -                       |
+| `APIURL`              | `URL`      | `apiurl`                | `APIURL`                |
+| `APIKey`              | `Key`      | `api-key`               | `API_KEY`               |
+| `MaximumContext`      | `Context`  | `maximum-context`       | `MAXIMUM_CONTEXT`       |
+| `MaximumOutput`       | `Output`   | `maximum-output`        | `MAXIMUM_OUTPUT`        |
+| `CCRDatabasePath`     | `Database` | `ccr-database-path`     | `CCR_DATABASE_PATH`     |
+| `CCRTtlSeconds`       | `TTL`      | `ccr-ttl-seconds`       | `CCR_TTL_SECONDS`       |
+| `StoreMaximumEntries` | `Entries`  | `store-maximum-entries` | `STORE_MAXIMUM_ENTRIES` |
+| `StoreMaximumBytes`   | `Bytes`    | `store-maximum-bytes`   | `STORE_MAXIMUM_BYTES`   |
+| `NoCCRMarker`         | `NoMarker` | `no-ccr-marker`         | - (flag)                |
+| `ToolRelay`           | `Relay`    | `tool-relay`            | - (flag)                |
+| `NotifyURL`           | `Callback` | `notify-url`            | `NOTIFY_URL`            |
+| `NotifyKey`           | `Auth`     | `notify-key`            | `NOTIFY_KEY`            |
 
 `value_name` is not optional here: clap derives it from the field name, so `MaximumContext` →
 `Context` would have shipped `--maximum-context <CONTEXT>`. The flag spelling is the smaller half
@@ -109,14 +109,14 @@ of the contract.
 
 ### `Configuration::CLI::Setup::Struct` and `Configuration::CLI::Command::Enum::Setup`
 
-| Was          | Now    | Flag (pinned) | Value name (pinned) |
-| ------------ | ------ | ------------- | ------------------- |
-| `APIKey`     | `Key`  | `api-key`     | `API_KEY`           |
-| `APIURL`     | `URL`  | `apiurl`      | `APIURL`            |
-| `CachePort`  | `Cache`| `cache-port`  | `CACHE_PORT`        |
-| `TokenPort`  | `Token`| `token-port`  | `TOKEN_PORT`        |
-| `NoLaunch`   | kept   | `no-launch`   | - (flag)            |
-| `Force`      | kept   | `force`       | - (flag)            |
+| Was         | Now     | Flag (pinned) | Value name (pinned) |
+| ----------- | ------- | ------------- | ------------------- |
+| `APIKey`    | `Key`   | `api-key`     | `API_KEY`           |
+| `APIURL`    | `URL`   | `apiurl`      | `APIURL`            |
+| `CachePort` | `Cache` | `cache-port`  | `CACHE_PORT`        |
+| `TokenPort` | `Token` | `token-port`  | `TOKEN_PORT`        |
+| `NoLaunch`  | kept    | `no-launch`   | - (flag)            |
+| `Force`     | kept    | `force`       | - (flag)            |
 
 ### `Configuration::Environment::*`
 
@@ -127,15 +127,15 @@ reading the path intends.
 
 ### `ConfigurationLoader::Configuration::Resolve::*` - one getter per family
 
-| Was             | Now        | Leaf              |
-| --------------- | ---------- | ----------------- |
-| `GetBool`       | `Bool`     | `Resolve/Bool`    |
-| `GetUsize`      | `Size`     | `Resolve/Size`    |
-| `GetOptUsize`   | `Limit`    | `Resolve/Limit`   |
-| `GetU64`        | `Number`   | `Resolve/Number`  |
-| `GetString`     | `Text`     | `Resolve/Text`    |
-| `GetStringList` | `List`     | `Resolve/List`    |
-| `GetTemplates`  | `Template` | `Resolve/Template`|
+| Was             | Now        | Leaf               |
+| --------------- | ---------- | ------------------ |
+| `GetBool`       | `Bool`     | `Resolve/Bool`     |
+| `GetUsize`      | `Size`     | `Resolve/Size`     |
+| `GetOptUsize`   | `Limit`    | `Resolve/Limit`    |
+| `GetU64`        | `Number`   | `Resolve/Number`   |
+| `GetString`     | `Text`     | `Resolve/Text`     |
+| `GetStringList` | `List`     | `Resolve/List`     |
+| `GetTemplates`  | `Template` | `Resolve/Template` |
 
 The `Get` verb is what the module `Resolve` already says. `GetOptUsize` also lost `Opt`, a
 forbidden abbreviation. These seven are inherent methods on one type, so §4 is what makes the
@@ -143,11 +143,11 @@ distinction word (`Bool`, `Size`, `Limit`, ...) necessary rather than decorative
 
 ### `ConfigurationLoader::Configuration::Load::*`
 
-| Was           | Now       | Leaf              |
-| ------------- | --------- | ----------------- |
-| `LoadFrom`    | `Read`    | `Load/File`       |
-| `SetOverride` | `Set`     | `Load/Override`   |
-| `Reload`      | `Refresh` | `Load/Reload`     |
+| Was           | Now       | Leaf            |
+| ------------- | --------- | --------------- |
+| `LoadFrom`    | `Read`    | `Load/File`     |
+| `SetOverride` | `Set`     | `Load/Override` |
+| `Reload`      | `Refresh` | `Load/Reload`   |
 
 `Refresh` is a deliberate distinction, not a synonym: it re-reads the document. `Reload` was freed
 for the apply pass below, because both are inherent methods on the same type and could not share
@@ -155,13 +155,13 @@ the name.
 
 ### `ConfigurationLoader::Configuration::Apply::*` - the two passes
 
-| Was                | Now       | Path                        |
-| ------------------ | --------- | --------------------------- |
-| `ApplyCompression` | `Startup` | `Apply::Startup::Fn`        |
-| `ApplyReload`      | `Reload`  | `Apply::Reload::Fn`         |
-| `ApplyGlobals`     | `Global`  | `Apply::Global::Fn`         |
-| `const Startup`    | `Sequence`| `Apply::Startup::Const`     |
-| `const Reload`     | `Sequence`| `Apply::Reload::Const`      |
+| Was                | Now        | Path                    |
+| ------------------ | ---------- | ----------------------- |
+| `ApplyCompression` | `Startup`  | `Apply::Startup::Fn`    |
+| `ApplyReload`      | `Reload`   | `Apply::Reload::Fn`     |
+| `ApplyGlobals`     | `Global`   | `Apply::Global::Fn`     |
+| `const Startup`    | `Sequence` | `Apply::Startup::Const` |
+| `const Reload`     | `Sequence` | `Apply::Reload::Const`  |
 
 `ApplyCompression` was also wrong on content - it applies every section, not compression - so the
 rename fixed a misnomer as well as a compound. `Configuration.Startup(&mut State)` /
@@ -192,21 +192,21 @@ path and `apply` is the verb the module already carries.
 
 ### `Setup::*`
 
-| Was                      | Now        | Path                        |
-| ------------------------ | ---------- | --------------------------- |
-| `Step::CreateDirectories`| `Create`   | `Plan::Step`                |
-| `Step::PreparePluginDirectory` | `Prepare` | `Plan::Step`           |
-| `Step::InstallBinary`    | `Binary`   | `Plan::Step`                |
-| `Step::InstallDylibs`    | `Dylib`    | `Plan::Step`                |
-| `Step::WriteConfiguration`| `Configuration` | `Plan::Step`          |
-| `Step::WriteManifest`    | `Manifest` | `Plan::Step`                |
-| `Step::WriteLoader`      | `Loader`   | `Plan::Step`                |
-| `Step::WriteVersionPin`  | `Pin`      | `Plan::Step`                |
-| `Step::RegisterPlugin`   | `Register` | `Plan::Step`                |
-| `Ownership::DevStaleSymlink` | `Stale` | `Plan::Ownership`          |
-| `Register::Outcome::ExitedNonZero` | `NonZero` | `Register::Outcome` |
-| `Register::Outcome::ExitedZero` | `Zero` | `Register::Outcome`      |
-| local `SetupOwnsDirectory` | `Owned`  | `Plan::Fn`                  |
+| Was                                | Now             | Path                |
+| ---------------------------------- | --------------- | ------------------- |
+| `Step::CreateDirectories`          | `Create`        | `Plan::Step`        |
+| `Step::PreparePluginDirectory`     | `Prepare`       | `Plan::Step`        |
+| `Step::InstallBinary`              | `Binary`        | `Plan::Step`        |
+| `Step::InstallDylibs`              | `Dylib`         | `Plan::Step`        |
+| `Step::WriteConfiguration`         | `Configuration` | `Plan::Step`        |
+| `Step::WriteManifest`              | `Manifest`      | `Plan::Step`        |
+| `Step::WriteLoader`                | `Loader`        | `Plan::Step`        |
+| `Step::WriteVersionPin`            | `Pin`           | `Plan::Step`        |
+| `Step::RegisterPlugin`             | `Register`      | `Plan::Step`        |
+| `Ownership::DevStaleSymlink`       | `Stale`         | `Plan::Ownership`   |
+| `Register::Outcome::ExitedNonZero` | `NonZero`       | `Register::Outcome` |
+| `Register::Outcome::ExitedZero`    | `Zero`          | `Register::Outcome` |
+| local `SetupOwnsDirectory`         | `Owned`         | `Plan::Fn`          |
 
 `Setup/Execute/Apply/Fn.rs` no longer aliases the step functions (`WriteBinaryVersion`,
 `WriteInitPy`, `WritePluginYAML`): it imports the modules and calls `BinaryVersion::Fn::Fn`,
@@ -269,17 +269,17 @@ not a compile error.
 
 Five call-site edits in other cards' paths, each required for the tree to stay self-consistent:
 
-| File | Card | Why |
-| --- | --- | --- |
-| `Proxy/Threshold/Resolve/Fn.rs` | B2 | reads the renamed `[compression]` fields; also aliases `Environment::Warn` and the table type |
-| `Proxy/CCR/Reload/Fn.rs` | B2 | reads `[previews]`/`[prompts]`/`[compression]`; JSON echo keys unchanged |
-| `Proxy/State/Build/Fn.rs` | B2 | builds `AppState` from the renamed `CLI` fields |
-| `Proxy/Threshold/Struct.rs` | B2 | one doc comment naming `Multi::Port::Override` |
-| `ABI/Initialise.rs` | B1 | calls `Startup`/`Global`, uses `Read` |
-| `ABI/Configuration/Reload/Assess/Fn.rs` | B1 | calls `Warn::Fn::Fn` |
-| `State/Struct.rs`, `State/Default.rs` | B6 | doc comments naming `Apply::Startup::Fn` |
-| `Marker/Test/Format.rs`, `Marker/Format/Registration/Guard/Fn.rs`, `Directive/Test/Load.rs` | B3/B7 | doc comments naming `Apply::Startup::Fn` |
-| `aphrodite-hermes/.../{Configuration/Template/Seeded/Fn.rs, Configuration/Reload/Fn.rs, Configuration/mod.rs, Session/Watcher/Apply/Fn.rs, Configuration/Test/Reload.rs, Session/Test/Apply.rs}` | B9 | calls `Startup`/`Reload`/`Global`, uses `Read` |
+| File                                                                                                                                                                                             | Card  | Why                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | --------------------------------------------------------------------------------------------- |
+| `Proxy/Threshold/Resolve/Fn.rs`                                                                                                                                                                  | B2    | reads the renamed `[compression]` fields; also aliases `Environment::Warn` and the table type |
+| `Proxy/CCR/Reload/Fn.rs`                                                                                                                                                                         | B2    | reads `[previews]`/`[prompts]`/`[compression]`; JSON echo keys unchanged                      |
+| `Proxy/State/Build/Fn.rs`                                                                                                                                                                        | B2    | builds `AppState` from the renamed `CLI` fields                                               |
+| `Proxy/Threshold/Struct.rs`                                                                                                                                                                      | B2    | one doc comment naming `Multi::Port::Override`                                                |
+| `ABI/Initialise.rs`                                                                                                                                                                              | B1    | calls `Startup`/`Global`, uses `Read`                                                         |
+| `ABI/Configuration/Reload/Assess/Fn.rs`                                                                                                                                                          | B1    | calls `Warn::Fn::Fn`                                                                          |
+| `State/Struct.rs`, `State/Default.rs`                                                                                                                                                            | B6    | doc comments naming `Apply::Startup::Fn`                                                      |
+| `Marker/Test/Format.rs`, `Marker/Format/Registration/Guard/Fn.rs`, `Directive/Test/Load.rs`                                                                                                      | B3/B7 | doc comments naming `Apply::Startup::Fn`                                                      |
+| `aphrodite-hermes/.../{Configuration/Template/Seeded/Fn.rs, Configuration/Reload/Fn.rs, Configuration/mod.rs, Session/Watcher/Apply/Fn.rs, Configuration/Test/Reload.rs, Session/Test/Apply.rs}` | B9    | calls `Startup`/`Reload`/`Global`, uses `Read`                                                |
 
 Items I could **not** rename because they are declared in another row, and which therefore still
 trip the 3+ probe from inside my paths:
@@ -315,7 +315,7 @@ trip the 3+ probe from inside my paths:
    this partition left long (`TestResolveTimeoutClampedTo600` and 52 siblings). They are read in CI
    output, not in source, and no other partition is shortening them - renaming them here alone would
    make the tree less coherent, not more. Declared as the exception rather than silently kept.
-5. **A clap field's doc comment *is* `--help` text.** §6's "every renamed item carries a `///`
+5. **A clap field's doc comment _is_ `--help` text.** §6's "every renamed item carries a `///`
    naming its external contract" cannot be applied to a `#[derive(Parser)]` field: adding
    ``/// `--maximum-context` `` to the doc would print that line in `--help` and change the very
    contract the card requires to stay identical. For the 16 clap fields the contract is named by the
@@ -328,15 +328,15 @@ The claims below are executable, not prose: `hermes-verify-b5-naming.py` in the 
 (`/private/var/folders/.../T/hermes-verify-b5-naming.py`) runs all seven checks and exits 0 only if
 every one passes. It is left in place rather than cleaned up, so the evidence survives this turn.
 
-| Claim | Probe | Result |
-| --- | --- | --- |
-| serde keys unchanged | extract `#[serde(rename)]` + field pairs from the six tables; assert every field is pinned and the key list equals the pre-rename list | 48 pins; 36 on a renamed field and already there, 11 on fields this card did not rename, exactly 1 added (`name`) |
-| CLI flags and value names unchanged | extract `long`/`value_name` per `#[arg]` (multi-line tolerant) and compare to `target/release/aphrodite --help` / `setup --help` captured **before** the edits (`.hermes/tmp/help-*-before.txt`) | 18 root + 7 setup options equal, flag and `<VALUE>` both |
-| one word per item | 3+ token probe over the partition, each non-comment hit classified as dependency / external contract / test label / another card's item | 229 → 106, 0 unclassified |
-| no renamed symbol survives | grep each old name across `crates/` | 0 hits |
-| module tree intact | `pub mod X;` vs `X.rs` / `X/mod.rs` | 0 missing |
-| every changed file parses | `rustfmt --edition 2024 --emit stdout` over every changed `.rs` | 0 parse errors (715 files) |
-| emitted artifacts untouched | `git status --porcelain crates/aphrodite/templates/ plugins/` | clean |
+| Claim                               | Probe                                                                                                                                                                                            | Result                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| serde keys unchanged                | extract `#[serde(rename)]` + field pairs from the six tables; assert every field is pinned and the key list equals the pre-rename list                                                           | 48 pins; 36 on a renamed field and already there, 11 on fields this card did not rename, exactly 1 added (`name`) |
+| CLI flags and value names unchanged | extract `long`/`value_name` per `#[arg]` (multi-line tolerant) and compare to `target/release/aphrodite --help` / `setup --help` captured **before** the edits (`.hermes/tmp/help-*-before.txt`) | 18 root + 7 setup options equal, flag and `<VALUE>` both                                                          |
+| one word per item                   | 3+ token probe over the partition, each non-comment hit classified as dependency / external contract / test label / another card's item                                                          | 229 → 106, 0 unclassified                                                                                         |
+| no renamed symbol survives          | grep each old name across `crates/`                                                                                                                                                              | 0 hits                                                                                                            |
+| module tree intact                  | `pub mod X;` vs `X.rs` / `X/mod.rs`                                                                                                                                                              | 0 missing                                                                                                         |
+| every changed file parses           | `rustfmt --edition 2024 --emit stdout` over every changed `.rs`                                                                                                                                  | 0 parse errors (715 files)                                                                                        |
+| emitted artifacts untouched         | `git status --porcelain crates/aphrodite/templates/ plugins/`                                                                                                                                    | clean                                                                                                             |
 
 Two findings the probe produced that the by-hand sweep had missed, both fixed: a stale module doc in
 `Home/Database/Fn.rs` and a stale `MaximumContext` reference in `Boot/Route/Chat.rs`.
@@ -347,11 +347,11 @@ The card forbids a build as its gate, but a rename's call sites can only be prov
 `cargo check --lib -p aphrodite -p aphrodite-hermes` was run as a diagnostic. It found seven real
 errors in this partition, all fixed:
 
-| Error | Cause | Fix |
-| --- | --- | --- |
-| `Rendering/Struct.rs`, `Resolve/Template.rs`, `Multi/Struct.rs` - `TemplatesConfiguration` not found | B6 renamed `State::Template::Struct::TemplatesConfiguration` → `Struct` | followed the rename at my three call sites |
-| `Section/Template.rs` - `ShippedSessionInject` not found | B3 renamed `Flow::Prompt::Const::ShippedSessionInject` → `Shipped` | followed the rename |
-| `Setup/Execute/Apply/Fn.rs` ×3 - `cannot find Fn in PluginYAML` | `Setup/Write/{PluginYAML,InitPy,BinaryVersion}` are single files, so the call is `X::Fn(..)`, not `X::Fn::Fn(..)` | dropped the extra hop |
+| Error                                                                                                | Cause                                                                                                             | Fix                                        |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `Rendering/Struct.rs`, `Resolve/Template.rs`, `Multi/Struct.rs` - `TemplatesConfiguration` not found | B6 renamed `State::Template::Struct::TemplatesConfiguration` → `Struct`                                           | followed the rename at my three call sites |
+| `Section/Template.rs` - `ShippedSessionInject` not found                                             | B3 renamed `Flow::Prompt::Const::ShippedSessionInject` → `Shipped`                                                | followed the rename                        |
+| `Setup/Execute/Apply/Fn.rs` ×3 - `cannot find Fn in PluginYAML`                                      | `Setup/Write/{PluginYAML,InitPy,BinaryVersion}` are single files, so the call is `X::Fn(..)`, not `X::Fn::Fn(..)` | dropped the extra hop                      |
 
 Result: **60 → 10 lib errors, 0 in this partition.** The ten survivors are in `Preview` (4),
 `StructExtract` (2), `Proxy`, `Prefetch`, `PollWorker`, `Hook` - other cards' in-flight work - and
@@ -370,5 +370,3 @@ the CLI probe reads attribute blocks rather than lines so it is insensitive to i
 
 Still owed to the verification card: the full build, the test count, and a real `--help` diff. The
 `value_name` pins make the last one a one-line check.
-
-

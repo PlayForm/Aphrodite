@@ -14,10 +14,10 @@ use aphrodite::State::Struct::AphroditeState;
 ///
 /// An absent payload field is omitted from the line rather than written empty,
 /// so the line never claims a value it lacks.
-pub(crate) fn Fn(State:&AphroditeState, Session:&str, Result:&serde_json::Value, ResultBytes:usize, ElapsedUs:u64) {
+pub(crate) fn Fn(State:&AphroditeState, Session:&str, Result:&serde_json::Value, Length:usize, Micros:u64) {
 	let mut Fields = vec![
-		("result_bytes", ResultBytes.to_string()),
-		("elapsed_us", ElapsedUs.to_string()),
+		("result_bytes", Length.to_string()),
+		("elapsed_us", Micros.to_string()),
 		(
 			"compressed",
 			Result.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false).to_string(),

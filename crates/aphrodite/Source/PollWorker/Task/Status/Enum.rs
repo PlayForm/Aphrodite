@@ -13,25 +13,25 @@
 
 use std::num::NonZeroI32;
 
-use crate::PollWorker::Task::Status::Stored::Struct::StoredOutput;
+use crate::PollWorker::Task::Status::Stored::Struct::Struct as Payload;
 
 /// Status of a backgrounded task.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BgStatus {
+pub enum Enum {
 	/// Task is still running - agent should keep polling.
 	Running,
 	/// Task completed successfully, with where its output was stored.
 	Done {
 		/// Where its output was stored.
-		Output:StoredOutput,
+		Output:Payload,
 	},
 	/// Task failed, with the code that failed it and where its output was stored.
 	Failed {
 		/// The non-zero exit code that failed it.
 		ExitCode:NonZeroI32,
 		/// Where its output was stored.
-		Output:StoredOutput,
+		Output:Payload,
 	},
-	/// Agent hasn't polled in `StaleTurnAge` turns - abandoned.
+	/// Agent hasn't polled in `Age` turns - abandoned.
 	Stale,
 }

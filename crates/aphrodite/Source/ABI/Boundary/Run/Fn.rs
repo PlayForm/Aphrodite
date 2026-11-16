@@ -12,7 +12,7 @@ use crate::ABI::Boundary::Panic::Fn::Fn as Dispose;
 /// contract rather than a convenience: a panic is converted into an error string
 /// that the caller reads, no invariant crosses the boundary in either direction,
 /// and a session whose state was half-mutated is documented as observably degraded
-/// (`Handle::Lookup::WithState`'s torn-state contract) rather than assumed clean.
+/// (`Handle::Lookup::Guarded`'s torn-state contract) rather than assumed clean.
 ///
 /// The caught payload does not end here as a value to drop: it is handed to
 /// `Boundary::Panic`, which owns the disposition policy. That matters because
@@ -21,7 +21,7 @@ use crate::ABI::Boundary::Panic::Fn::Fn as Dispose;
 ///
 /// The message is `"internal error: panicked"` and it is a contract string: the
 /// exports that do not take a handle have always answered it, while the ones that
-/// go through `WithState` answer `"internal error: hook panicked"` from inside that
+/// go through `Guarded` answer `"internal error: hook panicked"` from inside that
 /// wrapper, which catches before this frame sees the unwind.
 ///
 /// Rule: every new `pub unsafe extern "C" fn` added to this crate routes through

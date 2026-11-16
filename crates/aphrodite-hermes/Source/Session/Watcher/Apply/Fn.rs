@@ -1,8 +1,8 @@
 //! Apply a freshly loaded config to every live session.
 
 use crate::{
-	Configuration::Reload::Fn::apply_config_reload,
-	Session::{Broadcast::Fn::Fn as for_each_session, Watcher::Outcome},
+	Configuration::Reload,
+	Session::{Broadcast, Watcher::Outcome},
 };
 
 /// Apply `Configuration` to EVERY registered session and report what the pass
@@ -19,7 +19,7 @@ use crate::{
 pub(crate) fn Fn(Configuration:&aphrodite::ConfigurationLoader::Configuration::Struct::Struct) -> Outcome::Enum::Enum {
 	match Configuration.ParseFailure.clone() {
 		Some(Failure) => {
-			Outcome::Enum::Enum::Failed(for_each_session(|State| State.ConfigurationError = Some(Failure.clone())))
+			Outcome::Enum::Enum::Failed(Broadcast::Fn::Fn(|State| State.ConfigurationError = Some(Failure.clone())))
 		},
 		None => {
 			// The process-global rendering settings are published ONCE per reload,
@@ -27,9 +27,9 @@ pub(crate) fn Fn(Configuration:&aphrodite::ConfigurationLoader::Configuration::S
 			// process, so a pass that reached no session must still publish them. A
 			// broken file publishes nothing - the previous values stay in force,
 			// exactly as they do for the per-session state.
-			Configuration.ApplyGlobals();
+			Configuration.Global();
 
-			Outcome::Enum::Enum::Applied(for_each_session(|State| apply_config_reload(Configuration, State)))
+			Outcome::Enum::Enum::Applied(Broadcast::Fn::Fn(|State| Reload::Fn::Fn(Configuration, State)))
 		},
 	}
 }

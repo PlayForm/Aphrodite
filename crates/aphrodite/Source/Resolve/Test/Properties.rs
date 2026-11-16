@@ -8,20 +8,20 @@
 // ── T8: property tests ───────────────────────────────────────
 use proptest::{prop_assert, prop_assert_eq, proptest};
 
-use crate::Resolve::Parse::{Find::Fn as FindMarkers, Hash::Fn as ParseMarkerHash};
+use crate::Resolve::Parse::{Find::Fn as Find, Hash::Fn as Hash};
 
 proptest! {
-	/// `FindMarkers` must never panic on arbitrary input, and every occurrence it returns must
-	/// round-trip through `ParseMarkerHash` back to the same hash it was extracted with, with a
+	/// `Find` must never panic on arbitrary input, and every occurrence it returns must
+	/// round-trip through `Parse::Hash::Fn` back to the same hash it was extracted with, with a
 	/// span that still holds that exact marker text.
 	#[test]
 	fn PropFindMarkersNeverPanicsAndRoundtrips(s in ".*") {
-		let Markers = FindMarkers(&s);
+		let Markers = Find(&s);
 
 		Markers
 			.into_iter()
 			.try_for_each(|Occurrence| -> Result<(), proptest::test_runner::TestCaseError> {
-				prop_assert_eq!(ParseMarkerHash(Occurrence.Marker), Some(Occurrence.Hash));
+				prop_assert_eq!(Hash(Occurrence.Marker), Some(Occurrence.Hash));
 				prop_assert_eq!(&s[Occurrence.Span.clone()], Occurrence.Marker);
 				prop_assert!(Occurrence.Span.end <= s.len());
 

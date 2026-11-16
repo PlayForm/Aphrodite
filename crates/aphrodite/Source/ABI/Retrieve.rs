@@ -7,7 +7,7 @@ use crate::ABI::{
 	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 };
 
-/// Return the raw content stored under `hash` - not a JSON envelope.
+/// Return the raw content stored under `Hash` - not a JSON envelope.
 ///
 /// This is the one stateful export whose success payload is the content itself,
 /// because the caller's next move is to put it back into context verbatim; a
@@ -16,30 +16,30 @@ use crate::ABI::{
 /// start with a brace" from an error by checking for the `error` key, not by
 /// shape alone.
 ///
-/// Retrieval is also the teaching loop: the FFI path bypasses `ResolveOne`, so
-/// the consequence is attributed here instead, which is what lets the engine
+/// Retrieval is also the teaching loop: the FFI path bypasses `Resolve::One::Fn`,
+/// so the consequence is attributed here instead, which is what lets the engine
 /// learn which markers are actually worth keeping.
 /// # Safety
-/// `Handle` and `hash` must each be null or point to a valid, NUL-terminated C
+/// `Handle` and `Hash` must each be null or point to a valid, NUL-terminated C
 /// string that stays readable and unmoved for the duration of this call. The
 /// returned pointer is owned by the caller and must be released with
 /// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn AphroditeRetrieve(Handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let hash = unsafe { Cstr(hash) };
+pub unsafe extern "C" fn AphroditeRetrieve(Handle:*const c_char, Hash:*const c_char) -> *mut c_char {
+	let Hash = unsafe { Cstr(Hash) };
 
 	Bare(Handle, move |s| {
-		let hash = Optional(hash)?;
+		let Hash = Optional(Hash)?;
 
-		match s.InlineStoreGet(&hash) {
+		match s.Get(&Hash) {
 			Some(Content) => {
 				// Tier 1 teaching loop: the FFI retrieve path bypasses
-				// resolve_one, so attribute the consequence here too.
-				s.NoteSplitRetrieval(&hash);
+				// `Resolve::One::Fn`, so attribute the consequence here too.
+				s.NoteRetrieval(&Hash);
 
 				Ok(Answer::Text(Content))
 			},
-			None => anyhow::bail!("hash not found: {}", hash),
+			None => anyhow::bail!("hash not found: {}", Hash),
 		}
 	})
 }

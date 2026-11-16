@@ -3,18 +3,18 @@
 
 use crate::{
 	PollWorker::{
-		Insert::Fn::InsertBgTask,
-		Task::Status::{Enum::BgStatus, Stored::Fn::Fn as Stored},
-		Update::Fn::UpdateFromPoll,
+		Insert::Fn::Fn as Insert,
+		Task::Status::{Enum::Enum as Status, Stored::Fn::Fn as Stored},
+		Update::Fn::Fn as Update,
 	},
 	State::Struct::AphroditeState,
 };
 
 #[test]
-fn TestUpdateFromPollExitCodeZero() {
+fn Success() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(
+	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
@@ -28,9 +28,9 @@ fn TestUpdateFromPollExitCodeZero() {
 	})
 	.to_string();
 
-	let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
+	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed, "poll result should be consumed");
-	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
+	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
 	assert!(
 		Stored(&State.BgTasks[0].Status).is_some(),
 		"the completion records its stored output"
@@ -38,10 +38,10 @@ fn TestUpdateFromPollExitCodeZero() {
 }
 
 #[test]
-fn TestUpdateFromPollExitCodeNonzero() {
+fn Failure() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(
+	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
@@ -55,16 +55,16 @@ fn TestUpdateFromPollExitCodeNonzero() {
 	})
 	.to_string();
 
-	let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
+	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed);
-	assert!(matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 1));
+	assert!(matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 1));
 }
 
 #[test]
-fn TestUpdateFromPollNoExitCodeStillRunning() {
+fn Running() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(
+	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
@@ -78,9 +78,9 @@ fn TestUpdateFromPollNoExitCodeStillRunning() {
 	})
 	.to_string();
 
-	let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
+	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
+	assert_eq!(State.BgTasks[0].Status, Status::Running);
 	assert_eq!(State.BgTasks[0].PollCount, 1);
 	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("still compiling"));
 }
@@ -88,10 +88,10 @@ fn TestUpdateFromPollNoExitCodeStillRunning() {
 // ── Repetition & edge-case tests ──────────────────────────
 
 #[test]
-fn TestMultipleRapidPollsAccumulateOutput() {
+fn Multiple() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "long-running".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "long-running".into(), 1);
 
 	// Rapid successive polls - each should accumulate.
 	(0..5).for_each(|i| {
@@ -100,21 +100,21 @@ fn TestMultipleRapidPollsAccumulateOutput() {
 			"exit_code": serde_json::Value::Null,
 		})
 		.to_string();
-		let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
+		let Consumed = Update(&mut State, "process", &PollJSON);
 		assert!(Consumed, "poll {} should be consumed", i);
 	});
 
 	assert_eq!(State.BgTasks[0].PollCount, 5);
 	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 0"));
 	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 4"));
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
+	assert_eq!(State.BgTasks[0].Status, Status::Running);
 }
 
 #[test]
-fn TestPollWithExitCodeCompletesTask() {
+fn Exit() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 10;
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "npm install".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "npm install".into(), 1);
 
 	// First: running poll
 	let PollRunning = serde_json::json!({
@@ -122,8 +122,8 @@ fn TestPollWithExitCodeCompletesTask() {
 		"exit_code": serde_json::Value::Null,
 	})
 	.to_string();
-	UpdateFromPoll(&mut State, "process", &PollRunning);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
+	Update(&mut State, "process", &PollRunning);
+	assert_eq!(State.BgTasks[0].Status, Status::Running);
 
 	// Second: completion poll
 	let PollDone = serde_json::json!({
@@ -131,28 +131,28 @@ fn TestPollWithExitCodeCompletesTask() {
 		"exit_code": 0,
 	})
 	.to_string();
-	UpdateFromPoll(&mut State, "process", &PollDone);
-	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
+	Update(&mut State, "process", &PollDone);
+	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
 	assert!(Stored(&State.BgTasks[0].Status).is_some());
 }
 
 #[test]
-fn TestPollWithTextExitCodeCompletesTask() {
+fn Text() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "make build".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "make build".into(), 1);
 
 	// No JSON wrapper - just raw output with "exit code: 2" in text.
-	let Consumed = UpdateFromPoll(&mut State, "process", "building...\nfailed!\nexit code: 2\n");
+	let Consumed = Update(&mut State, "process", "building...\nfailed!\nexit code: 2\n");
 	assert!(Consumed);
-	assert!(matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 2));
+	assert!(matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2));
 }
 
 #[test]
-fn TestAccumulatedOutputCappedAt256kb() {
+fn Cap() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "very-verbose".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "very-verbose".into(), 1);
 
 	// Push 300KB of output across multiple polls.
 	let Chunk = "x".repeat(65536); // 64KB
@@ -162,7 +162,7 @@ fn TestAccumulatedOutputCappedAt256kb() {
 			"exit_code": serde_json::Value::Null,
 		})
 		.to_string();
-		UpdateFromPoll(&mut State, "process", &Poll);
+		Update(&mut State, "process", &Poll);
 	});
 
 	// Should be capped at ~256KB (256 * 1024).

@@ -2,20 +2,20 @@
 
 use std::collections::HashMap;
 
-use super::super::Guard::{GlobalsGuards, GuardedApplyCompression};
+use super::super::Guard::{Globals, Guarded};
 use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 
-// ── Pre-Rust port: `ApplyGlobals` publishes `[templates]` +
+// ── Pre-Rust port: `Global` publishes `[templates]` +
 // `[previews] model_family` into the process-global renderer so the
 // dylib path renders `[templates.preview.<family>.<ctype>]` format
 // strings, together with the marker grammar and the preview cap. ──
 #[test]
-fn TestApplyGlobalsRegistersTemplatesAndFamily() {
+fn TestGlobalRegistersTemplatesAndFamily() {
 	// One publication writes three process-wide registries, so this test holds all
 	// three guards for its WHOLE span: `cargo test` runs module bodies concurrently,
 	// and a sibling test that reset the marker registration between the publish and
 	// the assertions would make this test read another test's state.
-	let _Guards = GlobalsGuards();
+	let _Guards = Globals();
 
 	let cfg = Configuration {
 		raw:"[templates.preview.code_first]\ndiff = \"{type} {ln}L\"\n[templates.marker]\nformat = \
@@ -27,8 +27,8 @@ fn TestApplyGlobalsRegistersTemplatesAndFamily() {
 		ParseFailure:None,
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
-	cfg.ApplyCompression(&mut State);
-	cfg.ApplyGlobals();
+	cfg.Startup(&mut State);
+	cfg.Global();
 	assert_eq!(
 		crate::Template::Family::Get::Fn::Fn().as_deref(),
 		Some("code_first"),
@@ -52,7 +52,7 @@ fn TestApplyGlobalsRegistersTemplatesAndFamily() {
 	}));
 
 	// Restore globals for later tests: an empty document publishes the defaults.
-	Configuration::default().ApplyGlobals();
+	Configuration::default().Global();
 	assert!(crate::Marker::Format::Registration::With::Fn::Fn(|Registered| {
 		matches!(&Registered.Grammar, crate::Marker::Format::Grammar::Enum::Enum::Canonical)
 	}));
@@ -72,7 +72,7 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 		ParseFailure:None,
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
-	cfg.ApplyCompression(&mut State);
+	cfg.Startup(&mut State);
 	assert_eq!(State.SessionInject, "templates text");
 
 	// No [templates.prompts] => the legacy [prompts] location still works.
@@ -82,21 +82,21 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 		ParseFailure:None,
 	};
 	let mut State2 = crate::State::Struct::AphroditeState::default();
-	Cfg2.ApplyCompression(&mut State2);
+	Cfg2.Startup(&mut State2);
 	assert_eq!(State2.SessionInject, "legacy text");
 
 	// Neither => shipped constant.
 	let mut State3 = crate::State::Struct::AphroditeState::default();
-	Configuration::default().ApplyCompression(&mut State3);
-	assert_eq!(State3.SessionInject, crate::Flow::Prompt::Const::ShippedSessionInject);
+	Configuration::default().Startup(&mut State3);
+	assert_eq!(State3.SessionInject, crate::Flow::Prompt::Const::Shipped);
 }
 
 #[test]
 fn TestSessionInjectEnvironmentOverrideBeatsTemplatesPrompts() {
 	let _G = crate::Marker::Format::Registration::Guard::Fn::Fn();
 	let mut cfg = Configuration::default();
-	cfg.SetOverride("APHRODITE_SESSION_INJECT", "env wins");
+	cfg.Set("APHRODITE_SESSION_INJECT", "env wins");
 	let mut State = crate::State::Struct::AphroditeState::default();
-	cfg.ApplyCompression(&mut State);
+	cfg.Startup(&mut State);
 	assert_eq!(State.SessionInject, "env wins");
 }

@@ -2,7 +2,7 @@
 //!
 //! The cap is a property of the buffer rather than a check the caller has to
 //! remember: `Output::Append` decides what fits and reports what it did, so the
-//! buffer is never longer than `MaximumAccumulatedBytes` at any point - not
+//! buffer is never longer than `Maximum` at any point - not
 //! before an append, not after one.
 //!
 //! Two decisions are explicit here rather than implied by a caller:
@@ -14,7 +14,7 @@
 //!   earliest bytes, which is what the old code kept, and cuts on a `char`
 //!   boundary so the kept prefix is always valid UTF-8.
 
-use crate::PollWorker::Output::Const::MaximumAccumulatedBytes;
+use crate::PollWorker::Output::Const::Maximum;
 
 /// Accumulated poll output, bounded at construction.
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub struct Accumulator {
 
 impl Accumulator {
 	/// An empty accumulator at the shipped bound.
-	pub(crate) const fn New() -> Self { Self::NewWithin(MaximumAccumulatedBytes) }
+	pub(crate) const fn New() -> Self { Self::NewWithin(Maximum) }
 
 	/// An empty accumulator at an explicit bound.
 	///
@@ -35,7 +35,7 @@ impl Accumulator {
 	/// the only other constructor: a test can pin the cap arithmetic byte by byte at a
 	/// size it can reason about (`NewWithin(10)`), while the shipped path always uses
 	/// `New`. Nothing else may lower the bound.
-	pub(crate) const fn NewWithin(Maximum:usize) -> Self { Self { Buffer:String::new(), Maximum } }
+	pub(crate) const fn NewWithin(Cap:usize) -> Self { Self { Buffer:String::new(), Maximum:Cap } }
 
 	/// Bytes currently kept - what the live-container surface reports.
 	pub(crate) fn Len(&self) -> usize { self.Buffer.len() }

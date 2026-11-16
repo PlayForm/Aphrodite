@@ -7,11 +7,11 @@
 
 use crate::{
 	Directive::Model::Struct as Directive,
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// A state carrying one directive, active and ready to render.
-pub(super) fn StateWithDirective(name:&str, body:&str) -> AphroditeState {
+pub(super) fn WithDirective(name:&str, body:&str) -> AphroditeState {
 	let mut s = AphroditeState::default();
 	s.Directives
 		.insert(name.into(), Directive { name:name.into(), Content:body.into() });
@@ -33,9 +33,9 @@ pub(super) fn AddMarker(s:&mut AphroditeState, hash:&str, Turn:usize) {
 }
 
 /// A state with a templates table holding exactly one prompt entry.
-pub(super) fn StateWithPrompt(name:&str, Tmpl:&str) -> AphroditeState {
+pub(super) fn WithPrompt(name:&str, Tmpl:&str) -> AphroditeState {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::Template::Struct::TemplatesConfiguration::default());
+	s.Templates = Some(crate::State::Template::Struct::Struct::default());
 	s.Templates.as_mut().unwrap().Prompts.insert(name.into(), Tmpl.into());
 	s
 }

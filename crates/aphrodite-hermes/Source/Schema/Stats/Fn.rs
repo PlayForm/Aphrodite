@@ -6,7 +6,7 @@
 
 use serde_json::json;
 
-use crate::Schema::NoParams;
+use crate::Schema::Empty;
 
 /// The `aphrodite_stats` tool schema.
 pub(crate) fn Fn() -> serde_json::Value {
@@ -20,6 +20,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			terminal_threshold, proxies: {token: {port, alive}, cache: {port, alive}}}. \
 			`alive: false` means nothing answered on that port within 400ms - the plugin \
 			still works, it just is not proxying.",
-		"parameters": NoParams::Fn::Fn()
+		"parameters": Empty::Fn::Fn()
 	})
 }

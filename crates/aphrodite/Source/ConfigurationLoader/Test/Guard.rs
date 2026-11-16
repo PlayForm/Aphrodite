@@ -9,25 +9,25 @@ pub(super) static CwdGuard:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync
 
 /// Serialize a state apply against the tests that read the process environment.
 ///
-/// `ApplyCompression` writes state only - the process globals are `ApplyGlobals`'
+/// `Apply::Startup::Fn` writes state only - the process globals are `Apply::Global::Fn`'s
 /// business - so the guard here is about the environment and the cwd the directive
 /// discovery reads, not about a global this function writes.
-pub(super) fn GuardedApplyCompression(cfg:&Configuration, State:&mut AphroditeState) {
+pub(super) fn Guarded(cfg:&Configuration, State:&mut AphroditeState) {
 	let _G = crate::Marker::Format::Registration::Guard::Fn::Fn();
 
-	cfg.ApplyCompression(State);
+	cfg.Startup(State);
 }
 
 /// The three guards a process-global publication needs, taken in one order.
 ///
-/// `ApplyGlobals` writes three process-wide registries and `cargo test` runs module
+/// `Apply::Global::Fn` writes three process-wide registries and `cargo test` runs module
 /// bodies concurrently: the marker registration, the template registry and the preview
 /// cap each have their own guard, so one publication has to hold all three - and hold
 /// them across the assertions that read the published state, which is why the guards
 /// are handed back to the caller instead of being scoped to one call. Taken in this
 /// order (marker, template, preview) everywhere, which is what keeps the nesting
 /// deadlock-free.
-pub(super) fn GlobalsGuards() -> (
+pub(super) fn Globals() -> (
 	std::sync::MutexGuard<'static, ()>,
 	std::sync::MutexGuard<'static, ()>,
 	std::sync::MutexGuard<'static, ()>,

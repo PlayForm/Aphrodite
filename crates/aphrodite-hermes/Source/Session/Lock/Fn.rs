@@ -30,16 +30,16 @@ use crate::Session::Lock::Outcome;
 /// Poison is recovered into a guard, not reported: a panic in one call must not
 /// wedge every later call, and a session whose state survived the panic is more
 /// useful readable than declared dead.
-pub(crate) fn lock_bounded<'a>(state:&'a Arc<Mutex<AphroditeState>>) -> Outcome::Enum::Enum<'a> {
-	let deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
+pub(crate) fn Fn<'a>(State:&'a Arc<Mutex<AphroditeState>>) -> Outcome::Enum::Enum<'a> {
+	let Deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
 	loop {
-		match state.try_lock() {
-			Ok(guard) => return Outcome::Enum::Enum::Held(guard),
+		match State.try_lock() {
+			Ok(Guard) => return Outcome::Enum::Enum::Held(Guard),
 			// Poisoned: recover the guard (same contract as the pre-fix
 			// `.unwrap_or_else(PoisonError::into_inner)` path).
-			Err(std::sync::TryLockError::Poisoned(p)) => return Outcome::Enum::Enum::Held(p.into_inner()),
+			Err(std::sync::TryLockError::Poisoned(Poison)) => return Outcome::Enum::Enum::Held(Poison.into_inner()),
 			Err(std::sync::TryLockError::WouldBlock) => {
-				match std::time::Instant::now() >= deadline {
+				match std::time::Instant::now() >= Deadline {
 					true => return Outcome::Enum::Enum::Wedged,
 					false => std::thread::sleep(std::time::Duration::from_millis(2)),
 				}

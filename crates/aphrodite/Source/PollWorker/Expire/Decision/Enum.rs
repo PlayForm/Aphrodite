@@ -2,7 +2,7 @@
 
 /// The fate of one task in this expiry call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RetentionDecision {
+pub(crate) enum Enum {
 	/// Nothing changes.
 	Keep,
 	/// The agent stopped polling it: mark it abandoned, keep the record.

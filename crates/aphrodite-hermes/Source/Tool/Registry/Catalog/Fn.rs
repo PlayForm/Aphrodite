@@ -1,13 +1,13 @@
 //! `aphrodite_catalog` - full or table-of-contents view of recorded markers.
 
-use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
+use crate::Tool::{Arg, Dispatch::Fn::Handler};
 
 /// The `aphrodite_catalog` handler.
 ///
 /// Newest first, unfiltered: this is the reliable fallback when a search misses.
 /// `toc` mode drops `turn`/`center` because its whole purpose is to be cheap to
 /// read; `full` is the default so a caller that passes no mode gets everything.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_catalog", |Args| {
 		let Mode = match Arg::Fn::Fn(Args, "mode") {
 			"" => "full",

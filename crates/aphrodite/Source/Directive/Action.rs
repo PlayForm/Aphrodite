@@ -23,14 +23,14 @@ use super::{
 /// Every successful mutation latches `ManualDirectiveTurn` (P6) - inside the leaf that performs
 /// it, because a manual choice must switch phase-aware auto-swaps off and a *failed* action must
 /// not.
-pub fn Fn(State:&mut AphroditeState, Action:&str, name:&str) -> serde_json::Value {
-	match Action {
+pub fn Fn(State:&mut AphroditeState, Verb:&str, name:&str) -> serde_json::Value {
+	match Verb {
 		"list" => List::Fn::Fn(State),
 		"swap" => Swap::Fn::Fn(State, name),
 		"add" => Add::Fn::Fn(State, name),
 		"load" => Load::Fn::Fn(State, name),
 		"remove" => Remove::Fn::Fn(State, name),
 		"reset" => Reset::Fn::Fn(State),
-		_ => Refusal::Fn::Fn(&Refusal::Enum::Enum::UnknownAction, Action),
+		_ => Refusal::Fn::Fn(&Refusal::Enum::Enum::Action, Verb),
 	}
 }

@@ -6,13 +6,13 @@
 //! and removes it afterwards.
 //!
 //! The imports are explicit rather than `use super::*`: the parent module declares the three
-//! sub-modules and nothing else, so a glob imported no type at all - `ScriptEngine` and
-//! `HookPayload` were never in scope and this file did not compile under `--features scripting`.
+//! sub-modules and nothing else, so a glob imported no type at all - `Engine` and `HookPayload`
+//! were never in scope and this file did not compile under `--features scripting`.
 
 use std::{path::PathBuf, sync::Mutex, time::SystemTime};
 
 use crate::Scripting::{
-	Engine::Struct::Struct as ScriptEngine,
+	Engine::Struct::Struct as Engine,
 	Payload::Struct::Struct as HookPayload,
 	Script::Struct::Struct as Script,
 };
@@ -25,24 +25,24 @@ fn Script(Source:&str) -> Script {
 	}
 }
 
-fn Engine(Scripts:Vec<Script>) -> ScriptEngine { ScriptEngine { Scripts:Mutex::new(Scripts), Directories:Vec::new() } }
+fn Build(Scripts:Vec<Script>) -> Engine { Engine { Scripts:Mutex::new(Scripts), Directories:Vec::new() } }
 
 // ── Contract: a script evaluates against a hook payload and returns the modified payload
 // (Some) ──
 #[test]
 fn ScriptTransformsPayload() {
-	let Engine = Engine(vec![Script(
+	let Subject = Build(vec![Script(
 		r#"fn on_compress() {
 				content + " [size=" + size.to_string() + " type=" + content_type + "]"
 			}"#,
 	)]);
 	let Payload = HookPayload {
 		Content:Some("hello".to_string()),
-		ContentType:Some("text".to_string()),
+		Type:Some("text".to_string()),
 		Size:Some(5),
 		..Default::default()
 	};
-	let Out = Engine.Run("on_compress", &Payload);
+	let Out = Subject.Run("on_compress", &Payload);
 
 	assert_eq!(Out.as_deref(), Some("hello [size=5 type=text]"));
 }
@@ -50,26 +50,26 @@ fn ScriptTransformsPayload() {
 // ── Contract: scripts chain - each script's output feeds the next script's `Content` ──
 #[test]
 fn ScriptOutputChainsIntoNextScript() {
-	let Engine = Engine(vec![
+	let Subject = Build(vec![
 		Script("fn on_compress() { content + \"A\" }"),
 		Script("fn on_compress() { content + \"B\" }"),
 	]);
 	let Payload = HookPayload { Content:Some("x".to_string()), ..Default::default() };
 
-	assert_eq!(Engine.Run("on_compress", &Payload).as_deref(), Some("xAB"));
+	assert_eq!(Subject.Run("on_compress", &Payload).as_deref(), Some("xAB"));
 }
 
 // ── Contract: a script that errors (throws, returns the wrong type) degrades with a warn - no
 // panic - and the other scripts still apply ──
 #[test]
 fn ScriptErrorDegradesWithoutPanic() {
-	let Engine = Engine(vec![
+	let Subject = Build(vec![
 		Script(r#"fn on_compress() { throw "boom" }"#),
 		Script("fn on_compress() { 42 }"),
 		Script("fn on_compress() { content + \"!\" }"),
 	]);
 	let Payload = HookPayload { Content:Some("x".to_string()), ..Default::default() };
-	let Out = Engine.Run("on_compress", &Payload);
+	let Out = Subject.Run("on_compress", &Payload);
 
 	assert_eq!(Out.as_deref(), Some("x!"), "bad scripts skipped, good script applied");
 }
@@ -78,28 +78,28 @@ fn ScriptErrorDegradesWithoutPanic() {
 // change ──
 #[test]
 fn MissingHookFnIsSkippedSilently() {
-	let Engine = Engine(vec![Script("fn unrelated() { 1 }")]);
+	let Subject = Build(vec![Script("fn unrelated() { 1 }")]);
 	let Payload = HookPayload { Content:Some("x".to_string()), ..Default::default() };
 
-	assert_eq!(Engine.Run("on_compress", &Payload), None);
+	assert_eq!(Subject.Run("on_compress", &Payload), None);
 }
 
 // ── Contract: no scripts = pass-through unchanged (legacy surface) ──
 #[test]
 fn NoScriptsPassesThroughUnchanged() {
-	let Engine = Engine(Vec::new());
+	let Subject = Build(Vec::new());
 
-	assert_eq!(Engine.OnCompress("abc", "text", 3), "abc");
-	assert_eq!(Engine.OnMarker("hash", "text", "meta", "prev"), "prev");
-	assert_eq!(Engine.OnRetrieve("hash", "abc", "text"), "abc");
+	assert_eq!(Subject.Compress("abc", "text", 3), "abc");
+	assert_eq!(Subject.Marker("hash", "text", "meta", "prev"), "prev");
+	assert_eq!(Subject.Retrieve("hash", "abc", "text"), "abc");
 }
 
 // ── Contract: legacy on_marker chains on the preview ──
 #[test]
 fn OnMarkerTransformsPreview() {
-	let Engine = Engine(vec![Script("fn on_marker() { preview + \"|\" + hash + \"|\" + metadata }")]);
+	let Subject = Build(vec![Script("fn on_marker() { preview + \"|\" + hash + \"|\" + metadata }")]);
 
-	assert_eq!(Engine.OnMarker("h1", "text", "m1", "prev"), "prev|h1|m1");
+	assert_eq!(Subject.Marker("h1", "text", "m1", "prev"), "prev|h1|m1");
 }
 
 // ── Contract: a script that fails to compile is warned and dropped at reload - the engine
@@ -110,16 +110,16 @@ fn BrokenScriptIsDroppedAtReload() {
 	let _ = std::fs::create_dir_all(&Directory);
 	std::fs::write(Directory.join("broken.rhai"), "fn on_compress() { this is not valid rhai !!").unwrap();
 
-	let Engine = ScriptEngine { Scripts:Mutex::new(Vec::new()), Directories:vec![Directory.clone()] };
-	Engine.Reload();
+	let Subject = Engine { Scripts:Mutex::new(Vec::new()), Directories:vec![Directory.clone()] };
+	Subject.Reload();
 
 	let _ = std::fs::remove_dir_all(&Directory);
 
-	assert!(Engine.Scripts.lock().unwrap_or_else(|Error| Error.into_inner()).is_empty());
+	assert!(Subject.Scripts.lock().unwrap_or_else(|Error| Error.into_inner()).is_empty());
 
 	let Payload = HookPayload { Content:Some("x".to_string()), ..Default::default() };
 
-	assert_eq!(Engine.Run("on_compress", &Payload), None);
+	assert_eq!(Subject.Run("on_compress", &Payload), None);
 }
 
 // ── Gate documentation: this module only exists when the feature is on (`Library.rs` declares

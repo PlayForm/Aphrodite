@@ -6,7 +6,7 @@ use std::ffi::{CStr, CString};
 use crate::{
 	ABI::{CallHook::aphrodite_hermes_call_hook, FreeString::aphrodite_hermes_free_string},
 	Session::{
-		Registry::Struct::{DEFAULT_SESSION, session_state},
+		Registry::{Const::Fallback, Get},
 		With::Fn::{with_session, with_shared},
 	},
 };
@@ -22,11 +22,11 @@ fn probe_per_session_state_isolation() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 	// Reset the default (tool) session so its catalog count is
 	// deterministic (other tests leave markers behind).
-	with_shared(aphrodite::Session::Start::Fn::OnSessionStart);
+	with_shared(aphrodite::Session::Start::Fn::Fn);
 	// DIRECT read (bypasses with_shared): the reset must have cleared the
 	// real default state, not a throwaway fallback clone.
 	let post_reset = {
-		let s = session_state(DEFAULT_SESSION);
+		let s = Get::Fn::Fn(Fallback);
 		let g = s.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		g.RecentMarkers.len()
 	};

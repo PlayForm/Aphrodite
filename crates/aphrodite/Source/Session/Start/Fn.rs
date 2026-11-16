@@ -9,7 +9,7 @@
 use crate::State::Struct::AphroditeState;
 
 /// Handle session start - reset all per-session state.
-pub fn OnSessionStart(State:&mut AphroditeState) -> serde_json::Value {
+pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	State.TurnCounter = 0;
 	State.ScannedMessageIndex = 0;
 	State.ConvIndex.clear();

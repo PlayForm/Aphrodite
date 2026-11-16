@@ -1,31 +1,31 @@
 //! `Load` tests - what a file on disk produces, and what a missing or broken
 //! file produces instead.
 
-use super::Guard::GuardedApplyCompression;
+use super::Guard::Guarded;
 use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 
 #[test]
-fn TestLoadFromValidAndMissing() {
+fn TestReadValidAndMissing() {
 	let Stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
 		.as_nanos();
 	let Valid = std::env::temp_dir().join(format!("aphrodite-cfg-valid-{Stamp}.toml"));
 	std::fs::write(&Valid, "[compression]\nenabled = false\n").unwrap();
-	let cfg = Configuration::LoadFrom(Valid.to_str().unwrap());
+	let cfg = Configuration::Read(Valid.to_str().unwrap());
 	let _ = std::fs::remove_file(&Valid);
 	assert!(
-		!cfg.GetBool("NONEXISTENT", "compression", "enabled", true),
+		!cfg.Bool("NONEXISTENT", "compression", "enabled", true),
 		"a valid file must parse and win over the default"
 	);
 
 	// Missing path: defaults, no panic.
-	let cfg = Configuration::LoadFrom(&format!("/nonexistent/aphrodite-{Stamp}.toml"));
-	assert!(cfg.GetBool("NONEXISTENT", "compression", "enabled", true));
+	let cfg = Configuration::Read(&format!("/nonexistent/aphrodite-{Stamp}.toml"));
+	assert!(cfg.Bool("NONEXISTENT", "compression", "enabled", true));
 }
 
 // ── Parse-failure self-diagnosis: a broken file must record itself on
-// the Config (and via `ApplyCompression` on the state) so
+// the Config (and via `Startup` on the state) so
 // `AphroditeStats` can surface "defaults in effect (parse failed)" -
 // the tracing warn is a no-op in the Hermes dylib (no subscriber), so
 // the recorded field is the only guaranteed-visible diagnostic. ──
@@ -38,7 +38,7 @@ fn TestParseFailureRecordedOnConfigurationAndState() {
 	let Broken = std::env::temp_dir().join(format!("aphrodite-cfg-broken-recorded-{Stamp}.toml"));
 	std::fs::write(&Broken, "[compression\nenabled = false\n").unwrap();
 
-	let cfg = Configuration::LoadFrom(Broken.to_str().unwrap());
+	let cfg = Configuration::Read(Broken.to_str().unwrap());
 	let _ = std::fs::remove_file(&Broken);
 
 	let Pf = cfg.ParseFailure.as_ref().expect("parse failure must be recorded");
@@ -53,7 +53,7 @@ fn TestParseFailureRecordedOnConfigurationAndState() {
 
 	// `AphroditeStats` self-diagnosis surface.
 	let mut State = crate::State::Struct::AphroditeState::default();
-	GuardedApplyCompression(&cfg, &mut State);
+	Guarded(&cfg, &mut State);
 	let Ce = State
 		.ConfigurationError
 		.as_deref()
@@ -68,7 +68,7 @@ fn TestParseFailureRecordedOnConfigurationAndState() {
 // comment must parse and resolve - the fallback-to-defaults trigger is
 // a *broken* file, never non-ASCII bytes (report claim check). ──
 #[test]
-fn TestLoadFromMultibyteCommentParses() {
+fn TestReadMultibyteCommentParses() {
 	let Stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
@@ -79,7 +79,7 @@ fn TestLoadFromMultibyteCommentParses() {
 		"[compression]\nterminal_threshold = 16384   # bytes; was default 1024 - raised\n",
 	)
 	.unwrap();
-	let cfg = Configuration::LoadFrom(path.to_str().unwrap());
+	let cfg = Configuration::Read(path.to_str().unwrap());
 	let _ = std::fs::remove_file(&path);
 
 	assert!(
@@ -88,7 +88,7 @@ fn TestLoadFromMultibyteCommentParses() {
 		cfg.ParseFailure
 	);
 	let mut State = crate::State::Struct::AphroditeState::default();
-	GuardedApplyCompression(&cfg, &mut State);
+	Guarded(&cfg, &mut State);
 	assert_eq!(State.TerminalThreshold, 16384);
 	assert!(State.ConfigurationError.is_none());
 }

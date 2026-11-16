@@ -24,7 +24,7 @@ impl AphroditeState {
 	/// has no ratio. Both collapse to `Hold`, which is the honest answer for
 	/// "there is nothing to adapt from" - and `then`/`filter` keep the fold from
 	/// running when either condition already failed.
-	pub(super) fn AdaptChainSplitThreshold(&mut self) {
+	pub(super) fn Adapt(&mut self) {
 		let Trend = (self.SplitEvents.len() >= SplitAdaptMinimumEvents)
 			.then(|| {
 				self.SplitEvents.iter().fold((0usize, 0usize), |(Produced, Retrieved), Event| {

@@ -7,7 +7,7 @@
 
 use std::{collections::HashMap, io::ErrorKind, path::Path, sync::Mutex};
 
-use crate::Debug::Flag::{Cache::FLAG_CACHE, State};
+use crate::Debug::Flag::{self, State};
 
 /// Mtime-cached read of one flag file, as one of three states.
 ///
@@ -37,13 +37,10 @@ pub(crate) fn Fn(Path:&Path) -> State::Enum::Enum {
 		.unwrap_or(0.0);
 
 	let Cached = {
-		let Cache = FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-		let Guard = Cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+		let Map = Flag::Cache::Map.get_or_init(|| Mutex::new(HashMap::new()));
+		let Guard = Map.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
-		Guard
-			.get(&Key)
-			.filter(|(CachedMtime, _)| *CachedMtime == Mtime)
-			.map(|(_, CachedState)| *CachedState)
+		Guard.get(&Key).filter(|(Stamp, _)| *Stamp == Mtime).map(|(_, Flag)| *Flag)
 	};
 
 	Cached.unwrap_or_else(|| {
@@ -91,8 +88,8 @@ pub(crate) fn Fn(Path:&Path) -> State::Enum::Enum {
 			},
 		};
 
-		let Cache = FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-		let mut Guard = Cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+		let Map = Flag::Cache::Map.get_or_init(|| Mutex::new(HashMap::new()));
+		let mut Guard = Map.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		Guard.insert(Key, (Mtime, Fresh));
 
 		Fresh

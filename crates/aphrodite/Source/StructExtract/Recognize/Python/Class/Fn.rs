@@ -12,10 +12,10 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 			let Name = Rest.split(['(', ':']).next().unwrap_or("");
 
 			match (!Name.is_empty()).then_some(Name) {
-				Some(Name) => Declaration::Declaration { Kind:"class", Name, Parameters:None, Return:None },
+				Some(Name) => Declaration::Present { Kind:"class", Name, Parameters:None, Return:None },
 				None => Declaration::Malformed { Reason:Reason::NoName },
 			}
 		},
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

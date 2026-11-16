@@ -7,7 +7,7 @@
 
 /// Unix-seconds now - single source of truth for live-container arrival
 /// timestamps so the prefetch and poll-worker surfaces share one clock.
-pub fn UnixNow() -> u64 {
+pub fn Fn() -> u64 {
 	std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.map(|d| d.as_secs())

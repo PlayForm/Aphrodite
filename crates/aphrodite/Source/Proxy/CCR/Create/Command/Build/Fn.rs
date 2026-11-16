@@ -12,7 +12,7 @@ use crate::Proxy::{
 		Create::{Command::Struct::Struct as CreateCommand, Decode::Enum::Enum as DecodedBody},
 		Notification::{Build::Fn::Fn as BuildNotification, Event::Struct::Struct as NotificationEvent},
 	},
-	Measurement::Estimate::Fn::Fn as EstimateCompressedSize,
+	Measurement::Estimate::Fn::Fn as Estimate,
 };
 
 /// Build the command for a decoded body.
@@ -28,7 +28,7 @@ pub(crate) fn Fn(Decoded:DecodedBody, NotifyURL:Option<&str>) -> CreateCommand {
 			);
 
 			CreateCommand {
-				Estimate:Some(EstimateCompressedSize(&Request.Content)),
+				Estimate:Some(Estimate(&Request.Content)),
 				Hash,
 				Content:Request.Content,
 				Notification,

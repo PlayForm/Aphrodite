@@ -8,7 +8,7 @@
 //! Unparseable content returns `None` rather than a guess: a truncated or malformed payload reduced
 //! to "some JSON-looking text" would be worse than leaving the original in place.
 
-use crate::Stage2::Name::Fn::TypeName;
+use crate::Stage2::Name;
 
 /// Keys the structural header names: ten.
 const KeysShown:usize = 10;
@@ -17,7 +17,7 @@ const KeysShown:usize = 10;
 ///
 /// It is not a schema: the keys named are the ones the value has, not the ones it is required to
 /// have, and a scalar root reports only its kind.
-pub fn ReduceJSON(Content:&str) -> Option<String> {
+pub fn Fn(Content:&str) -> Option<String> {
 	let Data:serde_json::Value = serde_json::from_str(Content).ok()?;
 
 	let Structural = match &Data {
@@ -39,7 +39,7 @@ pub fn ReduceJSON(Content:&str) -> Option<String> {
 
 			format!("[json_list:{} items{Schema}]", Items.len())
 		},
-		Other => format!("[json:{}]", TypeName(Other)),
+		Other => format!("[json:{}]", Name::Fn::Fn(Other)),
 	};
 
 	// Minify. A serialisation failure is impossible for a value that just parsed, so the empty

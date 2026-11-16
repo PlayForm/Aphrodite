@@ -8,7 +8,6 @@
 //! instant marker the model reads.
 
 pub mod Chunk;
-pub mod Const;
 pub mod Container;
 pub mod Key;
 pub mod Marker;

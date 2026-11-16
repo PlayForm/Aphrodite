@@ -8,9 +8,9 @@ use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 // catalog_intent_hints previously parsed with no consumer. ──
 //
 // The marker grammar these knobs feed is a PROCESS GLOBAL, published by
-// `ApplyGlobals`; it is asserted in `Apply/Template.rs` alongside the rest of the
+// `Global`; it is asserted in `Apply/Template.rs` alongside the rest of the
 // global publication. This file asserts the state fields only, which is what
-// `ApplyCompression` is responsible for.
+// `Startup` is responsible for.
 #[test]
 fn TestPromptKnobsResolveFromTomlAndDefault() {
 	let cfg = Configuration {
@@ -22,13 +22,13 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 		ParseFailure:None,
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
-	cfg.ApplyCompression(&mut State);
+	cfg.Startup(&mut State);
 	assert_eq!(State.RetrieveGuidance, "verbose");
 	assert!(State.CatalogIntentHints);
 
 	// Absent everywhere => defaults (minimal / off).
 	let mut State2 = crate::State::Struct::AphroditeState::default();
-	Configuration::default().ApplyCompression(&mut State2);
+	Configuration::default().Startup(&mut State2);
 	assert_eq!(State2.RetrieveGuidance, "minimal");
 	assert!(!State2.CatalogIntentHints);
 }
@@ -36,10 +36,10 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 #[test]
 fn TestPromptKnobsResolveFromEnvironmentOverride() {
 	let mut cfg = Configuration::default();
-	cfg.SetOverride("APHRODITE_RETRIEVE_GUIDANCE", "standard");
-	cfg.SetOverride("APHRODITE_CATALOG_INTENT_HINTS", "1");
+	cfg.Set("APHRODITE_RETRIEVE_GUIDANCE", "standard");
+	cfg.Set("APHRODITE_CATALOG_INTENT_HINTS", "1");
 	let mut State = crate::State::Struct::AphroditeState::default();
-	cfg.ApplyCompression(&mut State);
+	cfg.Startup(&mut State);
 	assert_eq!(State.RetrieveGuidance, "standard");
 	assert!(State.CatalogIntentHints);
 }

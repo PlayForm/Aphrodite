@@ -1,6 +1,6 @@
-//! `CheckContent`: the three ordered refusals a stored payload must survive.
+//! `Content`: the three ordered refusals a stored payload must survive.
 
-use super::Const::MaximumContent;
+use super::Const::Maximum;
 
 /// Reject a payload no export can serve: empty, over the 16 MB cap, or
 /// carrying an interior NUL that would silently truncate the C string handed
@@ -24,8 +24,6 @@ use super::Const::MaximumContent;
 /// validator is the export's own statement of what it will serve.
 pub(crate) fn Fn(Content:&str) -> anyhow::Result<()> {
 	crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty(), || anyhow::anyhow!("empty content"))?;
-	crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
-		anyhow::anyhow!("content exceeds 16MB limit")
-	})?;
+	crate::ABI::Guard::Reject::Fn::Fn(Content.len() > Maximum, || anyhow::anyhow!("content exceeds 16MB limit"))?;
 	crate::ABI::Guard::Reject::Fn::Fn(Content.contains('\0'), || anyhow::anyhow!("content contains null bytes"))
 }

@@ -6,7 +6,7 @@
 /// `expires_after_turn = None` is permanent; `Some(n)` renders while
 /// `turn_counter <= n` and is purged in `PostLLMCall` once past.
 #[derive(Debug, Clone)]
-pub struct ActiveDirective {
+pub struct Struct {
 	/// Key into `state.directives`, or empty for an inline entry.
 	pub name:String,
 	/// Literal nudge text for synthesized entries (rendered as `[nudge: ...]`).

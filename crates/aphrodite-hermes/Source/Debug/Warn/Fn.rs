@@ -19,7 +19,7 @@ use crate::Debug::Init::{Const::TARGET, Ownership};
 ///     host did. Only the second case can swallow a warning, so only the second
 ///     case prints to stderr.
 ///
-/// `None` - no install attempted yet - takes the same branch as `HostOwned`:
+/// `None` - no install attempted yet - takes the same branch as `Host`:
 /// nothing is known to be listening, and an unheard warning is the worse error.
 /// The cost of being wrong is one duplicated line when a host both owns the
 /// dispatcher and logs our target; the cost of the old rule was a warning that
@@ -32,7 +32,7 @@ pub(crate) fn Fn(Message:&str) {
 
 	// `eprintln!` is the fallback for a dispatcher this crate does not own, so it
 	// must not also fire when this crate installed one.
-	let Reported = matches!(Ownership::Fn::Fn(), None | Some(Ownership::Enum::Enum::HostOwned));
+	let Reported = matches!(Ownership::Fn::Fn(), None | Some(Ownership::Enum::Enum::Host));
 
 	Reported
 		.then_some(Message)

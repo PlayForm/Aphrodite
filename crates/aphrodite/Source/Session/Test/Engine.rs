@@ -5,7 +5,7 @@
 //! runs inside `PreLLMCall`, where a partial mutation would show the model a
 //! history that no archive explains.
 
-use crate::{Session::Engine::Fn::EngineMaybeArchive, State::Struct::AphroditeState};
+use crate::{Session::Engine::Fn::Fn as Engine, State::Struct::AphroditeState};
 
 // ── Context-engine archiving (pre-Rust port of _engine.py) ──
 
@@ -21,41 +21,41 @@ fn EngineState(Entries:usize) -> AphroditeState {
 
 /// Assert the engine left the state completely untouched: same
 /// conversation index, empty inline store, no recorded markers.
-fn AssertZeroMutation(s:&AphroditeState) {
+fn Untouched(s:&AphroditeState) {
 	assert!(s.InlineStore.is_empty(), "no archive may hit the inline store");
 	assert!(s.RecentMarkers.is_empty(), "no marker may be recorded");
 }
 
 #[test]
-fn TestEngineArchiveBelowThresholdNoneNoMutation() {
+fn Below() {
 	// 10 archived turns = 20% fill; threshold 80 not crossed.
 	let mut s = EngineState(10);
 	s.EngineThresholdPct = 80;
 	let Before = s.ConvIndex.clone();
-	assert!(EngineMaybeArchive(&mut s).is_none());
+	assert!(Engine(&mut s).is_none());
 	assert_eq!(s.ConvIndex, Before, "below threshold must not touch conv_index");
-	AssertZeroMutation(&s);
+	Untouched(&s);
 }
 
 #[test]
-fn TestEngineArchiveDisabledNoneNoMutation() {
+fn Disabled() {
 	let mut s = EngineState(12);
 	s.EngineThresholdPct = 20; // well over the fill threshold when enabled
 	s.ContextEngineEnabled = false;
 	let Before = s.ConvIndex.clone();
-	assert!(EngineMaybeArchive(&mut s).is_none());
+	assert!(Engine(&mut s).is_none());
 	assert_eq!(s.ConvIndex, Before, "disabled engine must be byte-identical no-op");
-	AssertZeroMutation(&s);
+	Untouched(&s);
 }
 
 #[test]
-fn TestEngineArchiveOverThresholdArchivesMiddleAndReturnsPrompt() {
+fn Over() {
 	let mut s = EngineState(12);
 	s.EngineThresholdPct = 20; // 12 entries = 24% fill
 	s.EngineMinimumMsgs = 8;
 	s.EngineProtectFirst = 2;
 	s.EngineProtectLast = 5;
-	let Prompt = EngineMaybeArchive(&mut s).expect("over threshold must archive");
+	let Prompt = Engine(&mut s).expect("over threshold must archive");
 	// Returned prompt carries the marker line AND the rendered guidance
 	// (fallback references the hash for aphrodite_retrieve).
 	let hash = headroom_core::ccr::compute_key(
@@ -93,7 +93,7 @@ fn TestEngineArchiveOverThresholdArchivesMiddleAndReturnsPrompt() {
 }
 
 #[test]
-fn TestEngineArchiveProtectBoundsRespected() {
+fn Protect() {
 	// protect_first=2 / protect_last=5 on 12 turns: exactly keys 3..=7
 	// (5 entries) are the middle; head/tail survive verbatim.
 	let mut s = EngineState(12);
@@ -101,7 +101,7 @@ fn TestEngineArchiveProtectBoundsRespected() {
 	s.EngineMinimumMsgs = 8;
 	s.EngineProtectFirst = 2;
 	s.EngineProtectLast = 5;
-	let _ = EngineMaybeArchive(&mut s).expect("must archive");
+	let _ = Engine(&mut s).expect("must archive");
 	assert!(s.ConvIndex.contains_key(&1) && s.ConvIndex.contains_key(&2));
 	assert!(s.ConvIndex.contains_key(&8) && s.ConvIndex.contains_key(&12));
 	assert!(!s.ConvIndex.contains_key(&3) && !s.ConvIndex.contains_key(&7));
@@ -112,41 +112,38 @@ fn TestEngineArchiveProtectBoundsRespected() {
 	S0.EngineMinimumMsgs = 8;
 	S0.EngineProtectFirst = 0;
 	S0.EngineProtectLast = 5;
-	let _ = EngineMaybeArchive(&mut S0).expect("must archive");
+	let _ = Engine(&mut S0).expect("must archive");
 	assert!(!S0.ConvIndex.contains_key(&1), "protect_first=0 keeps no head");
 	assert!(S0.ConvIndex.contains_key(&8) && S0.ConvIndex.contains_key(&12));
 }
 
 #[test]
-fn TestEngineArchiveMinimumMsgsRespected() {
+fn Minimum() {
 	// 5 entries = 10% fill >= threshold 10, but 5 < min_msgs 8.
 	let mut s = EngineState(5);
 	s.EngineThresholdPct = 10;
 	s.EngineMinimumMsgs = 8;
 	let Before = s.ConvIndex.clone();
-	assert!(EngineMaybeArchive(&mut s).is_none());
+	assert!(Engine(&mut s).is_none());
 	assert_eq!(s.ConvIndex, Before);
-	AssertZeroMutation(&s);
+	Untouched(&s);
 }
 
 #[test]
-fn TestEngineArchiveThreshold100Off() {
+fn Hundred() {
 	// 100+ = documented engine-off escape hatch; also 0 = never.
 	[0u64, 100, 200].into_iter().for_each(|Pct| {
 		let mut s = EngineState(12);
 		s.EngineThresholdPct = Pct;
 		let Before = s.ConvIndex.clone();
-		assert!(
-			EngineMaybeArchive(&mut s).is_none(),
-			"threshold {Pct} must leave the engine off"
-		);
+		assert!(Engine(&mut s).is_none(), "threshold {Pct} must leave the engine off");
 		assert_eq!(s.ConvIndex, Before);
-		AssertZeroMutation(&s);
+		Untouched(&s);
 	});
 }
 
 #[test]
-fn TestEngineArchiveMiddleTooSmallNone() {
+fn Small() {
 	// protect 2/9 on 12 turns leaves a 1-entry middle (< pre-Rust floor 3).
 	let mut s = EngineState(12);
 	s.EngineThresholdPct = 20;
@@ -154,25 +151,25 @@ fn TestEngineArchiveMiddleTooSmallNone() {
 	s.EngineProtectFirst = 2;
 	s.EngineProtectLast = 9;
 	let Before = s.ConvIndex.clone();
-	assert!(EngineMaybeArchive(&mut s).is_none());
+	assert!(Engine(&mut s).is_none());
 	assert_eq!(s.ConvIndex, Before);
-	AssertZeroMutation(&s);
+	Untouched(&s);
 }
 
 #[test]
-fn TestEngineArchivePayloadRoundTripsInline() {
+fn Payload() {
 	let mut s = EngineState(12);
 	s.EngineThresholdPct = 20;
 	s.EngineMinimumMsgs = 8;
 	s.EngineProtectFirst = 2;
 	s.EngineProtectLast = 5;
-	let Prompt = EngineMaybeArchive(&mut s).expect("must archive");
+	let Prompt = Engine(&mut s).expect("must archive");
 	// Extract the hash from the marker line and resolve it back.
-	let hash = crate::Marker::Parse::Extract::ExtractHashes(&Prompt)
+	let hash = crate::Marker::Parse::Extract::Fn(&Prompt)
 		.into_iter()
 		.next()
 		.expect("marker hash must be extractable");
-	let Resolved = s.InlineStoreGet(&hash).expect("archive must resolve from inline store");
+	let Resolved = s.Get(&hash).expect("archive must resolve from inline store");
 	let Parsed:serde_json::Value = serde_json::from_str(&Resolved).expect("packed payload must be JSON");
 	assert_eq!(Parsed.as_array().map(Vec::len), Some(5), "middle of 5 turns packed");
 	assert_eq!(Parsed[0]["turn"], 3);

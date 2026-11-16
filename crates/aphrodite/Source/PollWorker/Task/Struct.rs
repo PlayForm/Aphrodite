@@ -9,23 +9,23 @@
 //! Two identities, deliberately distinct, and now two distinct types. `ID` is the
 //! *command* identity: the CCR hash of the command line, stable across turns, and the
 //! deduplication key, so two simultaneous runs of one command share it.
-//! `ExecutionID` is the *execution* identity, learned from the first poll that names
+//! `Execution` is the *execution* identity, learned from the first poll that names
 //! the process; it is what lets a second poll of that process reach the same task.
 //! Neither replaces the other, and neither can be stored in the other's slot.
 //!
-//! A finished task's stored output is not a pair of optional fields here: `BgStatus`
+//! A finished task's stored output is not a pair of optional fields here: `Status`
 //! carries it, so "Done" without a hash is not a representable state.
 
 use crate::{
-	PollWorker::{Output::Struct::Accumulator, Task::Status::Enum::BgStatus},
-	State::Identity::{Command::Struct::CommandID, Execution::Struct::ExecutionID},
+	PollWorker::{Output::Struct::Accumulator, Task::Status::Enum::Enum as Status},
+	State::Identity::{Command::Struct::Struct as Command, Execution::Struct::Struct as Execution},
 };
 
 /// A backgrounded tool call tracked by the poll worker.
 #[derive(Debug, Clone)]
-pub struct BgTask {
+pub struct Struct {
 	/// Command identity: the CCR hash of the command string (stable across turns).
-	pub ID:CommandID,
+	pub ID:Command,
 	/// Tool that produced the output: "terminal" or "process".
 	pub Tool:String,
 	/// The command being run (or tool + args summary for non-terminal).
@@ -36,10 +36,10 @@ pub struct BgTask {
 	pub LastPollTurn:usize,
 	/// Execution identity named by the first poll attributed to this task
 	/// (`session_id` on the wire), once one has been seen.
-	pub ExecutionID:Option<ExecutionID>,
+	pub Execution:Option<Execution>,
 	/// Current status, which owns the stored output's identity once the task has
 	/// finished.
-	pub Status:BgStatus,
+	pub Status:Status,
 	/// How many times the agent has polled.
 	pub PollCount:usize,
 	/// The uncompressed output content (accumulated from polls), bounded by the

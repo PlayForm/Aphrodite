@@ -10,9 +10,12 @@ use std::sync::Arc;
 use axum::http::{HeaderMap, Method};
 
 use crate::Proxy::{
-	Request::{Context::Struct::Struct as RequestContext, Semantics::Fn::Fn as InterpretRequest},
+	Request::{
+		Context::Struct::Struct as RequestContext,
+		Route::Chat::Const::Path,
+		Semantics::Fn::Fn as InterpretRequest,
+	},
 	State::Struct::Struct as AppState,
-	Threshold::Const::ChatCompletionsPath,
 };
 
 /// A context for `Body` posted to the Chat Completions route.
@@ -25,10 +28,10 @@ pub(crate) fn Fn<'a>(
 	RequestContext {
 		State,
 		Method,
-		Path:ChatCompletionsPath,
+		Path,
 		ID:"test",
 		Started:std::time::Instant::now(),
 		Headers,
-		Semantics:InterpretRequest(ChatCompletionsPath, Body, State.APIKey.Expose()),
+		Semantics:InterpretRequest(Path, Body, State.APIKey.Expose()),
 	}
 }

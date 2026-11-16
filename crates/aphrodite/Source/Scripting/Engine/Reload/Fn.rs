@@ -40,13 +40,13 @@ impl Struct {
 					return;
 				};
 				let Mtime = Entry
-					.Metadata()
+					.metadata()
 					.ok()
 					.and_then(|Metadata| Metadata.modified().ok())
 					.unwrap_or(SystemTime::UNIX_EPOCH);
 
 				match Rhai::new().compile(&Source) {
-					Ok(_Ast) => {
+					Ok(_AST) => {
 						tracing::info!(Script = %path.display(), "loaded");
 						Scripts.push(Script { Path:path, Mtime, Source });
 					},

@@ -1,6 +1,6 @@
 //! Rewrite a parsed chain into a command that marks each segment.
 
-use crate::ChainSplit::{Const::SegMarker, Segment::Struct::Struct as Segment};
+use crate::ChainSplit::Segment::{Const::Marker, Struct::Struct as Segment};
 
 /// Build the rewritten command: each segment preceded by a marker echoed to
 /// STDERR (not stdout). Markers on stderr never pollute stdout (files, pipes,
@@ -17,10 +17,10 @@ pub fn Fn(Segments:&[Segment]) -> String {
 		.map(|(Index, Seg)| {
 			let Prefix = match Index {
 				0 => String::new(),
-				_ => format!("echo {} 1>&2 ; ", SegMarker),
+				_ => format!("echo {} 1>&2 ; ", Marker),
 			};
 
-			format!("{Prefix}{}", Seg.command)
+			format!("{Prefix}{}", Seg.Command)
 		})
 		.collect();
 

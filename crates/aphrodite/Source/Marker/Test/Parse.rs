@@ -1,101 +1,117 @@
 //! The reading half: hash normalization, hash validity, hash extraction across
 //! all three delimiter families, and preview parsing.
+//!
+//! Each test is named for the one case it covers; the module path names the
+//! subject (`Marker::Test::Parse`).
 
 use crate::Marker::Parse::{
-	Extract::ExtractHashes,
-	Normalize::NormalizeHash,
-	Preview::ParsePreview,
-	Valid::IsValidCCRHash,
+	Extract::Fn as Extract,
+	Normalize::Fn as Normalize,
+	Preview::Fn as Preview,
+	Valid::Fn as Valid,
 };
 
-// ── T5 (F3): normalize_hash ────────────────────────────────────
+// ── T5 (F3): hash normalization ───────────────────────────────
+
+/// An already-bare hash is answered unchanged.
 #[test]
-fn TestNormalizeHashBareIsUnchanged() {
-	assert_eq!(NormalizeHash("abc123"), "abc123");
+fn Bare() {
+	assert_eq!(Normalize("abc123"), "abc123");
 }
 
+/// Everything from the first `|` onward is dropped.
 #[test]
-fn TestNormalizeHashStripsPipeSuffix() {
-	assert_eq!(NormalizeHash("abc123|tool|1024"), "abc123");
+fn Pipe() {
+	assert_eq!(Normalize("abc123|tool|1024"), "abc123");
 }
 
+/// Surrounding whitespace is trimmed.
 #[test]
-fn TestNormalizeHashTrimsWhitespace() {
-	assert_eq!(NormalizeHash("  abc123  "), "abc123");
+fn Whitespace() {
+	assert_eq!(Normalize("  abc123  "), "abc123");
 }
 
+/// Normalizing an already-normalized hash changes nothing.
 #[test]
-fn TestNormalizeHashIsIdempotent() {
-	let Once = NormalizeHash("  abc123|tool|1024  ");
-	assert_eq!(NormalizeHash(Once), Once);
+fn Idempotent() {
+	let Once = Normalize("  abc123|tool|1024  ");
+	assert_eq!(Normalize(Once), Once);
 }
 
+/// Both valid shapes pass and short or empty strings do not.
 #[test]
-fn TestValidHash() {
-	assert!(IsValidCCRHash("abc123def456abc123def456abc123def456"));
-	assert!(IsValidCCRHash("i:abc123def456"));
-	assert!(!IsValidCCRHash("short"));
-	assert!(!IsValidCCRHash(""));
+fn Validity() {
+	assert!(Valid("abc123def456abc123def456abc123def456"));
+	assert!(Valid("i:abc123def456"));
+	assert!(!Valid("short"));
+	assert!(!Valid(""));
 }
 
+/// Two markers in one blob are extracted in order.
 #[test]
-fn TestExtractHashes() {
+fn Pairs() {
 	let Text = "<<<CCR:aaa111|code|100>>>\nsome text\n<<<CCR:bbb222|diff|200>>>";
-	let Hashes = ExtractHashes(Text);
+	let Hashes = Extract(Text);
 	assert_eq!(Hashes, vec!["aaa111", "bbb222"]);
 }
 
-// ── T7: is_valid_ccr_hash boundary band ──────────────────────
+// ── T7: the full-hash length boundary ────────────────────────
+
+/// 8..23 hex chars sit below the 24-char full-hash floor; 24 is the floor.
 #[test]
-fn TestIsValidCCRHashBoundaryBand() {
-	// 8..23 hex chars: below the 24-char full-hash floor -> false.
-	assert!(!IsValidCCRHash("abcdef12")); // 8 hex chars
-	assert!(!IsValidCCRHash("abcdef0123456789abcdef")); // 22 hex chars
-	assert!(!IsValidCCRHash("abcdef0123456789abcdeff")); // 23 hex chars
-	// 24 hex chars: at the floor -> true.
-	assert!(IsValidCCRHash("abcdef0123456789abcdef01")); // 24 hex chars
+fn Boundary() {
+	assert!(!Valid("abcdef12")); // 8 hex chars
+	assert!(!Valid("abcdef0123456789abcdef")); // 22 hex chars
+	assert!(!Valid("abcdef0123456789abcdeff")); // 23 hex chars
+	assert!(Valid("abcdef0123456789abcdef01")); // 24 hex chars
 }
 
+/// The `i:` inline prefix needs six hex characters after it.
 #[test]
-fn TestIsValidCCRHashIPrefixVariants() {
-	assert!(!IsValidCCRHash("i:xyz")); // not hex, too short
-	assert!(IsValidCCRHash("i:abc123")); // 6 hex chars after i:
-	assert!(!IsValidCCRHash("i:abc1")); // only 4 hex chars after i:
+fn Prefix() {
+	assert!(!Valid("i:xyz")); // not hex, too short
+	assert!(Valid("i:abc123")); // 6 hex chars after i:
+	assert!(!Valid("i:abc1")); // only 4 hex chars after i:
 }
 
+/// Uppercase hex is valid - the check never lowercases.
 #[test]
-fn TestIsValidCCRHashUppercase() {
-	assert!(IsValidCCRHash("ABCDEF0123456789ABCDEF01"));
+fn Uppercase() {
+	assert!(Valid("ABCDEF0123456789ABCDEF01"));
 }
 
-// ── T7: extract_hashes delimiter families ────────────────────
+// ── T7: extraction across the delimiter families ─────────────
+
+/// The `[CCR:hash|type]` family.
 #[test]
-fn TestExtractHashesBracketForm() {
-	let Hashes = ExtractHashes("[CCR:aaa111|code]");
+fn Bracket() {
+	let Hashes = Extract("[CCR:aaa111|code]");
 	assert_eq!(Hashes, vec!["aaa111"]);
 }
 
+/// The glyph terminator `⫸` (U+2AF8) closes a `<<<CCR:` form; the hash capture
+/// stops at the first `|`, same as the `<<<CCR:...>>>` and `[CCR:...]` forms.
 #[test]
-fn TestExtractHashesGlyphTerminatedForm() {
-	// extract_hashes's regex accepts the glyph terminator \u{2af8} as an
-	// alternative to `]`/`>>>`; the hash capture stops at the first `|`,
-	// same as the `<<<CCR:...>>>` and `[CCR:...]` forms.
+fn Glyph() {
 	let Text = "<<<CCR:ccc333|text\u{2af8}";
-	let Hashes = ExtractHashes(Text);
+	let Hashes = Extract(Text);
 	assert_eq!(Hashes, vec!["ccc333"]);
 }
 
+/// An unterminated marker matches nothing.
 #[test]
-fn TestExtractHashesUnterminatedNoMatch() {
-	assert!(ExtractHashes("<<<CCR:no_terminator_here").is_empty());
+fn Unterminated() {
+	assert!(Extract("<<<CCR:no_terminator_here").is_empty());
 }
 
 // ── T7 (F7): the `⫷` (U+2AF7) opening glyph was previously never
 // recognized - only its `⫸` (U+2AF8) closing counterpart was - so the
 // Unicode-glyph marker style was silently never extracted at all.
+
+/// Both glyph delimiters together.
 #[test]
-fn TestExtractHashesFullGlyphDelimitedForm() {
-	let Hashes = ExtractHashes("\u{2af7}CCR:abc123\u{2af8}");
+fn Delimited() {
+	let Hashes = Extract("\u{2af7}CCR:abc123\u{2af8}");
 	assert_eq!(Hashes, vec!["abc123"]);
 }
 
@@ -104,15 +120,19 @@ fn TestExtractHashesFullGlyphDelimitedForm() {
 // lines later (possibly past other, unrelated markers) would be
 // captured as one garbage "hash". The hash class is now anchored to
 // hex/`i:` characters only, which can never include a newline.
+
+/// A capture never spans a newline.
 #[test]
-fn TestExtractHashesDoesNotCrossNewlines() {
+fn Newline() {
 	let Text = "<<<CCR:foo\nbar>>>";
-	assert!(ExtractHashes(Text).is_empty(), "must not capture a multi-line garbage hash");
+	assert!(Extract(Text).is_empty(), "must not capture a multi-line garbage hash");
 }
 
+/// A line that is not preview-shaped is `None`; a preview-shaped one answers its
+/// inner text.
 #[test]
-fn TestParsePreviewOnGarbage() {
-	assert_eq!(ParsePreview("no brackets here"), None);
-	assert_eq!(ParsePreview("[nocolon]"), None);
-	assert_eq!(ParsePreview("[code_rust:hello]"), Some("hello".to_string()));
+fn Garbage() {
+	assert_eq!(Preview("no brackets here"), None);
+	assert_eq!(Preview("[nocolon]"), None);
+	assert_eq!(Preview("[code_rust:hello]"), Some("hello".to_string()));
 }

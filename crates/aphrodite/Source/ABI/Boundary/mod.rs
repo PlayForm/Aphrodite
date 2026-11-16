@@ -19,7 +19,7 @@
 //!   its cost are stated there.
 //! - `State/` adds the session: it decodes the handle and runs the operation
 //!   under that session's own lock. `State::Fn` goes through
-//!   `Handle::Lookup::WithState`, whose inner `catch_unwind` answers
+//!   `Handle::Lookup::Guarded`, whose inner `catch_unwind` answers
 //!   `"internal error: hook panicked"`; `State::Bare` does not, so the panic
 //!   reaches `Run` and keeps the `"internal error: panicked"` wording the
 //!   read-shaped exports have always had.

@@ -12,11 +12,11 @@ use crate::PollWorker::{
 		Room::{Enum::Room, Fn::Fn as RoomOf},
 		Struct::Registry,
 	},
-	Task::Struct::BgTask,
+	Task::Struct::Struct as Record,
 };
 
 /// Admit `Task`, evicting one expendable task when the set is full.
-pub(crate) fn Fn(This:&mut Registry, Task:BgTask) -> Admit {
+pub(crate) fn Fn(This:&mut Registry, Task:Record) -> Admit {
 	match RoomOf(&Read(This), &Task.ID, This.Bound) {
 		Room::Duplicate => Admit::Duplicate,
 		Room::Free => {

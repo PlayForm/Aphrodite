@@ -2,9 +2,9 @@
 
 use std::sync::atomic::Ordering;
 
-use super::Maximum::PreviewMaximumChars;
+use super::Maximum::Value;
 
-/// Set the preview length cap in characters; `None` or 0 means unlimited.
+/// Set the cap, in characters; `None` or `0` means unlimited (`[previews] preview_max_chars`).
 ///
 /// Returns the previous value so callers - tests and the hot-reload path - can restore it.
 /// Wiring: the engine binary sets it right after `MultiConfig::load`, the proxy `/reload`
@@ -17,7 +17,7 @@ use super::Maximum::PreviewMaximumChars;
 /// because `0` IS "unlimited" and handing the caller back the sentinel would let it restore a
 /// value whose meaning it has to re-derive.
 pub fn Fn(Maximum:Option<u32>) -> Option<u32> {
-	let Previous = PreviewMaximumChars.swap(Maximum.unwrap_or(0), Ordering::Relaxed);
+	let Previous = Value.swap(Maximum.unwrap_or(0), Ordering::Relaxed);
 
 	(Previous != 0).then_some(Previous)
 }

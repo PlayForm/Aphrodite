@@ -2,7 +2,7 @@
 
 use crate::{
 	Health::Proxy::Fn::proxy_health,
-	Tool::{Compress, Dispatch::Fn::ToolHandler, Registry::Test::Mode},
+	Tool::{Compress, Dispatch::Fn::Handler, Registry::Test::Mode},
 };
 
 /// The `aphrodite_test` handler.
@@ -14,7 +14,7 @@ use crate::{
 /// It is not hermetic - the samples it compresses stay in the caller's session, so
 /// a test call adds catalogue rows. That is deliberate: it exercises the same path
 /// a real compression takes.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_test", |Args| {
 		let Resolved = Mode::Resolve::Fn::Fn(Args);
 		let Samples = Resolved.Samples();
@@ -44,13 +44,13 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 			true => "ok",
 			false => "fail",
 		};
-		let ModeName = match Resolved {
+		let Label = match Resolved {
 			Mode::Enum::Enum::Quick => "quick",
 			Mode::Enum::Enum::Full => "full",
 		};
 
 		serde_json::json!({
-			"mode": ModeName,
+			"mode": Label,
 			"status": Status,
 			"passed": Passed,
 			"total": Checks.len(),

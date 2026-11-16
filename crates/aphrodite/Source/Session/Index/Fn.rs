@@ -7,7 +7,7 @@
 use crate::State::Struct::AphroditeState;
 
 /// Get the conversation index as a JSON-serializable value, sorted oldest first.
-pub fn GetConvIndex(State:&AphroditeState) -> Vec<serde_json::Value> {
+pub fn Fn(State:&AphroditeState) -> Vec<serde_json::Value> {
 	let mut Turns:Vec<_> = State.ConvIndex.iter().collect();
 	Turns.sort_by_key(|(k, _)| *k);
 	Turns

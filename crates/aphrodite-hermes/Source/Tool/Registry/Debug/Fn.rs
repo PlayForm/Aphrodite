@@ -12,13 +12,13 @@
 //! `crate::Debug` remains live in both profiles (it only activates on a flag
 //! file).
 
-use crate::Tool::Dispatch::Fn::ToolHandler;
+use crate::Tool::Dispatch::Fn::Handler;
 
 /// The `aphrodite_debug` handler.
 ///
 /// A missing `on` defaults to `true` - asking for the tool at all is the request
 /// to turn debug on, and the schema documents that default.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_debug", |Args| {
 		let On = Args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
 

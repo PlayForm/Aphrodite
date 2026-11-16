@@ -8,8 +8,9 @@
 
 use super::{Go, JS, Python, Rust};
 
-/// Lines below which a snippet carries no language evidence.
-const MinimumEvidenceLines:usize = 3;
+/// Lines a snippet needs before a language rule runs: three. Below it the shape is
+/// `code` and no language is named.
+const Minimum:usize = 3;
 
 /// The language rules, in precedence order.
 ///
@@ -32,7 +33,7 @@ const Rules:[(&str, Rule); 4] = [
 /// that short carries no language evidence and guessing one would put a wrong language in the
 /// marker. It is not a parser and it is not a tie-break: the first matching rule wins.
 pub(crate) fn Fn(Content:&str) -> Option<&'static str> {
-	(Content.lines().count() > MinimumEvidenceLines)
+	(Content.lines().count() > Minimum)
 		.then_some(Content)
 		.and_then(|Content| Rules.into_iter().find(|(_, Rule)| Rule(Content)).map(|(Name, _)| Name))
 }

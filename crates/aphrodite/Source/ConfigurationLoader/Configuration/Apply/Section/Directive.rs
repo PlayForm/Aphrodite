@@ -84,7 +84,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// focus + foresight + lazy subset that exists in the loaded set (lazy
 	// keeps the session from over-eagerly stacking directives until a later
 	// turn proves it needs focus/explore/foresight/cleanup).
-	let Active = Configuration.GetStringList("directives", "active");
+	let Active = Configuration.List("directives", "active");
 	State.ActiveDirectives = Active.into_iter().filter(|name| State.Directives.contains_key(name)).collect();
 
 	let Defaults:Vec<String> = State

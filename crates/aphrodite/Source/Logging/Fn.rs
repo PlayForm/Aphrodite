@@ -1,6 +1,6 @@
 //! Installing the subscriber exactly once per process.
 
-use crate::Logging::{Install::Fn::Fn as InstallSubscriber, Installed::Const::Installed};
+use crate::Logging::{Install::Fn::Fn as Install, Installed::Const::Installed};
 
 /// Install the global `tracing` subscriber; a second call is a no-op.
 ///
@@ -28,7 +28,7 @@ pub fn Fn(Compact:bool, Configured:Option<tracing::Level>) -> anyhow::Result<()>
 		match tracing::dispatcher::has_been_set() {
 			true => Ok(()),
 			false => {
-				match InstallSubscriber(Compact, Configured) {
+				match Install(Compact, Configured) {
 					Ok(()) => Ok(()),
 					// Lost a race with another thread between the check above and
 					// the install: the stack exists, so this is not a failure.

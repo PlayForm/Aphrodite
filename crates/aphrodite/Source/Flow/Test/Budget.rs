@@ -5,17 +5,17 @@
 //! engine-offload prompt never go at all - a turn that silently loses its
 //! directives is a correctness failure, not a size optimisation.
 
-use super::Support::{AddMarker, StateWithDirective};
+use super::Support::{AddMarker, WithDirective};
 use crate::{
-	Flow::{Nudge::Push::Fn::PushNudge, Prompt::Const::ShippedSessionInject, TurnContext::Fn::BuildTurnContext},
+	Flow::{Nudge::Push::Fn::Fn as Push, Prompt::Const::Shipped, TurnContext::Fn::Fn as Assemble},
 	State::Struct::AphroditeState,
 };
 
 // ── T1: the assembler drops the recall catalog before directives when the
 // budget is too small - directives are never dropped. ──
 #[test]
-fn TestBudgetDropsCatalogBeforeDirectives() {
-	let mut s = StateWithDirective("focus", "stay targeted, minimal tool usage");
+fn Catalog() {
+	let mut s = WithDirective("focus", "stay targeted, minimal tool usage");
 
 	// 50 markers so the catalog_summary is large.
 	(0..50).for_each(|i| {
@@ -24,7 +24,7 @@ fn TestBudgetDropsCatalogBeforeDirectives() {
 	// Budget large enough for the directive block but too small for the
 	// recall block to also fit, so the catalog must be dropped first.
 	s.FlowBudgetChars = 90;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(Context.contains("[directives:"), "directives must survive: {Context}");
 	assert!(
 		!Context.contains("[recall]"),
@@ -38,11 +38,11 @@ fn TestBudgetDropsCatalogBeforeDirectives() {
 // always_survive (== 1 here) would have dropped the nudge and directive
 // too. ──
 #[test]
-fn TestBudgetKeepsAllAlwaysSurviveSectionsOnTurnZero() {
-	let mut s = StateWithDirective("focus", "stay targeted, minimal tool usage");
-	s.SessionInject = ShippedSessionInject.to_string();
+fn Required() {
+	let mut s = WithDirective("focus", "stay targeted, minimal tool usage");
+	s.SessionInject = Shipped.to_string();
 	s.TurnCounter = 0;
-	PushNudge(&mut s, "check marker sizes before retrieving", 1);
+	Push(&mut s, "check marker sizes before retrieving", 1);
 	// 50 markers so the recall catalog is large and must drop.
 	(0..50).for_each(|i| {
 		AddMarker(&mut s, &format!("hash{i:040}"), i);
@@ -50,7 +50,7 @@ fn TestBudgetKeepsAllAlwaysSurviveSectionsOnTurnZero() {
 	// Budget well below the three always-survive sections combined, so
 	// only the recall catalog may drop.
 	s.FlowBudgetChars = 600;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[aphrodite: first-turn orientation]"),
 		"session inject must survive: {Context}"
@@ -66,11 +66,11 @@ fn TestBudgetKeepsAllAlwaysSurviveSectionsOnTurnZero() {
 // ── T2: the retrieve-hint boilerplate is no longer emitted per turn
 // (04-F2 fix). Tool schemas in the system prompt already teach retrieval. ──
 #[test]
-fn TestRetrieveHintNotInPerTurnContext() {
+fn Hint() {
 	let mut s = AphroditeState::default();
 	AddMarker(&mut s, &"a".repeat(40), 0);
 	s.FlowBudgetChars = 4000;
-	let Context = BuildTurnContext(&mut s, None);
+	let Context = Assemble(&mut s, None);
 	assert_eq!(
 		Context.matches("retrieve: aphrodite_retrieve").count(),
 		0,
@@ -79,7 +79,7 @@ fn TestRetrieveHintNotInPerTurnContext() {
 }
 
 #[test]
-fn TestEmptyStateYieldsEmptyContext() {
+fn Empty() {
 	let mut s = AphroditeState::default();
-	assert_eq!(BuildTurnContext(&mut s, None), "");
+	assert_eq!(Assemble(&mut s, None), "");
 }

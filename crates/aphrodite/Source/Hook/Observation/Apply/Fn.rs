@@ -2,7 +2,7 @@
 
 use crate::{
 	Hook::Observation::{Outcome::Enum::Enum as Outcome, Struct::Struct},
-	State::{Event::Struct::ToolEvent, Struct::AphroditeState},
+	State::{Event::Struct::Struct as ToolEvent, Struct::AphroditeState},
 };
 
 /// Record an observation: the telemetry event and the file reference.
@@ -17,7 +17,7 @@ use crate::{
 /// `read_file` is in both on purpose (it is never compressed, and it is the
 /// single most common file-reference source), so skipping compression and
 /// recording a reference have to be decided separately. That is why this leaf
-/// knows about `EssentialTools` only for the doc note above and reads
+/// knows about `Hook::Tool::Const::Essential` only for the doc note above and reads
 /// `State.FileTools` for the decision.
 pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 	let Failed = matches!(Observation.Outcome, Outcome::Failed);
@@ -28,7 +28,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 		.into_iter()
 		.for_each(crate::Debug::Count::Bump::Fn::Fn);
 
-	State.RecordToolEvent(ToolEvent {
+	State.RecordEvent(ToolEvent {
 		Turn:State.TurnCounter,
 		Tool:Observation.Tool.clone(),
 		Sig:Observation.ArgsSig,

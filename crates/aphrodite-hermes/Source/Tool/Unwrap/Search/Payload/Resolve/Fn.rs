@@ -19,20 +19,18 @@ pub(crate) fn Fn(Object:&Map<String, Value>) -> Option<Payload::Enum::Enum> {
 	let Count = Object.get("total_count").and_then(Value::as_u64)?;
 	let Truncated = Object.get("truncated").and_then(Value::as_bool).unwrap_or(false);
 
-	let FromArray = Rows::Array::Fn::Fn(Object);
-	let Found = (!FromArray.is_empty())
-		.then_some(FromArray)
-		.or_else(|| Rows::Text::Fn::Fn(Object));
+	let Array = Rows::Array::Fn::Fn(Object);
+	let Found = (!Array.is_empty()).then_some(Array).or_else(|| Rows::Text::Fn::Fn(Object));
 
 	match Found {
 		Some(Found) => Some(Payload::Enum::Enum::Rows(Found)),
 		None => {
-			let IsSearch = Object.get("matches").is_some()
+			let Genuine = Object.get("matches").is_some()
 				|| Object.get("matches_text").is_some()
 				|| Object.get("matches_format").is_some()
 				|| Truncated;
 
-			IsSearch.then_some(Payload::Enum::Enum::Total { Count, Truncated })
+			Genuine.then_some(Payload::Enum::Enum::Total { Count, Truncated })
 		},
 	}
 }

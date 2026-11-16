@@ -16,13 +16,13 @@ use crate::Debug::Log::Level;
 /// reasons a test mutex cannot fix: `getenv` races `setenv` against every other
 /// thread in the harness, not just against other tests.
 ///
-/// `kv` is an ordered slice, not a map: the appended line keeps the caller's
+/// `Fields` is an ordered slice, not a map: the appended line keeps the caller's
 /// field order, which is what makes two runs of the same event diffable.
 pub(crate) fn Fn(
 	State:&AphroditeState,
 	Session:&str,
 	Event:&str,
-	Kv:&[(&str, String)],
+	Fields:&[(&str, String)],
 	Sink:impl FnOnce(u8, &str, &[(&str, String)]),
 ) {
 	let Effective = Level::Fn::Fn(State, Session);
@@ -30,6 +30,6 @@ pub(crate) fn Fn(
 	match Effective {
 		// Quiet path: no event, no file append, no formatting.
 		0 => {},
-		Effective => Sink(Effective, Event, Kv),
+		Effective => Sink(Effective, Event, Fields),
 	}
 }

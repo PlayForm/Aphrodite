@@ -21,10 +21,10 @@ use std::sync::atomic::Ordering;
 use axum::{body::Body, response::Response};
 
 use crate::Proxy::{
-	Compress::Chat::Fn::Fn as CompressChatCompletion,
+	Compress::Chat::Fn::Fn as Compress,
 	Handle::Proxy::Respond::{
 		BadGateway::Fn::Fn as BadGateway,
-		FinalBody::{Enum::Enum as FinalBody, Select::Fn::Fn as SelectFinalBody},
+		FinalBody::{Enum::Enum as FinalBody, Select::Fn::Fn as Select},
 	},
 	Log::Dev::Fn::Fn as DevLog,
 	Request::{
@@ -32,17 +32,13 @@ use crate::Proxy::{
 		Context::Struct::Struct as RequestContext,
 		Route::Enum::Enum as RequestRoute,
 	},
-	Threshold::Const::{ResponseCacheMaximumBodyBytes, ResponseMaximumBodyBytes},
-	Upstream::{
-		Body::Fn::Fn as AccumulateBody,
-		Head::Struct::Struct as UpstreamHead,
-		Headers::Fn::Fn as CopyUpstreamHeaders,
-	},
+	Threshold::Const::{CacheCap, ResponseCap},
+	Upstream::{Body::Fn::Fn as AccumulateBody, Head::Struct::Struct as UpstreamHead, Headers::Fn::Fn as CopyHeaders},
 };
 
 /// Render a buffered upstream response.
 pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:reqwest::Response) -> Response {
-	let Original = match AccumulateBody(Response, ResponseMaximumBodyBytes).await {
+	let Original = match AccumulateBody(Response, ResponseCap).await {
 		Ok(Body) => Body,
 		Err(e) => {
 			// 02-F8: the detailed error (which can embed the upstream
@@ -58,12 +54,9 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 	// Track upstream latency (before compression) and the response body bytes.
 	Context
 		.State
-		.UpstreamLatencyMicros
+		.UpstreamLatency
 		.fetch_add(Context.Started.elapsed().as_micros() as u64, Ordering::Relaxed);
-	Context
-		.State
-		.ResponseBodyBytes
-		.fetch_add(Original.len() as u64, Ordering::Relaxed);
+	Context.State.ResponseBytes.fetch_add(Original.len() as u64, Ordering::Relaxed);
 
 	// Only a Chat Completions response has a shape the compression pass
 	// understands. `Compress::Chat` itself declines when no store is
@@ -82,12 +75,12 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 				)
 			});
 
-			CompressChatCompletion(Context, &Original, HeadroomBudget).await
+			Compress(Context, &Original, HeadroomBudget).await
 		},
 		RequestRoute::Other => None,
 	};
 
-	let FinalBody = SelectFinalBody(&Original, Outcome);
+	let FinalBody = Select(&Original, Outcome);
 	let Compressed = matches!(FinalBody, FinalBody::Transformed { .. });
 
 	let Builder = match &FinalBody {
@@ -97,16 +90,16 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 			// describe what was actually emitted.
 			Context.State.TokensSaved.fetch_add(Accounting.Saved(), Ordering::Relaxed);
 
-			CopyUpstreamHeaders(Response::builder().status(Head.Status), &Head.Headers)
+			CopyHeaders(Response::builder().status(Head.Status), &Head.Headers)
 				.header("Content-Type", "application/json; charset=utf-8")
 				.header("X-Aphrodite-Compressed", "true")
 				.header("X-Aphrodite-Cache", "MISS")
-				.header("X-Aphrodite-Fill-Pct", Context.State.FillPctText())
+				.header("X-Aphrodite-Fill-Pct", Context.State.FillText())
 		},
 		FinalBody::Original(_) => {
-			let Builder = CopyUpstreamHeaders(Response::builder().status(Head.Status), &Head.Headers)
+			let Builder = CopyHeaders(Response::builder().status(Head.Status), &Head.Headers)
 				.header("X-Aphrodite-Cache", "MISS")
-				.header("X-Aphrodite-Fill-Pct", Context.State.FillPctText());
+				.header("X-Aphrodite-Fill-Pct", Context.State.FillText());
 
 			match Head.ContentType.clone() {
 				Some(Ct) => Builder.header("Content-Type", Ct),
@@ -169,7 +162,7 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 		RequestCacheability::Cacheable { Identity } => Some(Identity.clone()),
 		RequestCacheability::Uncacheable => None,
 	};
-	(Head.Status.is_success() && Payload.len() <= ResponseCacheMaximumBodyBytes)
+	(Head.Status.is_success() && Payload.len() <= CacheCap)
 		.then_some(Identity)
 		.flatten()
 		.into_iter()

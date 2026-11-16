@@ -12,7 +12,7 @@
 //! it is the case the borrow avoids copying - up to the accumulator's 256 KB bound, once
 //! per poll.
 //!
-//! `Command` and `ExecutionID` are two different identities and both are
+//! `Command` and `Execution` are two different identities and both are
 //! optional: an envelope names the command it polled (`command`) and the
 //! process it polled (`session_id`), a bare text result names neither. Neither
 //! of them is the task identity - that is the command hash, which two runs of
@@ -20,17 +20,17 @@
 
 use std::borrow::Cow;
 
-use crate::State::Identity::Execution::Struct::ExecutionID;
+use crate::State::Identity::Execution::Struct::Struct as Execution;
 
 /// One poll result, decoded.
 #[derive(Debug, Clone)]
-pub(crate) struct PollEvent<'a> {
+pub(crate) struct Struct<'a> {
 	/// The command line the poll result names, when the wire carries one.
 	pub Command:Option<String>,
 	/// The execution identity the poll result names (`session_id`), when the
 	/// wire carries one. Recorded on the task it is first attributed to, so a
 	/// later poll naming the same process reaches the same task.
-	pub ExecutionID:Option<ExecutionID>,
+	pub Execution:Option<Execution>,
 	/// Exit code, from the JSON envelope or from an `exit code: N` line.
 	pub ExitCode:Option<i32>,
 	/// The output text this poll contributes to the accumulator.

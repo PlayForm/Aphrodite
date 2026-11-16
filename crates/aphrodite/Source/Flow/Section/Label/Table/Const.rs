@@ -7,7 +7,7 @@
 //! last.
 
 /// `(first-line prefix, label)` pairs, in match order.
-pub(crate) const SectionPrefixes:&[(&str, &str)] = &[
+pub(crate) const Prefixes:&[(&str, &str)] = &[
 	("[directives", "directives"),
 	("[nudge", "nudges"),
 	("[engine-offload", "engine_offload"),

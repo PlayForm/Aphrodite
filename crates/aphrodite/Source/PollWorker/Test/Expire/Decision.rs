@@ -2,94 +2,82 @@
 
 use crate::{
 	PollWorker::{
-		Expire::{Const::FinishedLifetime, Decide::Fn::Fn as Decide, Decision::Enum::RetentionDecision},
+		Expire::{Const::Lifetime, Decide::Fn::Fn as Decide, Decision::Enum::Enum as Decision},
 		Task::{
-			Const::StaleTurnAge,
+			Const::Age,
 			New::Fn::Fn as New,
-			Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+			Status::{Enum::Enum as Status, Stored::Struct::Struct as Payload},
 		},
 	},
-	State::Identity::Content::Struct::ContentHash,
+	State::Identity::Content::Struct::Struct as Digest,
 };
 
-fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
+fn Stored() -> Payload { Payload { Hash:Digest::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
-fn Running(StartedTurn:usize, LastPollTurn:usize) -> crate::PollWorker::Task::Struct::BgTask {
+fn Running(StartedTurn:usize, LastPollTurn:usize) -> crate::PollWorker::Task::Struct::Struct {
 	let mut Task = New("t".into(), "terminal".into(), "cargo build".into(), StartedTurn, 0);
 	Task.LastPollTurn = LastPollTurn;
 	Task
 }
 
 #[test]
-fn TestRunningTaskAtTheStaleBoundaryIsKept() {
+fn Boundary() {
 	let Task = Running(0, 0);
-	assert_eq!(
-		Decide(&Task, StaleTurnAge),
-		RetentionDecision::Keep,
-		"exactly StaleTurnAge turns is not stale"
-	);
-	assert_eq!(
-		Decide(&Task, StaleTurnAge + 1),
-		RetentionDecision::MarkStale,
-		"one turn past it is"
-	);
+	assert_eq!(Decide(&Task, Age), Decision::Keep, "exactly Age turns is not stale");
+	assert_eq!(Decide(&Task, Age + 1), Decision::MarkStale, "one turn past it is");
 }
 
 #[test]
-fn TestStaleTaskIsKeptUntilItsLifetimeRunsOut() {
+fn Stale() {
 	let Task = Running(0, 0);
 	assert_eq!(
-		Decide(&Task, FinishedLifetime),
-		RetentionDecision::MarkStale,
+		Decide(&Task, Lifetime),
+		Decision::MarkStale,
 		"at the lifetime it is only marked"
 	);
-	assert_eq!(
-		Decide(&Task, FinishedLifetime + 1),
-		RetentionDecision::Remove,
-		"past it, it is dropped"
-	);
+	assert_eq!(Decide(&Task, Lifetime + 1), Decision::Remove, "past it, it is dropped");
 }
 
 #[test]
-fn TestNewlyStaleCanBeRemovedInTheSameCall() {
+fn Same() {
 	// The old pass marked stale first and then retained, so a task that went stale in
 	// this call could also be removed in this call. One decision reproduces that.
 	let Task = Running(0, 0);
-	let Turn = StaleTurnAge.max(FinishedLifetime) + 1;
+	let Turn = Age.max(Lifetime) + 1;
 
-	assert_eq!(Decide(&Task, Turn), RetentionDecision::Remove);
+	assert_eq!(Decide(&Task, Turn), Decision::Remove);
 }
 
 #[test]
-fn TestOldRunningTaskIsNeverRemoved() {
+fn Old() {
 	let Task = Running(0, 0);
-	let Turn = FinishedLifetime + 1;
+	let Turn = Lifetime + 1;
 
 	// Unpolled and young enough to be stale-marked, so it is kept as a record - but a
 	// task still being polled is never dropped however old it is.
 	let mut Polled = Running(0, 0);
 	Polled.LastPollTurn = Turn;
 
-	assert_eq!(Decide(&Polled, Turn), RetentionDecision::Keep);
-	assert_eq!(Decide(&Task, Turn), RetentionDecision::Remove);
+	assert_eq!(Decide(&Polled, Turn), Decision::Keep);
+	assert_eq!(Decide(&Task, Turn), Decision::Remove);
 }
 
 #[test]
-fn TestFinishedTaskKeepsItsStatusUntilTheLifetimeRunsOut() {
+fn Finished() {
 	let mut Task = Running(0, 0);
-	Task.Status = BgStatus::Done { Output:Finished() };
+	Task.Status = Status::Done { Output:Stored() };
 
-	assert_eq!(Decide(&Task, FinishedLifetime), RetentionDecision::Keep);
-	assert_eq!(Decide(&Task, FinishedLifetime + 1), RetentionDecision::Remove);
+	assert_eq!(Decide(&Task, Lifetime), Decision::Keep);
+	assert_eq!(Decide(&Task, Lifetime + 1), Decision::Remove);
 }
 
 #[test]
-fn TestTurnCounterGoingBackwardsYieldsNoExpiry() {
+fn Backwards() {
 	let Task = Running(10, 10);
 
 	assert_eq!(
 		Decide(&Task, 0),
-		RetentionDecision::Keep,
+		Decision::Keep,
 		"saturating_sub keeps a rewound counter from expiring anything"
 	);
 }

@@ -19,7 +19,7 @@
 // contract, so the snake_case module lint is switched off crate-wide rather
 // than renamed away at every declaration.
 #![allow(non_snake_case)]
-// House style: constants and statics are PascalCase (`const MaximumContent`,
+// House style: constants and statics are PascalCase (`const Maximum`,
 // `static HandleTable`), the same convention as every other item. That is the
 // opposite of `non_upper_case_globals`' default, so the lint is switched off
 // crate-wide rather than silenced file by file at every declaration.

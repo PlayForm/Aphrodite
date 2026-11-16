@@ -19,20 +19,20 @@ use crate::ABI::{
 /// routing it through `?` keeps the two success shapes on the arms that actually
 /// succeed.
 /// # Safety
-/// `Content` and `CCRType` must each be null or point to a valid, NUL-terminated
+/// `Content` and `Type` must each be null or point to a valid, NUL-terminated
 /// C string that stays readable and unmoved for the duration of this call. The
 /// returned pointer is owned by the caller and must be released with
 /// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn AphroditeStage2(Content:*const c_char, CCRType:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeStage2(Content:*const c_char, Type:*const c_char) -> *mut c_char {
 	let Content = unsafe { Cstr(Content) };
-	let CCRType = unsafe { Cstr(CCRType) };
+	let Type = unsafe { Cstr(Type) };
 
 	Run(move || {
 		let Content = Required(Content)?;
-		let CCRType = Optional(CCRType)?;
+		let Type = Optional(Type)?;
 
-		crate::Stage2::Compress::Fn::CompressStage2(&Content, &CCRType)
+		crate::Stage2::Compress::Fn::Fn(&Content, &Type)
 			.map(Answer::Text)
 			.ok_or_else(|| anyhow::anyhow!("no reduction possible"))
 	})

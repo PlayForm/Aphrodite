@@ -3,7 +3,7 @@
 use std::fmt::Write as _;
 
 use crate::Debug::{
-	Log::{Emit::Fn::Fn as EmitDebugRecord, Sanitize::Fn::Fn as SanitizeKv},
+	Log::{Emit::Fn::Fn as Emit, Sanitize::Fn::Fn as SanitizeKv},
 	Path::Log::Fn::Fn as LogPath,
 	Time::Fn::Fn as IsoTimestamp,
 };
@@ -49,7 +49,7 @@ pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
 	// proxy's spans. Emitted BEFORE the destination is resolved: a record that
 	// cannot reach the file (no session id, missing dir, permissions) still
 	// reaches the operator.
-	EmitDebugRecord(Level.get(), &Line);
+	Emit(Level.get(), &Line);
 
 	let Some(path) = LogPath() else { return };
 

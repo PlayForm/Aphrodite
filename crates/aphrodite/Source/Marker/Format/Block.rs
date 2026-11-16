@@ -8,26 +8,23 @@
 //! point every marker passes through.
 
 use super::{
-	Fallback::RenderMarkerFallback,
+	Fallback::Fn as Fallback,
 	Grammar::Enum::Enum as Grammar,
 	Registration::With::Fn::Fn as With,
-	Vars::SubstituteVars,
+	Vars::Fn as Substitute,
 };
 
 /// Dispatch marker rendering: a registered `[templates.marker] format` wins, the
 /// canonical three-part grammar is the fallback.
 ///
+/// External contract: whichever grammar is in force, the returned string is the
+/// marker block a consumer parses - `<<<CCR:{hash}|{type}|{size}>>>` followed by
+/// the preview line, so an empty `Preview` still renders a preview line.
+///
 /// The registration is read once, inside one closure, so the format and the hint
 /// this marker is rendered with come from the same publication - and neither is
 /// cloned on the way out of it.
-pub(super) fn RenderMarkerBlock(
-	Preview:&str,
-	CCRType:&str,
-	meta:&str,
-	Center:Option<&str>,
-	hash:&str,
-	Size:usize,
-) -> String {
+pub(super) fn Fn(Preview:&str, Type:&str, Meta:&str, Center:Option<&str>, Hash:&str, Size:usize) -> String {
 	// DEV-ONLY debug instrumentation (crate::Debug): marker-render counter +
 	// verbose line at APHRODITE_DEBUG=2 (captured only when verbose).
 	let T0 = (crate::Debug::Level::Get::Fn::Fn() >= 2).then(std::time::Instant::now);
@@ -35,21 +32,21 @@ pub(super) fn RenderMarkerBlock(
 		let Hint = Registered.Hint.as_deref().unwrap_or("");
 		match &Registered.Grammar {
 			Grammar::Template(Format) => {
-				let SizeS = Size.to_string();
-				let CenterSeg = Center.map(|c| format!(";center={c}")).unwrap_or_default();
+				let Number = Size.to_string();
+				let Segment = Center.map(|Center| format!(";center={Center}")).unwrap_or_default();
 				let Vars = [
 					("preview", Preview),
-					("type", CCRType),
-					("meta", meta),
+					("type", Type),
+					("meta", Meta),
 					("center", Center.unwrap_or("")),
-					("center_seg", CenterSeg.as_str()),
-					("hash", hash),
-					("size", SizeS.as_str()),
+					("center_seg", Segment.as_str()),
+					("hash", Hash),
+					("size", Number.as_str()),
 					("hint", Hint),
 				];
-				SubstituteVars(Format, &Vars)
+				Substitute(Format, &Vars)
 			},
-			Grammar::Canonical => RenderMarkerFallback(Preview, CCRType, meta, Center, hash, Size, Hint),
+			Grammar::Canonical => Fallback(Preview, Type, Meta, Center, Hash, Size, Hint),
 		}
 	});
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::TemplateRenders);
@@ -57,8 +54,8 @@ pub(super) fn RenderMarkerBlock(
 		crate::Debug::Log::Verbose::Fn::Fn(
 			"marker_render",
 			&[
-				("hash", hash.to_string()),
-				("type", CCRType.to_string()),
+				("hash", Hash.to_string()),
+				("type", Type.to_string()),
 				("size", Size.to_string()),
 				("elapsed_us", T0.elapsed().as_micros().to_string()),
 			],

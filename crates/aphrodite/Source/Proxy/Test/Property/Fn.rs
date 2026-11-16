@@ -16,7 +16,7 @@ proptest! {
 	/// output), and the generated metadata must respect its own documented
 	/// invariants: no pipe/newline, <=400 chars.
 	#[test]
-	fn PropClassifierAndMetadataNeverPanic(s in ".*") {
+	fn Panic(s in ".*") {
 		let Detected = AnalyseContent(&s);
 		let Named = NamedAnalysis(&s, Detected.Ct());
 

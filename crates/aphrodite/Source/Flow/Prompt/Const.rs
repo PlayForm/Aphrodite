@@ -11,8 +11,8 @@
 /// with the Rust-side current strings where those already ship compiled in
 /// (`SessionInject`, `search_hint`). A key absent from the TOML map falls
 /// back to its entry here; an unknown key renders as "" (never panics).
-pub const FallbackPrompts:&[(&str, &str)] = &[
-	("session_inject", ShippedSessionInject),
+pub const Fallback:&[(&str, &str)] = &[
+	("session_inject", Shipped),
 	(
 		"engine_offload",
 		"These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} \
@@ -32,9 +32,9 @@ pub const FallbackPrompts:&[(&str, &str)] = &[
 
 /// Default first-turn session injection. Loaded from `[prompts] session_inject`
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
-/// Rendered once (turn_counter == 0) by `BuildFirstTurnInjection`, then
+/// Rendered once (turn_counter == 0) by `Flow::FirstTurn::Fn::Fn`, then
 /// dropped. Empty string disables it entirely.
-pub const ShippedSessionInject:&str = "\
+pub const Shipped:&str = "\
 [APHRODITE] v{VERSION} active.
   This session is running with CCR compression. Tool outputs larger than a
   few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.

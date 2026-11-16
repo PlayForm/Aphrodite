@@ -18,12 +18,12 @@ use crate::Directive::{Materialize, Resolve};
 /// It is not a retry loop and holds no state: calling it twice re-runs the
 /// whole resolution, which is what makes a second call idempotent rather than
 /// additive.
-pub(crate) fn Fn(HomeParam:&str) -> serde_json::Value {
+pub(crate) fn Fn(Override:&str) -> serde_json::Value {
 	// `materialize_directives` is the earliest thing the Python loader calls,
 	// so it is where a cold process gets its subscriber (`Debug::Init`).
 	crate::Debug::Init::Fn::Fn();
 
-	let (Dir, Warnings) = Resolve::Fn::Fn(HomeParam);
+	let (Dir, Warnings) = Resolve::Fn::Fn(Override);
 	Warnings.iter().for_each(|Warning| crate::Debug::Warn::Fn::Fn(Warning));
 
 	let mut Report = Materialize::Fn::Fn(&Dir);

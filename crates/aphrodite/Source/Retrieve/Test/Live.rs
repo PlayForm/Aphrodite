@@ -11,7 +11,7 @@ use axum::{
 
 use crate::{
 	Proxy::State::Struct::Struct as AppState,
-	Retrieve::{Handle::Fn::Fn as HandleRetrieve, Request::Struct::Struct as RetrieveRequest},
+	Retrieve::{Handle::Fn::Fn as Handle, Request::Struct::Struct as Request},
 };
 
 // ── Live containers (pre-Rust port of _hooks/live.py): the retrieve
@@ -22,12 +22,11 @@ use crate::{
 
 // Seed an AppState inline store exactly as `Hook::transform_live_container`
 // stores one: round-trip hash + meta envelope + per-chunk entries.
-fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
-	let Chunks:Vec<&str> =
-		crate::Hook::Live::Chunk::Policy::Struct::Struct::new(crate::Hook::Live::Const::LiveChunkSize)
-			.expect("the shipped chunk target is non-zero")
-			.Chunks(Content)
-			.collect();
+fn Seed(state:&AppState, hash:&str, Content:&str) -> usize {
+	let Chunks:Vec<&str> = crate::Hook::Live::Chunk::Policy::Struct::Struct::new(crate::Hook::Live::Chunk::Const::Size)
+		.expect("the shipped chunk target is non-zero")
+		.Chunks(Content)
+		.collect();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put(hash.to_string(), Content.to_string());
@@ -36,12 +35,12 @@ fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
 			"type": "terminal",
 			"size": Content.len(),
 			"chunks": Chunks.len(),
-			"chunk_size": crate::Hook::Live::Const::LiveChunkSize,
+			"chunk_size": crate::Hook::Live::Chunk::Const::Size,
 			"bytes_arrived": 0,
 		});
-		Map.put(crate::Hook::Live::Key::Fn::LiveMetaKey(hash), meta.to_string());
+		Map.put(crate::Hook::Live::Key::Meta::Fn::Fn(hash), meta.to_string());
 		Chunks.iter().enumerate().for_each(|(i, c)| {
-			Map.put(crate::Hook::Live::Key::Fn::LiveChunkKey(hash, i), (*c).to_string());
+			Map.put(crate::Hook::Live::Key::Chunk::Fn::Fn(hash, i), (*c).to_string());
 		});
 	}
 	Chunks.len()
@@ -53,62 +52,62 @@ fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
 // content and marks the container complete.
 #[test]
 fn TestRetrieveLiveContainerChunkedProgressThenFullContent() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::WithCCR();
 	let hash = "livehash_abc123";
 	let Content = (0..40)
 		.map(|i| format!("container line {i:02} - payload content\n"))
 		.collect::<String>();
-	let ChunkCount = SeedLiveContainer(&state, hash, &Content);
-	assert!(ChunkCount >= 2, "test content must span multiple chunks");
+	let Count = Seed(&state, hash, &Content);
+	assert!(Count >= 2, "test content must span multiple chunks");
 	let state = Arc::new(state);
 
-	async fn BodyOf(Response:axum::response::Response) -> serde_json::Value {
+	async fn Decode(Response:axum::response::Response) -> serde_json::Value {
 		let bytes = axum::body::to_bytes(Response.into_body(), usize::MAX).await.unwrap();
 		serde_json::from_slice(&bytes).unwrap()
 	}
 
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
 		// 1. Partial retrieve → chunked progress, not complete.
-		let Response = HandleRetrieve(
+		let Response = Handle(
 			State(state.clone()),
-			Json(RetrieveRequest { hash:Some(hash.to_string()), Query:None, Offset:0, Limit:2 }),
+			Json(Request { hash:Some(hash.to_string()), Query:None, Offset:0, Limit:2 }),
 		)
 		.await
 		.into_response();
-		let body = BodyOf(Response).await;
+		let body = Decode(Response).await;
 		assert_eq!(body["found"], true);
 		assert_eq!(body["truncated"], true, "a windowed live retrieve must be flagged truncated");
-		let Live = &body["live"];
-		assert_eq!(Live["chunks"].as_u64().unwrap() as usize, ChunkCount);
-		assert_eq!(Live["bytes_total"].as_u64().unwrap() as usize, Content.len());
-		assert_eq!(Live["complete"], false, "a partial retrieve must not report completion");
-		let Arrived = Live["bytes_arrived"].as_u64().unwrap() as usize;
+		let Progress = &body["live"];
+		assert_eq!(Progress["chunks"].as_u64().unwrap() as usize, Count);
+		assert_eq!(Progress["bytes_total"].as_u64().unwrap() as usize, Content.len());
+		assert_eq!(Progress["complete"], false, "a partial retrieve must not report completion");
+		let Arrived = Progress["bytes_arrived"].as_u64().unwrap() as usize;
 		assert!(
 			Arrived > 0 && Arrived < Content.len(),
 			"partial retrieve must advance bytes arrived: {Arrived}"
 		);
 
 		// 2. Final resolve (limit: 0) → full content, complete.
-		let Response = HandleRetrieve(
+		let Response = Handle(
 			State(state.clone()),
-			Json(RetrieveRequest { hash:Some(hash.to_string()), Query:None, Offset:0, Limit:0 }),
+			Json(Request { hash:Some(hash.to_string()), Query:None, Offset:0, Limit:0 }),
 		)
 		.await
 		.into_response();
-		let body = BodyOf(Response).await;
+		let body = Decode(Response).await;
 		assert_eq!(body["found"], true);
 		assert_eq!(body["content"], Content, "final resolve must return the exact original content");
 		assert_eq!(body["truncated"], false);
-		let Live = &body["live"];
-		assert_eq!(Live["complete"], true, "final resolve must mark the container complete");
-		assert_eq!(Live["bytes_arrived"].as_u64().unwrap() as usize, Content.len());
+		let Progress = &body["live"];
+		assert_eq!(Progress["complete"], true, "final resolve must mark the container complete");
+		assert_eq!(Progress["bytes_arrived"].as_u64().unwrap() as usize, Content.len());
 
 		// The envelope's progress was written back for later retrieves.
 		let Stored = state
 			.InlineCCR
 			.lock()
 			.unwrap()
-			.get(&crate::Hook::Live::Key::Fn::LiveMetaKey(hash))
+			.get(&crate::Hook::Live::Key::Meta::Fn::Fn(hash))
 			.cloned()
 			.unwrap();
 		assert!(
@@ -122,26 +121,26 @@ fn TestRetrieveLiveContainerChunkedProgressThenFullContent() {
 // no `Live` field appears in the response (byte-identical shape).
 #[test]
 fn TestRetrievePlainEntryHasNoLiveField() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::WithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("plain1".to_string(), "plain content".to_string());
 	}
 	let state = Arc::new(state);
 
-	async fn BodyOf(Response:axum::response::Response) -> serde_json::Value {
+	async fn Decode(Response:axum::response::Response) -> serde_json::Value {
 		let bytes = axum::body::to_bytes(Response.into_body(), usize::MAX).await.unwrap();
 		serde_json::from_slice(&bytes).unwrap()
 	}
 
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
-		let Response = HandleRetrieve(
+		let Response = Handle(
 			State(state.clone()),
-			Json(RetrieveRequest { hash:Some("plain1".into()), Query:None, Offset:0, Limit:0 }),
+			Json(Request { hash:Some("plain1".into()), Query:None, Offset:0, Limit:0 }),
 		)
 		.await
 		.into_response();
-		let body = BodyOf(Response).await;
+		let body = Decode(Response).await;
 		assert_eq!(body["content"], "plain content");
 		assert_eq!(body["truncated"], false);
 		assert!(
@@ -155,30 +154,30 @@ fn TestRetrievePlainEntryHasNoLiveField() {
 // (warn + degrade) instead of panicking or 500ing.
 #[test]
 fn TestRetrieveLiveContainerMalformedEnvelopeDegradesToPlain() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::WithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("livehash_malformed".to_string(), "the plain content".to_string());
 		Map.put(
-			crate::Hook::Live::Key::Fn::LiveMetaKey("livehash_malformed"),
+			crate::Hook::Live::Key::Meta::Fn::Fn("livehash_malformed"),
 			"this is not valid json {".to_string(),
 		);
 	}
 	let state = Arc::new(state);
 
-	async fn BodyOf(Response:axum::response::Response) -> serde_json::Value {
+	async fn Decode(Response:axum::response::Response) -> serde_json::Value {
 		let bytes = axum::body::to_bytes(Response.into_body(), usize::MAX).await.unwrap();
 		serde_json::from_slice(&bytes).unwrap()
 	}
 
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
-		let Response = HandleRetrieve(
+		let Response = Handle(
 			State(state.clone()),
-			Json(RetrieveRequest { hash:Some("livehash_malformed".into()), Query:None, Offset:0, Limit:0 }),
+			Json(Request { hash:Some("livehash_malformed".into()), Query:None, Offset:0, Limit:0 }),
 		)
 		.await
 		.into_response();
-		let body = BodyOf(Response).await;
+		let body = Decode(Response).await;
 		assert_eq!(body["found"], true);
 		assert_eq!(
 			body["content"], "the plain content",

@@ -9,27 +9,27 @@
 /// identity only after something reports it.
 ///
 /// ```compile_fail
-/// use aphrodite::State::Identity::{Command::Struct::CommandID, Execution::Struct::ExecutionID};
+/// use aphrodite::State::Identity::{Command::Struct::Struct as Command, Execution::Struct::Struct as Execution};
 ///
-/// let execution: ExecutionID = "proc-7".into();
-/// let command: CommandID = execution;
+/// let execution: Execution = "proc-7".into();
+/// let command: Command = execution;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ExecutionID(String);
+pub struct Struct(String);
 
-impl ExecutionID {
+impl Struct {
 	/// The identity's text.
 	pub fn as_str(&self) -> &str { &self.0 }
 }
 
-impl From<String> for ExecutionID {
+impl From<String> for Struct {
 	fn from(Value:String) -> Self { Self(Value) }
 }
 
-impl From<&str> for ExecutionID {
+impl From<&str> for Struct {
 	fn from(Value:&str) -> Self { Self(Value.to_string()) }
 }
 
-impl std::fmt::Display for ExecutionID {
+impl std::fmt::Display for Struct {
 	fn fmt(&self, Formatter:&mut std::fmt::Formatter<'_>) -> std::fmt::Result { Formatter.write_str(&self.0) }
 }

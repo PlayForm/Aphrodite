@@ -3,7 +3,7 @@
 use crate::Resolve::{Expansion, Halt, Traversal::Struct::Struct as Traversal};
 use super::Build;
 
-/// Expand `HashValue` and every marker its content contains.
+/// Expand `Hash` and every marker its content contains.
 ///
 /// Called only for a hash the prelude classified `Fresh`, so the cycle, depth and cache
 /// questions are already settled and are not repeated here.
@@ -15,14 +15,10 @@ use super::Build;
 /// path that was never popped was the old shape, and it made "already on the path" and "seen
 /// anywhere in this tree" the same test - so a hash first reached at the depth cap stayed
 /// capped for every later branch.
-pub(crate) fn Fn(
-	Traversal:&mut Traversal,
-	HashValue:&str,
-	Depth:usize,
-) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
-	Traversal.Enter(HashValue);
+pub(crate) fn Fn(Traversal:&mut Traversal, Hash:&str, Depth:usize) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
+	Traversal.Enter(Hash);
 
-	let Out = Build::Fn::Fn(Traversal, HashValue, Depth);
+	let Out = Build::Fn::Fn(Traversal, Hash, Depth);
 
 	Traversal.Leave();
 

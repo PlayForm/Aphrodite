@@ -22,7 +22,7 @@ impl AppState {
 		let Bucket = BucketLimits.iter().position(|Limit| Us < *Limit).unwrap_or(BucketLimits.len());
 
 		self.LatencyBuckets[Bucket].fetch_add(1, Ordering::Relaxed);
-		self.TotalLatencyMicros.fetch_add(Us, Ordering::Relaxed);
+		self.TotalLatency.fetch_add(Us, Ordering::Relaxed);
 	}
 
 	pub(crate) fn RecordError(&self, Message:String) {
@@ -34,7 +34,7 @@ impl AppState {
 	}
 
 	pub(crate) fn RecordCompression(&self, Ct:&str) {
-		let _ = self.CompressionsByType.lock().map(|mut Counts| {
+		let _ = self.Compressions.lock().map(|mut Counts| {
 			*Counts.entry(Ct.to_owned()).or_insert(0) += 1;
 		});
 	}

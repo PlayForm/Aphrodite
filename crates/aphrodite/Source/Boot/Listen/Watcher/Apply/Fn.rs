@@ -42,11 +42,11 @@ pub(crate) fn Fn(States:&[Arc<AppState>], Target:&Target::Struct::Struct) {
 	let Thresholds = Proxy::Threshold::Resolve::Fn::Fn(Configuration.Compression.as_ref());
 
 	States.iter().for_each(|State| {
-		State.CacheCompressThreshold.store(Thresholds.Cache, Ordering::Relaxed);
-		State.TokenCompressThreshold.store(Thresholds.Token, Ordering::Relaxed);
-		State.InlineCCRThreshold.store(Thresholds.inline, Ordering::Relaxed);
+		State.CacheThreshold.store(Thresholds.Cache, Ordering::Relaxed);
+		State.TokenThreshold.store(Thresholds.Token, Ordering::Relaxed);
+		State.InlineThreshold.store(Thresholds.inline, Ordering::Relaxed);
 		State
-			.CodeMultiplierX100
+			.CodeMultiplier
 			.store((Thresholds.CodeMultiplier * 100.0) as u64, Ordering::Relaxed);
 	});
 

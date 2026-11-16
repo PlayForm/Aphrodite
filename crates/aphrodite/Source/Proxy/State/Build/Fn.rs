@@ -31,7 +31,7 @@ use crate::{
 	Proxy::{
 		State::Struct::Struct as AppState,
 		Threshold::{
-			Const::{InitialFillPct, InitialRatioEma},
+			Const::{InitialFill, InitialRatio},
 			Resolve::Fn::Fn as ResolveThresholds,
 		},
 	},
@@ -60,8 +60,8 @@ pub async fn Fn(CLI:&CLI, Compression:Option<&CompressionConfiguration>) -> anyh
 		.build()?;
 
 	let ccr:Option<Arc<dyn CcrStore>> = match CLI.Mode {
-		ProxyMode::Token if !CLI.NoCCRMarker => {
-			let DatabasePath = CLI.CCRDatabasePath.as_ref().map_or_else(
+		ProxyMode::Token if !CLI.NoMarker => {
+			let DatabasePath = CLI.Database.as_ref().map_or_else(
 				|| {
 					// Runtime home is a single shared decision
 					// (Home::Runtime::Fn::Fn: $APHRODITE_HOME -> $HERMES_HOME ->
@@ -101,18 +101,12 @@ pub async fn Fn(CLI:&CLI, Compression:Option<&CompressionConfiguration>) -> anyh
 				std::fs::create_dir_all(Parent)
 					.map_err(|e| anyhow::anyhow!("SQLite CCR: cannot create directory {}: {}", Parent.display(), e))
 			})?;
-			let Store = SqliteCcrStore::open_with_limits(
-				&DatabasePath,
-				CLI.CCRTtlSeconds,
-				Some(CLI.StoreMaximumEntries),
-				Some(CLI.StoreMaximumBytes),
-			)
-			.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
+			let Store = SqliteCcrStore::open_with_limits(&DatabasePath, CLI.TTL, Some(CLI.Entries), Some(CLI.Bytes))
+				.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
 			Some(Arc::new(Store))
 		},
 		ProxyMode::Cache => {
-			let Store =
-				InMemoryCcrStore::with_capacity_and_ttl(10_000, std::time::Duration::from_secs(CLI.CCRTtlSeconds));
+			let Store = InMemoryCcrStore::with_capacity_and_ttl(10_000, std::time::Duration::from_secs(CLI.TTL));
 			Some(Arc::new(Store))
 		},
 		_ => None,
@@ -123,15 +117,15 @@ pub async fn Fn(CLI:&CLI, Compression:Option<&CompressionConfiguration>) -> anyh
 	Ok(AppState {
 		Client,
 		StreamClient,
-		APIURL:CLI.APIURL.clone(),
+		APIURL:CLI.URL.clone(),
 		Model:CLI.Model.clone(),
-		APIKey:CLI.APIKey.clone().into(),
+		APIKey:CLI.Key.clone().into(),
 		ccr,
-		AddMarkers:!CLI.NoCCRMarker,
+		AddMarkers:!CLI.NoMarker,
 		Mode:CLI.Mode,
-		ToolRelay:CLI.ToolRelay,
-		NotifyURL:CLI.NotifyURL.clone(),
-		NotifyKey:CLI.NotifyKey.clone(),
+		ToolRelay:CLI.Relay,
+		NotifyURL:CLI.Callback.clone(),
+		NotifyKey:CLI.Auth.clone(),
 		Dev:CLI.Dev,
 		LatencyBuckets:[
 			AtomicU64::new(0),
@@ -140,50 +134,50 @@ pub async fn Fn(CLI:&CLI, Compression:Option<&CompressionConfiguration>) -> anyh
 			AtomicU64::new(0),
 			AtomicU64::new(0),
 		],
-		TotalLatencyMicros:AtomicU64::new(0),
+		TotalLatency:AtomicU64::new(0),
 		LastErrors:Mutex::new(VecDeque::new()),
-		CompressionsByType:Mutex::new(HashMap::new()),
+		Compressions:Mutex::new(HashMap::new()),
 		RequestHistory:Mutex::new(VecDeque::new()),
 		InlineCCR:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 		RequestsTotal:AtomicU64::new(0),
 		RequestsCompressed:AtomicU64::new(0),
 		TokensSaved:AtomicU64::new(0),
-		BodyBytesSaved:AtomicU64::new(0),
+		BytesSaved:AtomicU64::new(0),
 		CCRHits:AtomicU64::new(0),
 		CCRMisses:AtomicU64::new(0),
 		CCRCreated:AtomicU64::new(0),
-		ToolRelayCalls:AtomicU64::new(0),
-		CompressionRatioEma:AtomicU64::new(InitialRatioEma),
+		RelayCalls:AtomicU64::new(0),
+		RatioEma:AtomicU64::new(InitialRatio),
 		ResponseCache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
-		ResponseCacheTtl:std::time::Duration::from_secs(CLI.CCRTtlSeconds),
+		CacheTtl:std::time::Duration::from_secs(CLI.TTL),
 		CacheHits:AtomicU64::new(0),
 		CacheMisses:AtomicU64::new(0),
-		FillPct:AtomicU64::new(InitialFillPct()),
+		FillPct:AtomicU64::new(InitialFill()),
 		TaskTracker:TaskTracker::new(),
 
-		InlineCCRHits:AtomicU64::new(0),
-		InlineCCRMisses:AtomicU64::new(0),
-		ToolRelaySuccess:AtomicU64::new(0),
-		ToolRelayFailure:AtomicU64::new(0),
+		InlineHits:AtomicU64::new(0),
+		InlineMisses:AtomicU64::new(0),
+		RelaySuccess:AtomicU64::new(0),
+		RelayFailure:AtomicU64::new(0),
 		NotifySuccess:AtomicU64::new(0),
 		NotifyFailure:AtomicU64::new(0),
 		UpstreamErrors4xx:AtomicU64::new(0),
 		UpstreamErrors5xx:AtomicU64::new(0),
 		UpstreamTimeouts:AtomicU64::new(0),
-		UpstreamConnectErrors:AtomicU64::new(0),
-		UpstreamOtherErrors:AtomicU64::new(0),
-		SSEStreamErrors:AtomicU64::new(0),
-		RequestBodyBytes:AtomicU64::new(0),
-		ResponseBodyBytes:AtomicU64::new(0),
-		UpstreamLatencyMicros:AtomicU64::new(0),
-		UpstreamHealthCache:std::sync::Mutex::new(None),
-		CacheCompressThreshold:AtomicUsize::new(Thresholds.Cache),
-		TokenCompressThreshold:AtomicUsize::new(Thresholds.Token),
-		InlineCCRThreshold:AtomicUsize::new(Thresholds.inline),
-		CodeMultiplierX100:AtomicU64::new((Thresholds.CodeMultiplier * 100.0) as u64),
+		ConnectErrors:AtomicU64::new(0),
+		OtherErrors:AtomicU64::new(0),
+		StreamErrors:AtomicU64::new(0),
+		RequestBytes:AtomicU64::new(0),
+		ResponseBytes:AtomicU64::new(0),
+		UpstreamLatency:AtomicU64::new(0),
+		UpstreamHealth:std::sync::Mutex::new(None),
+		CacheThreshold:AtomicUsize::new(Thresholds.Cache),
+		TokenThreshold:AtomicUsize::new(Thresholds.Token),
+		InlineThreshold:AtomicUsize::new(Thresholds.inline),
+		CodeMultiplier:AtomicU64::new((Thresholds.CodeMultiplier * 100.0) as u64),
 		AutoExpand:AtomicBool::new(Thresholds.AutoExpand),
-		AutoExpandLimit:AtomicUsize::new(Thresholds.AutoExpandLimit),
-		MaximumRequestBodySize:Thresholds.MaximumRequestBodySize,
+		ExpandLimit:AtomicUsize::new(Thresholds.ExpandLimit),
+		BodyLimit:Thresholds.BodyLimit,
 	})
 }
 

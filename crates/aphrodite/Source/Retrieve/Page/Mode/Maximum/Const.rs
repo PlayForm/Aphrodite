@@ -8,4 +8,8 @@
 /// content-addressing contract and is returned whatever its length, which is
 /// exactly why the two requests are now different values rather than two
 /// meanings of one `usize`.
+///
+/// It is not a configuration key and not a per-caller budget: it is the ceiling
+/// the server is willing to serve, so it lives beside the mode it clamps rather
+/// than in `Configuration`.
 pub(crate) const Const:usize = 10_000;

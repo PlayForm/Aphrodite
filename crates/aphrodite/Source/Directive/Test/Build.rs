@@ -3,11 +3,8 @@
 use std::collections::HashMap;
 
 use crate::Directive::{
-	Build::Fn as BuildDirectiveContext,
-	Cap::{
-		MaximumCombinedChars::Const::Const as MaximumCombinedChars,
-		MaximumDirectiveChars::Const::Const as MaximumDirectiveChars,
-	},
+	Build::Fn as Build,
+	Cap::{Combined::Const::Const as Combined, Single::Const::Const as Single},
 	Model::Struct as Directive,
 };
 
@@ -24,7 +21,7 @@ fn Active(name:&str, Content:&str) -> (HashMap<String, Directive>, Vec<String>) 
 #[test]
 fn TestBuildEmpty() {
 	let all = HashMap::new();
-	let Context = BuildDirectiveContext(&all, &[]);
+	let Context = Build(&all, &[]);
 	assert!(Context.is_empty());
 }
 
@@ -35,7 +32,7 @@ fn TestBuildWithActive() {
 		"focus".into(),
 		Directive { name:"focus".into(), Content:"stay concise\nuse 1-2 tools".into() },
 	);
-	let Context = BuildDirectiveContext(&all, &["focus".into()]);
+	let Context = Build(&all, &["focus".into()]);
 	assert!(Context.contains("[directives: focus]"));
 	assert!(Context.contains("focus:\n"));
 	assert!(Context.contains("stay concise"));
@@ -57,7 +54,7 @@ fn TestBuildWithActiveInjectsFullBodyNotJustFirstLine() {
 				.into(),
 		},
 	);
-	let Context = BuildDirectiveContext(&all, &["focus".into()]);
+	let Context = Build(&all, &["focus".into()]);
 	assert!(
 		Context.contains("Each turn: use at most 1-2 tools."),
 		"body line missing: {Context}"
@@ -72,17 +69,14 @@ fn TestBuildWithActiveInjectsFullBodyNotJustFirstLine() {
 #[test]
 fn TestBuildWithActiveCapsCombinedOutput() {
 	let mut all = HashMap::new();
-	all.insert(
-		"big".into(),
-		Directive { name:"big".into(), Content:"x".repeat(MaximumDirectiveChars) },
-	);
+	all.insert("big".into(), Directive { name:"big".into(), Content:"x".repeat(Single) });
 	all.insert(
 		"also-big".into(),
-		Directive { name:"also-big".into(), Content:"y".repeat(MaximumDirectiveChars) },
+		Directive { name:"also-big".into(), Content:"y".repeat(Single) },
 	);
-	let Context = BuildDirectiveContext(&all, &["big".into(), "also-big".into()]);
+	let Context = Build(&all, &["big".into(), "also-big".into()]);
 	assert!(
-		Context.len() <= MaximumCombinedChars + 10,
+		Context.len() <= Combined + 10,
 		"combined output must respect the cap: {} chars",
 		Context.len()
 	);
@@ -95,15 +89,15 @@ fn TestBuildWithActiveCapsCombinedOutput() {
 #[test]
 fn TestCombinedCharCapCountsCharsNotBytes() {
 	let (all, Active) = Active("focus", &"\u{2014}".repeat(3000));
-	let Out = BuildDirectiveContext(&all, &Active);
+	let Out = Build(&all, &Active);
 	// Char count (prefix + 3000 dashes + newline) is within the cap...
 	assert!(
-		Out.chars().count() <= MaximumCombinedChars,
+		Out.chars().count() <= Combined,
 		"char-count output must stay within the char cap"
 	);
 	// ...but the byte length exceeds it, which would have tripped the
 	// old byte-based gate and truncated valid content.
-	assert!(Out.len() > MaximumCombinedChars, "byte length exceeds the cap");
+	assert!(Out.len() > Combined, "byte length exceeds the cap");
 	// Untruncated: full content present, no ellipsis.
 	assert!(!Out.contains("..."), "within-cap content must not be truncated");
 	assert!(Out.ends_with("\u{2014}\n"));
@@ -115,9 +109,9 @@ fn TestCombinedCharCapCountsCharsNotBytes() {
 #[test]
 fn TestCombinedCharCapTruncatesOverCapContent() {
 	let (all, Active) = Active("focus", &"-".repeat(4100));
-	let Out = BuildDirectiveContext(&all, &Active);
+	let Out = Build(&all, &Active);
 	assert!(Out.ends_with("...\n"), "over-cap content must be truncated");
 	let ContentPart = Out.trim_end_matches("...\n");
-	assert_eq!(ContentPart.chars().count(), MaximumCombinedChars);
-	assert_eq!(Out.chars().count(), MaximumCombinedChars + 4);
+	assert_eq!(ContentPart.chars().count(), Combined);
+	assert_eq!(Out.chars().count(), Combined + 4);
 }

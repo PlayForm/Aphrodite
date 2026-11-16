@@ -9,7 +9,7 @@ use serde_json::Value;
 use crate::Proxy::{
 	Cache::{
 		Entry::Struct::Struct as CacheEntry,
-		Get::Fn::Fn as ResponseCacheGet,
+		Get::Fn::Fn as Get,
 		Hash::Fn::Fn as Fnv1a64,
 		Identity::Struct::Struct as CacheIdentity,
 	},
@@ -17,10 +17,10 @@ use crate::Proxy::{
 		Body::Enum::Enum as RequestBody,
 		Cacheability::Enum::Enum as RequestCacheability,
 		Delivery::Enum::Enum as RequestDelivery,
+		Route::Chat::Const::Path,
 		Semantics::Fn::Fn as InterpretRequest,
 	},
 	Test::Support::State::Fn::TestState,
-	Threshold::Const::ChatCompletionsPath,
 };
 
 /// The identity of the one-message chat request the cache tests use.
@@ -32,7 +32,7 @@ fn Identity() -> CacheIdentity {
 
 // ── Cache identity: a digest to index by, canonical bytes for equality ──
 #[test]
-fn TestCacheIdentityDeterministic() {
+fn Deterministic() {
 	let body:Value = serde_json::from_str(r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#).unwrap();
 	let First = CacheIdentity::New(&body, "key-a");
 	let Second = CacheIdentity::New(&body, "key-a");
@@ -42,7 +42,7 @@ fn TestCacheIdentityDeterministic() {
 }
 
 #[test]
-fn TestCacheIdentityDiffersByAPIKey() {
+fn APIKey() {
 	let body:Value = serde_json::from_str(r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#).unwrap();
 	let First = CacheIdentity::New(&body, "key-a");
 	let Second = CacheIdentity::New(&body, "key-b");
@@ -55,7 +55,7 @@ fn TestCacheIdentityDiffersByAPIKey() {
 // hashed a hand-listed eight fields, so a request differing only in `max_tokens`
 // or `stop` aliased one that did not, and was served the other's cached answer.
 #[test]
-fn TestCacheIdentityCoversFieldsOutsideTheOldKeyList() {
+fn KeyList() {
 	let Base:Value = serde_json::from_str(r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#).unwrap();
 	let Capped:Value =
 		serde_json::from_str(r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"max_tokens":16}"#)
@@ -80,7 +80,7 @@ fn TestCacheIdentityCoversFieldsOutsideTheOldKeyList() {
 // same request. Without this the identity would be a function of the client's
 // serialiser rather than of what the client asked for.
 #[test]
-fn TestCacheIdentityIgnoresMemberOrder() {
+fn MemberOrder() {
 	let Ordered:Value = serde_json::from_str(r#"{"model":"gpt-4","messages":[],"temperature":0.2}"#).unwrap();
 	let Shuffled:Value = serde_json::from_str(r#"{"temperature":0.2,"messages":[],"model":"gpt-4"}"#).unwrap();
 	let First = CacheIdentity::New(&Ordered, "key");
@@ -94,7 +94,7 @@ fn TestCacheIdentityIgnoresMemberOrder() {
 // valid response can look like, and streamed requests must never be cached at
 // all. ──
 #[test]
-fn TestCacheIdentityDiffersByToolsAndTemperature() {
+fn Differ() {
 	let Base:Value = serde_json::from_str(r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#).unwrap();
 	let WithTools:Value = serde_json::from_str(
 		r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"tools":[{"type":"function"}]}"#,
@@ -126,31 +126,31 @@ fn TestCacheIdentityDiffersByToolsAndTemperature() {
 // read off the same parsed top-level field, so a body cannot be forwarded as a
 // stream and cached as a buffered completion. ──
 #[test]
-fn TestSemanticsStreamingRequestIsUncacheable() {
+fn Streaming() {
 	let Streamed = r#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"stream":true}"#;
-	let Semantics = InterpretRequest(ChatCompletionsPath, Streamed.as_bytes(), "key");
+	let Semantics = InterpretRequest(Path, Streamed.as_bytes(), "key");
 
 	assert!(matches!(Semantics.Delivery, RequestDelivery::Streaming));
 	assert!(matches!(Semantics.Cacheability, RequestCacheability::Uncacheable));
 }
 
 #[test]
-fn TestSemanticsNestedStreamFlagDoesNotStream() {
+fn NestedFlag() {
 	// The byte scan this replaced matched `"stream":true` at ANY depth, so a
 	// buffered request that merely mentioned the word was forwarded on the
 	// streaming client (no total timeout) while the key path still cached it.
 	let Body = r#"{"model":"m","stream":false,"messages":[],"meta":{"stream":true}}"#;
-	let Semantics = InterpretRequest(ChatCompletionsPath, Body.as_bytes(), "key");
+	let Semantics = InterpretRequest(Path, Body.as_bytes(), "key");
 
 	assert!(matches!(Semantics.Delivery, RequestDelivery::Buffered));
 	assert!(matches!(Semantics.Cacheability, RequestCacheability::Cacheable { .. }));
 }
 
 #[test]
-fn TestSemanticsOpaqueBodyIsBufferedAndUncacheable() {
+fn Opaque() {
 	// The unknown-body path is preserved: not JSON, forwarded unchanged,
 	// buffered, never keyed.
-	let Semantics = InterpretRequest(ChatCompletionsPath, b"not json", "key");
+	let Semantics = InterpretRequest(Path, b"not json", "key");
 
 	assert!(matches!(Semantics.Body, RequestBody::Opaque));
 	assert!(matches!(Semantics.Delivery, RequestDelivery::Buffered));
@@ -160,16 +160,16 @@ fn TestSemanticsOpaqueBodyIsBufferedAndUncacheable() {
 // ── T1 remainder (F5, report 06): response_cache entries must expire
 // on their own instead of being replayed forever. ──
 #[test]
-fn TestResponseCacheGetExpiresPastTtl() {
+fn Expires() {
 	let mut State = TestState();
-	State.ResponseCacheTtl = std::time::Duration::from_millis(1);
+	State.CacheTtl = std::time::Duration::from_millis(1);
 	State.ResponseCache.lock().unwrap().put(
 		Identity(),
 		CacheEntry { StoredAt:Instant::now(), Body:Bytes::from_static(b"cached") },
 	);
 	std::thread::sleep(std::time::Duration::from_millis(20));
 	assert_eq!(
-		ResponseCacheGet(&State, &Identity(), Instant::now()),
+		Get(&State, &Identity(), Instant::now()),
 		None,
 		"expired entry must not be returned"
 	);
@@ -180,26 +180,23 @@ fn TestResponseCacheGetExpiresPastTtl() {
 }
 
 #[test]
-fn TestResponseCacheGetHitsWithinTtl() {
+fn Hits() {
 	let mut State = TestState();
-	State.ResponseCacheTtl = std::time::Duration::from_secs(3600);
+	State.CacheTtl = std::time::Duration::from_secs(3600);
 	State.ResponseCache.lock().unwrap().put(
 		Identity(),
 		CacheEntry { StoredAt:Instant::now(), Body:Bytes::from_static(b"cached") },
 	);
-	assert_eq!(
-		ResponseCacheGet(&State, &Identity(), Instant::now()),
-		Some(Bytes::from_static(b"cached"))
-	);
+	assert_eq!(Get(&State, &Identity(), Instant::now()), Some(Bytes::from_static(b"cached")));
 }
 
 // ── The cache is keyed by the identity, so a stored answer is never served to a
 // request that differs from it - not even one field outside the old key list. A
 // digest match alone is an index hit, not equality evidence.
 #[test]
-fn TestResponseCacheDoesNotServeARequestThatDiffersOnlyInMaxTokens() {
+fn MaxTokens() {
 	let mut State = TestState();
-	State.ResponseCacheTtl = std::time::Duration::from_secs(3600);
+	State.CacheTtl = std::time::Duration::from_secs(3600);
 	State.ResponseCache.lock().unwrap().put(
 		Identity(),
 		CacheEntry { StoredAt:Instant::now(), Body:Bytes::from_static(b"cached") },
@@ -211,14 +208,14 @@ fn TestResponseCacheDoesNotServeARequestThatDiffersOnlyInMaxTokens() {
 	let Capped = CacheIdentity::New(&Capped, "key");
 
 	assert_eq!(
-		ResponseCacheGet(&State, &Capped, Instant::now()),
+		Get(&State, &Capped, Instant::now()),
 		None,
 		"a request with a different `max_tokens` must not be served another request's answer"
 	);
 }
 
 #[test]
-fn TestFnv1a64KnownVectors() {
+fn Vectors() {
 	// FNV-1a 64-bit offset basis is the hash of the empty input.
 	assert_eq!(Fnv1a64(b""), 14695981039346656037);
 	// Two different inputs should (overwhelmingly likely) hash differently.

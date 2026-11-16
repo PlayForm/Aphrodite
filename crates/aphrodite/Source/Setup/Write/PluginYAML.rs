@@ -61,11 +61,11 @@ provides_context_engine: true
 install_message: |
   aphrodite v{version} - installed via `cargo install aphrodite` + `aphrodite setup`.
   All logic in binaries/ - Rust-powered. Secure defaults.
-  Proxies: token (:{TokenPort}, SQLite), cache (:{CachePort}, in-memory).
+  Proxies: token (:{Token}, SQLite), cache (:{Cache}, in-memory).
 "#,
 		version = env!("CARGO_PKG_VERSION"),
-		TokenPort = Args.TokenPort,
-		CachePort = Args.CachePort,
+		Token = Args.Token,
+		Cache = Args.Cache,
 	);
 	println!("writing plugin manifest -> {}", path.display());
 	fs::write(&path, &YAML).with_context(|| format!("write the plugin manifest {}", path.display()))?;

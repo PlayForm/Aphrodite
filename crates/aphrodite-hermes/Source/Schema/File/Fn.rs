@@ -6,7 +6,7 @@
 
 use serde_json::json;
 
-use crate::Schema::NoParams;
+use crate::Schema::Empty;
 
 /// The `aphrodite_files` tool schema.
 pub(crate) fn Fn() -> serde_json::Value {
@@ -17,6 +17,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			as a record of what has already been looked at. Takes no arguments. \
 			Returns {total, files: [{path, tool}]} where `tool` is the tool that first \
 			referenced the path.",
-		"parameters": NoParams::Fn::Fn()
+		"parameters": Empty::Fn::Fn()
 	})
 }

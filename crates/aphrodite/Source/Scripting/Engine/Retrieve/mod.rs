@@ -1,3 +1,3 @@
-//! The `OnRetrieve` surface.
+//! The `Retrieve` surface.
 
 pub mod Fn;

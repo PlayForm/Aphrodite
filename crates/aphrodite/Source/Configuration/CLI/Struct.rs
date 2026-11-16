@@ -20,7 +20,7 @@ use crate::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
 pub struct Struct {
 	/// Subcommand: `setup` to bootstrap, or omitted to run the proxy.
 	#[command(subcommand)]
-	pub command:Option<Command>,
+	pub Command:Option<Command>,
 	/// Proxy mode: cache or token
 	#[arg(long, default_value = "token", env = "APHRODITE_MODE")]
 	pub Mode:ProxyMode,
@@ -30,63 +30,102 @@ pub struct Struct {
 	pub Listen:SocketAddr,
 
 	/// Upstream API base URL
-	#[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
-	pub APIURL:String,
+	#[arg(
+		long = "apiurl",
+		value_name = "APIURL",
+		default_value = "https://api.openai.com",
+		env = "APHRODITE_API_URL"
+	)]
+	pub URL:String,
 
 	/// Upstream API key (optional at parse time - `setup` and keyless
 	/// launches don't require it; required only when a proxy must forward
 	/// to an upstream). Empty string default so `aphrodite setup` and other
 	/// subcommands parse without `--api-key`.
-	#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true, default_value = "")]
-	pub APIKey:String,
+	#[arg(
+		long = "api-key",
+		value_name = "API_KEY",
+		env = "APHRODITE_API_KEY",
+		hide_env_values = true,
+		default_value = ""
+	)]
+	pub Key:String,
 
 	/// Model name to forward (set via APHRODITE_MODEL env or --model)
 	#[arg(long, default_value = "default-model", env = "APHRODITE_MODEL")]
 	pub Model:String,
 
 	/// Max context tokens
-	#[arg(long, default_value = "1000000")]
-	pub MaximumContext:usize,
+	#[arg(
+		long = "maximum-context",
+		value_name = "MAXIMUM_CONTEXT",
+		default_value = "1000000"
+	)]
+	pub Context:usize,
 
 	/// Max output tokens
-	#[arg(long, default_value = "384000")]
-	pub MaximumOutput:usize,
+	#[arg(long = "maximum-output", value_name = "MAXIMUM_OUTPUT", default_value = "384000")]
+	pub Output:usize,
 
 	/// SQLite database path for CCR storage
-	#[arg(long, env = "APHRODITE_DB")]
-	pub CCRDatabasePath:Option<PathBuf>,
+	#[arg(
+		long = "ccr-database-path",
+		value_name = "CCR_DATABASE_PATH",
+		env = "APHRODITE_DB"
+	)]
+	pub Database:Option<PathBuf>,
 
 	/// CCR TTL in seconds (default: 3600 = 1 hour)
-	#[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
-	pub CCRTtlSeconds:u64,
+	#[arg(
+		long = "ccr-ttl-seconds",
+		value_name = "CCR_TTL_SECONDS",
+		default_value = "3600",
+		env = "APHRODITE_CCR_TTL"
+	)]
+	pub TTL:u64,
 
 	/// Maximum live rows in the SQLite CCR store before least-recently-
 	/// accessed rows are evicted (0 = unlimited). A TTL bounds the store
 	/// only in time; this bounds it in space so a burst of compression
 	/// inside one TTL window cannot grow the file without limit.
-	#[arg(long, default_value = "100000", env = "APHRODITE_STORE_MAX_ENTRIES")]
-	pub StoreMaximumEntries:usize,
+	#[arg(
+		long = "store-maximum-entries",
+		value_name = "STORE_MAXIMUM_ENTRIES",
+		default_value = "100000",
+		env = "APHRODITE_STORE_MAX_ENTRIES"
+	)]
+	pub Entries:usize,
 
 	/// Maximum stored payload bytes (`SUM(LENGTH(original))`) before
 	/// least-recently-accessed rows are evicted (0 = unlimited).
-	#[arg(long, default_value = "536870912", env = "APHRODITE_STORE_MAX_BYTES")]
-	pub StoreMaximumBytes:u64,
+	#[arg(
+		long = "store-maximum-bytes",
+		value_name = "STORE_MAXIMUM_BYTES",
+		default_value = "536870912",
+		env = "APHRODITE_STORE_MAX_BYTES"
+	)]
+	pub Bytes:u64,
 
 	/// Disable CCR markers in compressed output
-	#[arg(long)]
-	pub NoCCRMarker:bool,
+	#[arg(long = "no-ccr-marker")]
+	pub NoMarker:bool,
 
 	/// Enable tool relay endpoint (POST /tool/relay)
-	#[arg(long)]
-	pub ToolRelay:bool,
+	#[arg(long = "tool-relay")]
+	pub Relay:bool,
 
 	/// Hermes callback URL for CCR notifications
-	#[arg(long, env = "APHRODITE_NOTIFY_URL")]
-	pub NotifyURL:Option<String>,
+	#[arg(long = "notify-url", value_name = "NOTIFY_URL", env = "APHRODITE_NOTIFY_URL")]
+	pub Callback:Option<String>,
 
 	/// Hermes API key for callback auth
-	#[arg(long, env = "APHRODITE_NOTIFY_KEY", hide_env_values = true)]
-	pub NotifyKey:Option<String>,
+	#[arg(
+		long = "notify-key",
+		value_name = "NOTIFY_KEY",
+		env = "APHRODITE_NOTIFY_KEY",
+		hide_env_values = true
+	)]
+	pub Auth:Option<String>,
 
 	/// Enable dev mode - verbose request/response logging
 	#[arg(long)]

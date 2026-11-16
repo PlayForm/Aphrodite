@@ -8,7 +8,7 @@
 
 use serde_json::json;
 
-/// Parameter block for a tool that takes no arguments.
+/// The `parameters` object every argument-less tool schema emits.
 ///
 /// `additionalProperties: false` is deliberate: it is the only signal that
 /// stops a model from inventing plausible-looking arguments for an argument-

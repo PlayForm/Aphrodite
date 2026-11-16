@@ -7,7 +7,7 @@
 //!
 //! This module rewrites such chains by inserting segment markers between the
 //! component commands, and splits the produced output back into per-segment
-//! pieces. `pre_tool_call` rewrites the command; `TransformToolResult`
+//! pieces. `pre_tool_call` rewrites the command; `Hook::ToolResult::Entry::Fn`
 //! detects the markers and compresses each segment independently, so the
 //! agent sees N compact per-segment previews (`[chain:3 | build ... ]`) and
 //! retrieves exactly the segment it needs.
@@ -20,8 +20,8 @@
 //!
 //! The tree is grouped by the two directions of one format: `Split/` parses a
 //! command into segments, `Marked/` writes the marker rewrite and reads the
-//! marked output back apart, `Segment/` is the item they pass around,
-//! `Const.rs` is the marker's exact bytes, and `ErrorHint/` is the
+//! marked output back apart, `Segment/` is the item they pass around and owns
+//! the marker's exact bytes (`Segment::Const::Marker`), and `ErrorHint/` is the
 //! content-level hint attached to a failed segment.
 //!
 //! `Prepared/` is the third stage: it owns the batch a split produces, from the
@@ -32,7 +32,6 @@
 //! (`ChainSplit::Split::Fn::Fn`), so the file that defines an item is the only
 //! place it is defined and there is exactly one way to spell it.
 
-pub mod Const;
 pub mod ErrorHint;
 pub mod Marked;
 pub mod Prepared;

@@ -12,7 +12,7 @@ pub fn Fn(State:&AphroditeState) -> Vec<(&'static str, String)> {
 	vec![
 		("tool_threshold", State.ToolThreshold.to_string()),
 		("terminal_threshold", State.TerminalThreshold.to_string()),
-		("inline_byte_budget", State.InlineStoreByteBudget().to_string()),
+		("inline_byte_budget", State.Budget().to_string()),
 		("engine_threshold_pct", State.EngineThresholdPct.to_string()),
 		("engine_min_msgs", State.EngineMinimumMsgs.to_string()),
 		("engine_protect_first", State.EngineProtectFirst.to_string()),

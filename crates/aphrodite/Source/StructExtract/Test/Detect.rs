@@ -2,7 +2,7 @@
 //! shapes that used to fool the detector - a long leading doc comment, and a
 //! multi-byte character straddling the old fixed byte window.
 
-use crate::StructExtract::{Detect::Fn as AutoDetect, Extract::Fn as ExtractCodeStructure};
+use crate::StructExtract::{Detect::Fn as AutoDetect, Extract::Fn as Structure};
 
 #[test]
 fn TestAutoDetectRust() {
@@ -52,5 +52,5 @@ fn TestAutoDetectMultibyteNear500ByteBoundary() {
 	Content.push('é');
 	Content.push_str("fn f() -> i32 { 1 }");
 	// Must not panic.
-	let _ = ExtractCodeStructure(&Content, "");
+	let _ = Structure(&Content, "");
 }

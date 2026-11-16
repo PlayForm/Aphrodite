@@ -28,7 +28,7 @@
 //!
 //! Layout: one leaf per tool schema (the directory names the tool family, the
 //! item is `Fn`), plus `All/` (the ordered array), `Get/` (lookup by name) and
-//! `NoParams/` (the shared argument-less parameter block). The text of every
+//! `Empty/` (the shared argument-less parameter block). The text of every
 //! schema is a contract with the model: copy it, never reword it.
 
 pub(crate) mod All;
@@ -36,9 +36,9 @@ mod Catalog;
 mod Compress;
 mod Diff;
 mod Directive;
+mod Empty;
 mod File;
 pub(crate) mod Get;
-mod NoParams;
 mod Prefetch;
 mod PrefetchStatus;
 mod Rebuild;

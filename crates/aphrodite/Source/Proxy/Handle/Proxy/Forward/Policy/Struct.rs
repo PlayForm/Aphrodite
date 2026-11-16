@@ -9,8 +9,8 @@
 pub(crate) struct Struct {
 	/// Total attempts, including the first. Three means at most two retries.
 	pub(crate) MaximumAttempts:u32,
-	/// First backoff, doubled per attempt.
-	pub(crate) BaseBackoffMs:u64,
+	/// First backoff in milliseconds, doubled per attempt.
+	pub(crate) Backoff:u64,
 	/// Lowest jitter multiplier - 0.75 keeps a retry from landing on the same
 	/// millisecond as a peer's.
 	pub(crate) JitterFloor:f64,

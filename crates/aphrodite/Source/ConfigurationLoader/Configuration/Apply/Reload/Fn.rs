@@ -1,14 +1,14 @@
 //! Re-applying a document to a live session - every section it has authority over.
 
 use crate::State::Struct::AphroditeState;
-use super::{super::super::Struct::Struct, Const::Reload};
+use super::{super::super::Struct::Struct, Const::Sequence};
 
 impl Struct {
 	/// Re-apply the document to an existing `AphroditeState`, without directives.
 	///
 	/// A live session owns three things the document cannot know about: its
 	/// directive set (swapped and extended at runtime by `aphrodite_directive`), its
-	/// CCR store and its telemetry. `ApplyCompression` would re-probe the directives
+	/// CCR store and its telemetry. `Apply::Startup::Fn` would re-probe the directives
 	/// directory and reseed `ActiveDirectives` from `[directives] active`, silently
 	/// resetting the model's directive selection mid-session.
 	///
@@ -22,9 +22,9 @@ impl Struct {
 	///
 	/// `ConfigurationError` is still recorded, because a broken file must be visible
 	/// to `AphroditeStats` on every path that applied it.
-	pub fn ApplyReload(&self, State:&mut AphroditeState) {
+	pub fn Reload(&self, State:&mut AphroditeState) {
 		State.ConfigurationError = self.ParseFailure.clone();
 
-		Reload.iter().for_each(|Apply| Apply(self, State));
+		Sequence.iter().for_each(|Apply| Apply(self, State));
 	}
 }

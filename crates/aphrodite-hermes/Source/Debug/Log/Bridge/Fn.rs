@@ -28,9 +28,9 @@ use crate::Debug::{Init::Const::TARGET, Log::Bridge::At};
 /// It does not filter or truncate - a caller that logs a 40 KB value gets a 40 KB
 /// line, so callers pass sizes and hashes rather than payloads, and no caller
 /// here ever passes a secret or a content body.
-pub(crate) fn Fn(state:&aphrodite::State::Struct::AphroditeState, session:&str, event:&str, kv:&[(&str, String)]) {
-	At::Fn::Fn(state, session, event, kv, |Level, Event, Kv| {
-		tracing::debug!(target: TARGET, session, event = Event, level = Level, fields = ?Kv);
-		aphrodite::Debug::Log::At::Fn::Fn(Level, Event, Kv);
+pub(crate) fn Fn(state:&aphrodite::State::Struct::AphroditeState, session:&str, event:&str, Fields:&[(&str, String)]) {
+	At::Fn::Fn(state, session, event, Fields, |Level, Event, Fields| {
+		tracing::debug!(target: TARGET, session, event = Event, level = Level, fields = ?Fields);
+		aphrodite::Debug::Log::At::Fn::Fn(Level, Event, Fields);
 	});
 }

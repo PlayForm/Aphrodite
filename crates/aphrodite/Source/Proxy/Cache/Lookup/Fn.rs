@@ -14,7 +14,7 @@ use std::{sync::atomic::Ordering, time::Instant};
 use axum::{body::Body, http::StatusCode, response::Response};
 
 use crate::Proxy::{
-	Cache::{Get::Fn::Fn as ResponseCacheGet, Lookup::Enum::Enum as CacheLookup},
+	Cache::{Get::Fn::Fn as Get, Lookup::Enum::Enum as CacheLookup},
 	Log::Dev::Fn::Fn as DevLog,
 	Measurement::Encoded::Struct::Struct as EncodedAccounting,
 	Request::{Cacheability::Enum::Enum as RequestCacheability, Context::Struct::Struct as RequestContext},
@@ -28,7 +28,7 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Now:Instant) -> CacheLookup {
 		RequestCacheability::Uncacheable => return CacheLookup::Bypassed,
 	};
 
-	match ResponseCacheGet(Context.State, Identity, Now) {
+	match Get(Context.State, Identity, Now) {
 		Some(CachedBody) => {
 			Context.State.CacheHits.fetch_add(1, Ordering::Relaxed);
 			// Encoded-body accounting, not content accounting: a hit avoided a
@@ -38,7 +38,7 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Now:Instant) -> CacheLookup {
 			// different denominators in one counter.
 			let Avoided = EncodedAccounting { BodyBytes:CachedBody.len() }.Avoided();
 
-			Context.State.BodyBytesSaved.fetch_add(Avoided, Ordering::Relaxed);
+			Context.State.BytesSaved.fetch_add(Avoided, Ordering::Relaxed);
 			DevLog(
 				Context.State.Dev,
 				|| tracing::info!(ID = %Context.ID, CachedLength = CachedBody.len(), "<<< CACHE HIT"),
@@ -61,7 +61,7 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Now:Instant) -> CacheLookup {
 					.status(StatusCode::OK)
 					.header("Content-Type", "application/json; charset=utf-8")
 					.header("X-Aphrodite-Cache", "HIT")
-					.header("X-Aphrodite-Fill-Pct", Context.State.FillPctText())
+					.header("X-Aphrodite-Fill-Pct", Context.State.FillText())
 					.body(Body::from(CachedBody))
 					.unwrap(),
 			)

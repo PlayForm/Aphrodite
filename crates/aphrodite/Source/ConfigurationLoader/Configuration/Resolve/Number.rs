@@ -14,17 +14,17 @@ impl Struct {
 	/// `parse().unwrap_or(default)` rather than through `and_then(parse().ok())`: the
 	/// latter would let an unparseable override fall through to the environment, which
 	/// is a different knob value than the one the operator set.
-	pub fn GetU64(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:u64) -> u64 {
+	pub fn Number(&self, EnvironmentKey:&str, Section:&str, Key:&str, Fallback:u64) -> u64 {
 		self.Overrides
 			.get(EnvironmentKey)
-			.map(|Raw| Raw.parse().unwrap_or(default))
-			.or_else(|| std::env::var(EnvironmentKey).ok().map(|Raw| Raw.parse().unwrap_or(default)))
+			.map(|Raw| Raw.parse().unwrap_or(Fallback))
+			.or_else(|| std::env::var(EnvironmentKey).ok().map(|Raw| Raw.parse().unwrap_or(Fallback)))
 			.unwrap_or_else(|| {
 				self.Section(Section)
-					.and_then(|s| s.get(Key))
-					.and_then(|v| v.as_integer())
-					.map(|v| v as u64)
-					.unwrap_or(default)
+					.and_then(|Table| Table.get(Key))
+					.and_then(|Value| Value.as_integer())
+					.map(|Integer| Integer as u64)
+					.unwrap_or(Fallback)
 			})
 	}
 }

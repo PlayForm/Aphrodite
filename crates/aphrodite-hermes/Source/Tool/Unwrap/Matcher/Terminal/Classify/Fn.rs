@@ -10,8 +10,8 @@ use crate::Tool::Unwrap::Matcher::Terminal::Classify::{Kind, Resolve};
 pub(crate) fn Fn(Output:&str) -> String {
 	match Resolve::Fn::Fn(Output) {
 		Kind::Enum::Failure => "terminal".to_string(),
-		Kind::Enum::Build { CompilerError: true } => "build_error".to_string(),
-		Kind::Enum::Build { CompilerError: false } => "build_output".to_string(),
+		Kind::Enum::Build { Error: true } => "build_error".to_string(),
+		Kind::Enum::Build { Error: false } => "build_output".to_string(),
 		Kind::Enum::Detected => aphrodite::Preview::Detect::Type::Fn(Output),
 	}
 }

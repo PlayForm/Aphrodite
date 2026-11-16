@@ -3,19 +3,18 @@
 use crate::{
 	Hook::{
 		Live::{
-			Chunk::Policy::Struct::Struct as ChunkPolicy,
-			Const::LiveChunkSize,
-			Key::Fn::{LiveChunkKey, LiveMetaKey},
+			Chunk::{Const::Size, Policy::Struct::Struct as ChunkPolicy},
+			Key::{Chunk::Fn::Fn as ChunkKey, Meta::Fn::Fn as MetaKey},
 		},
-		Terminal::Entry::Fn::TransformTerminalOutput,
-		ToolResult::Entry::Fn::TransformToolResult,
+		Terminal::Entry::Fn::Fn as Terminal,
+		ToolResult::Entry::Fn::Fn as Tool,
 	},
 	State::Struct::AphroditeState,
 };
 
 /// The chunks a container stores for `Content`, under the shipped target policy.
 fn ChunksOf(Content:&str) -> Vec<&str> {
-	ChunkPolicy::new(LiveChunkSize)
+	ChunkPolicy::new(Size)
 		.expect("the shipped chunk target is non-zero")
 		.Chunks(Content)
 		.collect()
@@ -25,11 +24,11 @@ fn ChunksOf(Content:&str) -> Vec<&str> {
 // byte-identical to the pre-live shape - same field set, same marker
 // grammar, no container fields, no container store keys.
 #[test]
-fn TestLiveContainerOffPayloadIsByteIdentical() {
+fn Identical() {
 	let mut s = AphroditeState::default(); // live_container = false
 	s.ToolThreshold = 0;
 	let Content = "fn main() {\n    println!(\"hello\");\n}\n";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Tool(&mut s, Content, "terminal");
 	assert_eq!(r["status"], "ok");
 	assert_eq!(r["compressed"], true);
 	assert!(r.get("live").is_none(), "off must not emit container fields");
@@ -43,11 +42,11 @@ fn TestLiveContainerOffPayloadIsByteIdentical() {
 	);
 	assert_eq!(r["marker"], ExpectMarker, "off must keep the exact marker grammar");
 	assert!(
-		!s.InlineStore.contains_key(&LiveMetaKey(hash)),
+		!s.InlineStore.contains_key(&MetaKey(hash)),
 		"off must not store a container envelope"
 	);
 	assert!(
-		!s.InlineStore.contains_key(&LiveChunkKey(hash, 0)),
+		!s.InlineStore.contains_key(&ChunkKey(hash, 0)),
 		"off must not store container chunks"
 	);
 	assert_eq!(crate::Resolve::Expand::Fn(&mut s, hash), Some(Content.to_string()));
@@ -56,11 +55,11 @@ fn TestLiveContainerOffPayloadIsByteIdentical() {
 // Contract 2: enabled but below the compress threshold → unchanged
 // (no container) on BOTH the tool and terminal paths.
 #[test]
-fn TestLiveContainerBelowThresholdUnchanged() {
+fn Below() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	s.ToolThreshold = 10_000;
-	let r = TransformToolResult(&mut s, "short output", "terminal");
+	let r = Tool(&mut s, "short output", "terminal");
 	assert_eq!(r["compressed"], false);
 	assert_eq!(r["reason"], "below_threshold");
 	assert!(r.get("live").is_none(), "below-threshold must not emit a container");
@@ -68,7 +67,7 @@ fn TestLiveContainerBelowThresholdUnchanged() {
 	let mut S2 = AphroditeState::default();
 	S2.LiveContainer = true;
 	S2.TerminalThreshold = 10_000;
-	let R2 = TransformTerminalOutput(&mut S2, "tiny terminal output");
+	let R2 = Terminal(&mut S2, "tiny terminal output");
 	assert_eq!(R2["compressed"], false);
 	assert_eq!(R2["reason"], "below_threshold");
 	assert!(R2.get("live").is_none());
@@ -79,7 +78,7 @@ fn TestLiveContainerBelowThresholdUnchanged() {
 // per-chunk entries) AND the round-trip hash; the marker's hash still
 // resolves to the exact original.
 #[test]
-fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
+fn Progress() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	s.ToolThreshold = 0; // always compress
@@ -88,7 +87,7 @@ fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
 		.collect::<String>();
 	let Chunks = ChunksOf(&Content);
 	assert!(Chunks.len() >= 2, "test content must span multiple chunks");
-	let r = TransformToolResult(&mut s, &Content, "terminal");
+	let r = Tool(&mut s, &Content, "terminal");
 	assert_eq!(r["status"], "ok");
 	assert_eq!(r["compressed"], true);
 	assert_eq!(r["live"], true);
@@ -112,9 +111,9 @@ fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
 		"marker must carry the progress annotation: {Marker}"
 	);
 	// Container store: meta envelope + per-chunk entries + round-trip hash.
-	assert!(s.InlineStore.contains_key(&LiveMetaKey(hash)), "meta envelope must be stored");
+	assert!(s.InlineStore.contains_key(&MetaKey(hash)), "meta envelope must be stored");
 	(0..Chunks.len()).for_each(|i| {
-		assert!(s.InlineStore.contains_key(&LiveChunkKey(hash, i)), "chunk {i} must be stored");
+		assert!(s.InlineStore.contains_key(&ChunkKey(hash, i)), "chunk {i} must be stored");
 	});
 	assert_eq!(crate::Resolve::Expand::Fn(&mut s, hash), Some(Content.clone()));
 	assert!(
@@ -124,16 +123,16 @@ fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
 }
 
 // Contract 3 (terminal path): same instant-marker contract through
-// `TransformTerminalOutput`.
+// `Terminal::Entry::Fn`.
 #[test]
-fn TestLiveContainerTerminalOverThresholdInstantMarker() {
+fn Instant() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	s.TerminalThreshold = 0;
 	let Content = (0..40)
 		.map(|i| format!("cargo step {i:02} done - line content\n"))
 		.collect::<String>();
-	let r = TransformTerminalOutput(&mut s, &Content);
+	let r = Terminal(&mut s, &Content);
 	assert_eq!(r["live"], true);
 	assert_eq!(r["type"], "live");
 	assert_eq!(r["chunks"].as_u64().unwrap() as usize, ChunksOf(&Content).len());
@@ -150,7 +149,7 @@ fn TestLiveContainerTerminalOverThresholdInstantMarker() {
 // Contract 4: the default state keeps `LiveContainer` off - no config
 // change, no behavioral drift.
 #[test]
-fn TestLiveContainerDefaultStateUnchanged() {
+fn Default() {
 	let s = AphroditeState::default();
 	assert!(!s.LiveContainer, "default state must keep live_container off");
 }
@@ -159,14 +158,14 @@ fn TestLiveContainerDefaultStateUnchanged() {
 // the limit) the hook returns the expanded content inline even when
 // live_container is on - no container marker may leak.
 #[test]
-fn TestLiveContainerDefersToAutoExpandWithinLimit() {
+fn Defer() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	s.AutoExpand = true;
 	s.AutoExpandLimit = 102400;
 	s.ToolThreshold = 0;
 	let Content = "some content that would otherwise become a live container\n";
-	let r = TransformToolResult(&mut s, Content, "terminal");
+	let r = Tool(&mut s, Content, "terminal");
 	assert_eq!(r["auto_expanded"], true, "auto-expand must win over the container path");
 	assert!(r.get("live").is_none());
 	assert_eq!(r["expanded"], Content);

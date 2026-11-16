@@ -9,7 +9,7 @@ use crate::PollWorker::Apply::Applied::{Finished::Struct::Finished, Subject::Str
 /// exit code is not an `Option` here and the output is not an empty string on the
 /// progress path - each variant holds exactly what its case has.
 #[derive(Debug, Clone)]
-pub(crate) enum Applied {
+pub(crate) enum Enum {
 	/// The poll carried output but no exit code: the task is still running, and its
 	/// accumulator grew by whatever fitted.
 	Progressed(Subject),

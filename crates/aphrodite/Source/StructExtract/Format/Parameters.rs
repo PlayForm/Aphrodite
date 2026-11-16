@@ -2,9 +2,9 @@
 
 use std::num::NonZeroUsize;
 
-use crate::StructExtract::{Format::Floor::Fn as Floor, MaximumParametersLength::Const as MaximumParametersLength};
+use crate::StructExtract::{Format::Floor::Fn as Floor, Maximum::Parameters::Const::Const as Maximum};
 
-/// Truncate a parameter list to `MaximumParametersLength` bytes with `...` appended.
+/// Truncate a parameter list to `Maximum::Parameters::Const` bytes with `...` appended.
 ///
 /// The extractors pass the text between the parentheses verbatim; this cuts it to `Maximum - 3` bytes
 /// plus three dots, so the list never exceeds the cap. It is not a parser: it does not balance
@@ -17,8 +17,8 @@ use crate::StructExtract::{Format::Floor::Fn as Floor, MaximumParametersLength::
 /// a list at exactly 35 bytes lost its last three characters to the ellipsis - the same size, three
 /// characters less information, which is the defect class this preview exists to avoid.
 pub(crate) fn Fn(Params:&str) -> String {
-	match NonZeroUsize::new(Params.len().saturating_sub(MaximumParametersLength)) {
+	match NonZeroUsize::new(Params.len().saturating_sub(Maximum)) {
 		None => Params.to_string(),
-		Some(_) => Floor(Params, MaximumParametersLength - 3).to_string() + "...",
+		Some(_) => Floor(Params, Maximum - 3).to_string() + "...",
 	}
 }

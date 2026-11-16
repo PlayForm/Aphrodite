@@ -1,10 +1,10 @@
 //! `Mode` - the one knob with a documented fallback instead of an error.
 
-use crate::Configuration::{Proxy::Mode::Enum::Enum as ProxyMode, Test::MultiConfigurationFromToml};
+use crate::Configuration::{Proxy::Mode::Enum::Enum as ProxyMode, Test::Toml};
 
 #[test]
 fn TestResolveInvalidModeFallsBackToToken() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "weird"
@@ -18,7 +18,7 @@ fn TestResolveInvalidModeFallsBackToToken() {
 
 #[test]
 fn TestResolveMissingModeFallsBackToToken() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "no_mode"

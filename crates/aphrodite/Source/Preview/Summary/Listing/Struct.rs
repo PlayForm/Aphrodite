@@ -9,7 +9,7 @@ use crate::Preview::Parse::Listing::{Entry::Struct::Struct as Entry, Kind::Enum:
 /// The key is bounded because it is a map key, not because it is displayed - an
 /// unbounded key would let a pathological listing grow the tally without limit. It is
 /// not a display cap: the renderer prints the key it finds.
-const ExtensionKeyMaximum:usize = 8;
+const Extension:usize = 8;
 
 /// A parsed listing: how many files, how many directories, and the extension tally.
 ///
@@ -41,9 +41,9 @@ impl Struct {
 
 				Base.rfind('.')
 					.filter(|Dot| *Dot > 0 && *Dot < Base.len() - 1)
-					.map(|Dot| Base[Dot..].chars().take(ExtensionKeyMaximum).collect::<String>())
+					.map(|Dot| Base[Dot..].chars().take(Extension).collect::<String>())
 					.into_iter()
-					.for_each(|Extension| *self.Extensions.entry(Extension).or_insert(0) += 1);
+					.for_each(|Key| *self.Extensions.entry(Key).or_insert(0) += 1);
 			},
 		}
 	}
@@ -55,11 +55,7 @@ impl Struct {
 	/// stable ranking: two extensions with the same count are ordered by name, which is
 	/// the tie-break the previous reader used.
 	pub(crate) fn Extensions(&self, Shown:usize) -> Vec<(&str, usize)> {
-		let mut Sorted:Vec<(&str, usize)> = self
-			.Extensions
-			.iter()
-			.map(|(Extension, Count)| (Extension.as_str(), *Count))
-			.collect();
+		let mut Sorted:Vec<(&str, usize)> = self.Extensions.iter().map(|(Key, Count)| (Key.as_str(), *Count)).collect();
 
 		Sorted.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
 

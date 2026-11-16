@@ -1,6 +1,6 @@
 //! One path's outcome, as the response reports it.
 
-use crate::State::Identity::Content::Struct::ContentHash;
+use crate::State::Identity::Content::Struct::Struct as Digest;
 
 /// What one requested path produced, in the shape the report needs.
 ///
@@ -15,7 +15,7 @@ pub(crate) enum Record {
 		/// The path the content came from.
 		Path:String,
 		/// Content identity, resolvable through the store.
-		Hash:ContentHash,
+		Hash:Digest,
 		/// Detected content type.
 		Type:String,
 		/// Length of the stored payload.

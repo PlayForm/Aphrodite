@@ -9,22 +9,22 @@ use std::sync::{Arc, atomic::Ordering};
 use axum::response::{IntoResponse, Json, Response};
 
 use crate::Proxy::{
-	Relay::{Execute::Fn::Fn as ExecuteToolRelay, Response::Struct::Struct as ToolRelayResponse},
+	Relay::{Execute::Fn::Fn as Execute, Response::Struct::Struct as RelayResponse},
 	State::Struct::Struct as AppState,
 };
 
 /// Run the tool and render its answer.
 pub(crate) async fn Fn(state:&Arc<AppState>, Tool:&str, Params:&serde_json::Value) -> Response {
-	match ExecuteToolRelay(state, Tool, Params).await {
+	match Execute(state, Tool, Params).await {
 		Ok(Value) => {
-			state.ToolRelaySuccess.fetch_add(1, Ordering::Relaxed);
+			state.RelaySuccess.fetch_add(1, Ordering::Relaxed);
 
-			Json(ToolRelayResponse { Success:true, Result:Some(Value), error:None, AsyncCall:false }).into_response()
+			Json(RelayResponse { Success:true, Result:Some(Value), error:None, AsyncCall:false }).into_response()
 		},
 		Err(e) => {
-			state.ToolRelayFailure.fetch_add(1, Ordering::Relaxed);
+			state.RelayFailure.fetch_add(1, Ordering::Relaxed);
 
-			Json(ToolRelayResponse { Success:false, Result:None, error:Some(format!("{e:#}")), AsyncCall:false })
+			Json(RelayResponse { Success:false, Result:None, error:Some(format!("{e:#}")), AsyncCall:false })
 				.into_response()
 		},
 	}

@@ -2,31 +2,31 @@
 //! per-segment error hints.
 
 use crate::ChainSplit::{
-	Const::SegMarker,
-	ErrorHint::Fn::Fn as SegmentErrorHint,
-	Marked::{Command::Fn::Fn as BuildMarkedCommand, Output::Fn::Fn as SplitMarkedOutput},
+	ErrorHint::Fn::Fn as Hint,
+	Marked::{Command::Fn::Fn as Command, Output::Fn::Fn as Output},
+	Segment::Const::Marker,
 	Split::Fn::Fn as SplitChain,
 };
 
 #[test]
-fn SplitsOnAndAndSemicolon() {
+fn Separator() {
 	let Segs = SplitChain("cd x && cargo build ; cargo test").unwrap();
 	assert_eq!(Segs.len(), 3);
-	assert_eq!(Segs[0].command, "cd x");
-	assert_eq!(Segs[1].command, "cargo build");
-	assert_eq!(Segs[2].command, "cargo test");
+	assert_eq!(Segs[0].Command, "cd x");
+	assert_eq!(Segs[1].Command, "cargo build");
+	assert_eq!(Segs[2].Command, "cargo test");
 }
 
 #[test]
 fn RespectsQuotes() {
 	let Segs = SplitChain("echo 'a && b' ; echo \"c ; d\"").unwrap();
 	assert_eq!(Segs.len(), 2);
-	assert_eq!(Segs[0].command, "echo 'a && b'");
-	assert_eq!(Segs[1].command, "echo \"c ; d\"");
+	assert_eq!(Segs[0].Command, "echo 'a && b'");
+	assert_eq!(Segs[1].Command, "echo \"c ; d\"");
 }
 
 #[test]
-fn SingleSegmentIsNone() {
+fn Single() {
 	assert!(SplitChain("cargo build").is_none());
 	assert!(SplitChain("").is_none());
 }
@@ -37,15 +37,15 @@ fn HeredocRefused() {
 }
 
 #[test]
-fn MarkedCommandRoundtrip() {
+fn Roundtrip() {
 	let Segs = SplitChain("a && b && c").unwrap();
-	let Marked = BuildMarkedCommand(&Segs);
+	let Marked = Command(&Segs);
 	assert!(Marked.contains("__APHRODITE_SEG__"));
 	// Markers go to STDERR, never stdout: redirected files stay clean.
 	assert!(Marked.contains("1>&2"));
 	assert!(!Marked.contains("echo __APHRODITE_SEG__ ;"));
-	let Out = format!("seg a output\n{}\nseg b output\n{}\nseg c output\n", SegMarker, SegMarker);
-	let Parts = SplitMarkedOutput(&Out);
+	let Out = format!("seg a output\n{}\nseg b output\n{}\nseg c output\n", Marker, Marker);
+	let Parts = Output(&Out);
 	assert_eq!(Parts.len(), 3);
 	assert_eq!(Parts[0].Index, 0);
 	assert_eq!(Parts[0].Text, "seg a output");
@@ -64,36 +64,33 @@ fn NewlineSeparator() {
 // ── Tier 3: per-segment error hints ──
 
 #[test]
-fn ErrorHintNoneForCleanOutput() {
-	assert_eq!(SegmentErrorHint("everything fine\nno problems here"), None);
-	assert_eq!(SegmentErrorHint(""), None);
+fn HintClean() {
+	assert_eq!(Hint("everything fine\nno problems here"), None);
+	assert_eq!(Hint(""), None);
 }
 
 #[test]
-fn ErrorHintFindsFirstSignal() {
+fn HintSignal() {
 	let Out = "compiling...\nerror: could not compile `demo`\nfailed\n";
-	assert_eq!(SegmentErrorHint(Out).as_deref(), Some("error: could not compile `demo`"));
+	assert_eq!(Hint(Out).as_deref(), Some("error: could not compile `demo`"));
 }
 
 #[test]
-fn ErrorHintPrefersErrorCodeLine() {
+fn Prefer() {
 	let Out = "warning: unused\nfatal: something\nerror[E0432]: unresolved import `x`\n";
-	assert_eq!(SegmentErrorHint(Out).as_deref(), Some("error[E0432]: unresolved import `x`"));
+	assert_eq!(Hint(Out).as_deref(), Some("error[E0432]: unresolved import `x`"));
 }
 
 #[test]
-fn ErrorHintCatchesExitCode() {
-	assert_eq!(SegmentErrorHint("done\n").as_deref(), None);
-	assert_eq!(
-		SegmentErrorHint("make: *** [all] Error 2\n").as_deref(),
-		Some("make: *** [all] Error 2")
-	);
+fn Exit() {
+	assert_eq!(Hint("done\n").as_deref(), None);
+	assert_eq!(Hint("make: *** [all] Error 2\n").as_deref(), Some("make: *** [all] Error 2"));
 }
 
 #[test]
-fn ErrorHintTruncatesLongLines() {
+fn HintTruncate() {
 	let long = format!("error: {}", "x".repeat(200));
-	let Hint = SegmentErrorHint(&long).unwrap();
+	let Hint = Hint(&long).unwrap();
 	assert!(Hint.len() <= 60);
 	assert!(Hint.starts_with("error: "));
 }

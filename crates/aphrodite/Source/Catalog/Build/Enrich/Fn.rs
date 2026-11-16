@@ -24,6 +24,6 @@ pub(crate) fn Fn(State:&AphroditeState, Mode:&Mode::Enum::Enum, Result:&mut serd
 
 	Recommendations.into_iter().for_each(|Recommendations| {
 		Result["recommendations"] = serde_json::json!(Recommendations);
-		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
+		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::Fn(State, "search_hint", &[]));
 	});
 }

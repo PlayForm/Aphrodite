@@ -10,7 +10,7 @@
 
 use crate::Proxy::{
 	Analysis::Struct::Struct as ContentAnalysis,
-	Format::Fn::Fn as ProxyFormatCCROutput,
+	Format::Fn::Fn as Format,
 	Metadata::Fn::Fn as GenerateMetadata,
 };
 
@@ -22,5 +22,5 @@ pub(crate) fn Fn(hash:&str, Analysis:&ContentAnalysis<'_>, Center:Option<&str>) 
 	// uses, so proxy and hook previews can never drift.
 	let Preview = crate::Preview::Builder::Entry::Fn(Analysis.Ct(), Analysis.Content());
 
-	ProxyFormatCCROutput(&Preview, Analysis.Ct(), &Metadata, Center, hash, Analysis.Size())
+	Format(&Preview, Analysis.Ct(), &Metadata, Center, hash, Analysis.Size())
 }

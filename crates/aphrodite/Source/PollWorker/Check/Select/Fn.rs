@@ -11,10 +11,10 @@
 
 use crate::PollWorker::{
 	Registry::{IterateRev::Fn::Fn as IterateRev, Reader::Struct::Reader},
-	Task::{Status::Enum::BgStatus, Struct::BgTask},
+	Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 };
 
 /// At most two tasks, newest first, stale ones silent.
-pub(crate) fn Fn<'a>(This:&'a Reader<'_>) -> Vec<&'a BgTask> {
-	IterateRev(This).filter(|Task| Task.Status != BgStatus::Stale).take(2).collect()
+pub(crate) fn Fn<'a>(This:&'a Reader<'_>) -> Vec<&'a Record> {
+	IterateRev(This).filter(|Task| Task.Status != Status::Stale).take(2).collect()
 }

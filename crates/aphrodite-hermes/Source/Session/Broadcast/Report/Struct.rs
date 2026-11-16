@@ -27,6 +27,7 @@ pub(crate) struct Struct {
 	/// Of the `Applied` sessions, how many still have `auto_reload` on after
 	/// the closure ran. A parse failure does not change this field - the
 	/// sessions keep their previous configuration, and the failure is reported
-	/// on the state instead.
-	pub WantsReload:usize,
+	/// on the state instead. It is logged as the tracing field `wants_reload`,
+	/// which is the operator-visible name and does not follow this rename.
+	pub Reload:usize,
 }

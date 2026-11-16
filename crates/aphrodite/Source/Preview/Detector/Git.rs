@@ -4,7 +4,7 @@
 //! majority so a diff hunk or prose is not mistaken for a listing. It is not a repository query - the
 //! text is all that is read.
 
-use crate::Preview::{Input::Struct::Struct as Input, Line::GitStatus};
+use crate::Preview::{Input::Struct::Struct as Input, Line::Git::Status};
 
 /// True when the content looks like `git status` output.
 ///
@@ -17,7 +17,7 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 		.raw
 		.lines()
 		.any(|Line| Line.trim_start().starts_with("On branch ") || Line.trim_start().starts_with("Your branch "));
-	let Status = Inp.Count(|Line| GitStatus::Fn(Line).is_some());
+	let Status = Inp.Count(|Line| Status::Fn(Line).is_some());
 
 	OnBranch || (Status >= 2 && Status * 2 >= Inp.NonEmpty.len())
 }

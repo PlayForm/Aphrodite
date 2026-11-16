@@ -6,5 +6,6 @@
 //! 127.0.0.1 - that connection genuinely is loopback; the `Host` check alone
 //! would not stop a remote peer that guesses a loopback hostname.
 
+pub mod Allowed;
 pub mod Fn;
 pub mod Middleware;

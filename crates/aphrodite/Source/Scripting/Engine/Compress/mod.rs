@@ -1,3 +1,3 @@
-//! The `OnCompress` surface.
+//! The `Compress` surface.
 
 pub mod Fn;

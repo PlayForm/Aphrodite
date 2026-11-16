@@ -10,8 +10,11 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct Struct {
 	pub hash:String,
+	/// The reduction achieved, emitted as `token_savings_ratio` - the key is
+	/// pinned because a rename must not change the wire contract. `1.0` when the
+	/// original size is zero.
 	#[serde(rename = "token_savings_ratio")]
-	pub TokenSavingsRatio:f64,
+	pub Ratio:f64,
 	#[serde(rename = "original_size")]
 	pub OriginalSize:usize,
 	#[serde(rename = "compressed_size")]

@@ -12,17 +12,17 @@ use crate::{
 	PollWorker::{
 		Registry::{Capacity::Struct::Capacity, Reader::Struct::Reader, Room::Enum::Room},
 		Select::Eviction::Fn::Fn as Eviction,
-		Task::Status::Enum::BgStatus,
+		Task::Status::Enum::Enum as Status,
 	},
-	State::Identity::Command::Struct::CommandID,
+	State::Identity::Command::Struct::Struct as Command,
 };
 
 /// What admitting a task with `Identity` finds.
-pub(crate) fn Fn(This:&Reader, Identity:&CommandID, Bound:Capacity) -> Room {
+pub(crate) fn Fn(This:&Reader, Identity:&Command, Bound:Capacity) -> Room {
 	match This
 		.Tasks
 		.iter()
-		.position(|Task| &Task.ID == Identity && Task.Status == BgStatus::Running)
+		.position(|Task| &Task.ID == Identity && Task.Status == Status::Running)
 	{
 		Some(_) => Room::Duplicate,
 		None => {

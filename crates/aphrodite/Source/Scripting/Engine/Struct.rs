@@ -30,15 +30,15 @@ impl Struct {
 	/// already installed.
 	pub fn new() -> Self {
 		let Home = dirs::home_dir().unwrap_or_default();
-		let Engine = Struct {
+		let Built = Struct {
 			Scripts:Mutex::new(Vec::new()),
 			Directories:vec![
 				Home.join(".hermes").join("aphrodite").join("scripts"),
 				PathBuf::from("scripts/aphrodite"),
 			],
 		};
-		Engine.Reload();
-		Engine
+		Built.Reload();
+		Built
 	}
 }
 

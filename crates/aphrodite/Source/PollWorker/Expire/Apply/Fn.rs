@@ -4,12 +4,10 @@
 //! registry's one mutation that both filters and reports.
 
 use crate::PollWorker::{
-	Expire::{Decide::Fn::Fn as Decide, Report::Struct::ExpirationReport},
+	Expire::{Decide::Fn::Fn as Decide, Report::Struct::Struct as Expiry},
 	Registry::{Retain::Fn::Fn as Retain, Struct::Registry},
-	Task::Struct::BgTask,
+	Task::Struct::Struct as Record,
 };
 
 /// Apply one decision per task at `Turn`.
-pub(crate) fn Fn(This:&mut Registry, Turn:usize) -> ExpirationReport {
-	Retain(This, |Task:&mut BgTask| Decide(Task, Turn))
-}
+pub(crate) fn Fn(This:&mut Registry, Turn:usize) -> Expiry { Retain(This, |Task:&mut Record| Decide(Task, Turn)) }

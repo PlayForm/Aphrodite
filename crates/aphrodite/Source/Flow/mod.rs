@@ -4,7 +4,7 @@
 //! Before this module, three call sites composed the model-visible context
 //! independently: the Hermes bridge `PreLLMCall` arm, the
 //! `context_engine_pre_llm` tool, and core `Hook::LLM::Pre::Fn::Fn`. The bridge
-//! sites never called `BuildDirectiveContext`, so the directives system was
+//! sites never called `Directive::Build::Fn`, so the directives system was
 //! invisible on the only path real sessions use (bug class 01-F3 / 04-F1).
 //! Routing every site through one assembler makes the "bridge reimplements the
 //! hook body and forks" failure mode unrepresentable.

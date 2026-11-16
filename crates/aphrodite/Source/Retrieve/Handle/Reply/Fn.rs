@@ -5,7 +5,7 @@ use axum::{
 	response::{IntoResponse, Json, Response},
 };
 
-use crate::Retrieve::{Handle::Failure, Response::Struct::Struct as RetrieveResponse};
+use crate::Retrieve::Handle::Failure;
 
 /// The status and body for one failure.
 ///
@@ -17,10 +17,8 @@ use crate::Retrieve::{Handle::Failure, Response::Struct::Struct as RetrieveRespo
 /// `error` because the message describes the request, not a missing entry.
 pub(crate) fn Fn(Failure:&Failure::Enum::Enum) -> Response {
 	let (Status, Source, Content, Error) = match Failure {
-		Failure::Enum::Enum::MissingHash => {
-			(StatusCode::BAD_REQUEST, "none", None, Some("`hash` required".to_string()))
-		},
-		Failure::Enum::Enum::LockPoisoned => {
+		Failure::Enum::Enum::Missing => (StatusCode::BAD_REQUEST, "none", None, Some("`hash` required".to_string())),
+		Failure::Enum::Enum::Poisoned => {
 			(
 				StatusCode::INTERNAL_SERVER_ERROR,
 				"none",
@@ -28,7 +26,7 @@ pub(crate) fn Fn(Failure:&Failure::Enum::Enum) -> Response {
 				Some("inline_ccr lock poisoned; cannot serve /retrieve".to_string()),
 			)
 		},
-		Failure::Enum::Enum::NotFound(hash) => {
+		Failure::Enum::Enum::Absent(hash) => {
 			(
 				StatusCode::NOT_FOUND,
 				"none",
@@ -41,13 +39,13 @@ pub(crate) fn Fn(Failure:&Failure::Enum::Enum) -> Response {
 
 	(
 		Status,
-		Json(RetrieveResponse {
+		Json(crate::Retrieve::Response::Struct::Struct {
 			Found:false,
 			Content,
 			Source:Source.to_string(),
 			error:Error,
 			Truncated:false,
-			Live:None,
+			Progress:None,
 		}),
 	)
 		.into_response()

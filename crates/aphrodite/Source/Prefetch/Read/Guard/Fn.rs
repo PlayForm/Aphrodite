@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 /// checks), otherwise the cwd-joined absolute path (a refusal like
 /// `~/.ssh/id_rsa` must hold even before the file exists). Tilde expansion
 /// mirrors `Home`'s `ExpandTilde`.
-pub(in crate::Prefetch) fn GuardAbsolute(path:&Path) -> PathBuf {
+pub(in crate::Prefetch) fn Fn(path:&Path) -> PathBuf {
 	let s = path.to_string_lossy();
 	let Expanded:PathBuf = match s == "~" {
 		true => dirs::home_dir().unwrap_or_else(|| path.to_path_buf()),

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// Walk `Session` -> parent -> ... -> root over `Map`, leaf first.
 ///
 /// Pure: no lock, no global, no allocation beyond the chain itself. That is what
-/// makes it callable with the `SESSION_PARENTS` guard ALREADY HELD - and it is
+/// makes it callable with the `State::Parent` guard ALREADY HELD - and it is
 /// the only walk such a caller may use, since `MutexGuard` lives to the end of
 /// its scope and a second acquisition of the same mutex on the same thread is a
 /// permanent hang, not an error.

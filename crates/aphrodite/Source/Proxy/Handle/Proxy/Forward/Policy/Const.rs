@@ -13,4 +13,4 @@ use crate::Proxy::Handle::Proxy::Forward::Policy::Struct::Struct as ForwardPolic
 
 /// Three attempts, 100ms doubling, jittered 0.75x-1.25x.
 pub(crate) const Const:ForwardPolicy =
-	ForwardPolicy { MaximumAttempts:3, BaseBackoffMs:100, JitterFloor:0.75, JitterSpan:0.5 };
+	ForwardPolicy { MaximumAttempts:3, Backoff:100, JitterFloor:0.75, JitterSpan:0.5 };

@@ -1,6 +1,6 @@
 //! The store-and-marker step itself.
 
-use aphrodite::State::{Marker::Struct::MarkerEntry, Struct::AphroditeState};
+use aphrodite::State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState};
 
 use crate::Tool::Compress::Classified;
 
@@ -25,9 +25,9 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, Hint:&str, Center:Opti
 	let Hash = aphrodite::Hook::Hash::Fn::Fn(Content);
 	let Preview = aphrodite::Preview::Builder::Entry::Fn(&Resolved.Kind, &Resolved.Body);
 	let Marker =
-		aphrodite::Marker::Format::Entry::CCRMarker(&Hash, &Resolved.Kind, Content.len(), &Preview, None, None, Center);
+		aphrodite::Marker::Format::Entry::Fn(&Hash, &Resolved.Kind, Content.len(), &Preview, None, None, Center);
 
-	State.InlineStorePut(Hash.clone(), Content.to_string());
+	State.Put(Hash.clone(), Content.to_string());
 	State.RecordMarker(MarkerEntry {
 		hash:Hash.clone(),
 		CCRType:Resolved.Kind.clone(),

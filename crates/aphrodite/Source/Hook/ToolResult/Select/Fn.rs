@@ -2,7 +2,7 @@
 
 use crate::Hook::{
 	Reason::Enum::Enum as Reason,
-	Tool::Const::EssentialTools,
+	Tool::Const::Essential,
 	ToolResult::{Input::Struct::Struct as Input, Plan::Enum::Enum as Plan, Policy::Struct::Struct as Policy},
 };
 
@@ -31,14 +31,14 @@ pub(crate) fn Fn<'a>(Policy:&Policy, Input:Input<'a>) -> Plan<'a> {
 	let Content = Input.Content;
 	let Tool = Input.Tool;
 	let Unmarked = !Policy.AutoExpand;
-	let Essential = EssentialTools.contains(&Tool);
+	let Bypass = Essential.contains(&Tool);
 	let Own = Tool.starts_with("aphrodite_") || Tool.starts_with("headroom");
 	let BelowThreshold = Unmarked && Policy.Threshold > 0 && Content.len() < Policy.Threshold;
 	let Live = Policy.Live && Unmarked;
 
 	[
 		(Content.is_empty(), Plan::Passthrough(Reason::Empty)),
-		(Essential, Plan::Passthrough(Reason::EssentialTool)),
+		(Bypass, Plan::Passthrough(Reason::EssentialTool)),
 		(Own, Plan::Passthrough(Reason::SelfTool)),
 		(BelowThreshold, Plan::Passthrough(Reason::BelowThreshold)),
 		(Live, Plan::Live { Input }),

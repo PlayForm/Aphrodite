@@ -26,21 +26,21 @@ use super::{Occurrence, Prefix, Tolerance};
 /// spans, and both are substituted.
 pub(crate) fn Fn(Content:&str) -> Vec<Occurrence::Struct::Struct<'_>> {
 	let mut Occurrences = Vec::new();
-	let mut SearchFrom = 0;
+	let mut Cursor = 0;
 
-	while let Some(Start) = Content[SearchFrom..].find(Prefix::Const) {
-		let AbsStart = SearchFrom + Start;
+	while let Some(Found) = Content[Cursor..].find(Prefix::Const) {
+		let Start = Cursor + Found;
 
-		match Tolerance::Fn::Fn(Content, AbsStart) {
+		match Tolerance::Fn::Fn(Content, Start) {
 			Tolerance::Enum::Enum::Reference { Marker, Hash, End } => {
-				Occurrences.push(Occurrence::Struct::Struct { Span:AbsStart..End, Marker, Hash });
+				Occurrences.push(Occurrence::Struct::Struct { Span:Start..End, Marker, Hash });
 
-				SearchFrom = End;
+				Cursor = End;
 			},
 			// Complete but nameless: nothing to look up, so the scan continues after it.
-			Tolerance::Enum::Enum::Hashless { End } => SearchFrom = End,
+			Tolerance::Enum::Enum::Hashless { End } => Cursor = End,
 			// Unclosed: step over the delimiter itself, not the rest of the text.
-			Tolerance::Enum::Enum::Unterminated => SearchFrom = AbsStart + Prefix::Const.len(),
+			Tolerance::Enum::Enum::Unterminated => Cursor = Start + Prefix::Const.len(),
 		}
 	}
 

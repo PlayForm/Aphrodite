@@ -6,7 +6,7 @@
 
 use serde_json::json;
 
-use crate::Schema::NoParams;
+use crate::Schema::Empty;
 
 /// The `aphrodite_rebuild` tool schema.
 pub(crate) fn Fn() -> serde_json::Value {
@@ -17,6 +17,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			replace itself mid-session - it reports the state an operator needs plus the \
 			command to run outside the session. Takes no arguments. \
 			Returns {status: \"ok\", version, proxies, hint}.",
-		"parameters": NoParams::Fn::Fn()
+		"parameters": Empty::Fn::Fn()
 	})
 }

@@ -12,21 +12,24 @@ use std::sync::Arc;
 use axum::{body::Body, extract::FromRequest, http::StatusCode, response::IntoResponse};
 
 use crate::Proxy::{
-	Body::{Capped::Struct::Struct as CappedBody, Truncate::Fn::Fn as TruncateCharSafe},
-	Request::{Delivery::Enum::Enum as RequestDelivery, Semantics::Fn::Fn as InterpretRequest},
-	Test::Support::State::Fn::{TestState, TestStateWithMaximumBody},
-	Threshold::Const::ChatCompletionsPath,
+	Body::{Capped::Struct::Struct as CappedBody, Truncate::Fn::Fn as Truncate},
+	Request::{
+		Delivery::Enum::Enum as RequestDelivery,
+		Route::Chat::Const::Path,
+		Semantics::Fn::Fn as InterpretRequest,
+	},
+	Test::Support::State::Fn::{TestState, WithLimit},
 };
 
 /// The delivery mode one request body asks for.
-fn Delivery(Body:&[u8]) -> RequestDelivery { InterpretRequest(ChatCompletionsPath, Body, "test-key").Delivery }
+fn Delivery(Body:&[u8]) -> RequestDelivery { InterpretRequest(Path, Body, "test-key").Delivery }
 
 // ── 02-F2: the delivery mode decides which client (bounded vs
 // no-total-timeout) a request goes out on - must read the top-level field real
 // clients send, and fail closed (bounded client) on anything unparseable rather
 // than accidentally going timeout-free for garbage input. ──
 #[test]
-fn TestDeliveryStreamingWhenTopLevelFlagSet() {
+fn TopLevel() {
 	assert!(matches!(
 		Delivery(br#"{"model":"gpt-4o","stream":true}"#),
 		RequestDelivery::Streaming
@@ -34,7 +37,7 @@ fn TestDeliveryStreamingWhenTopLevelFlagSet() {
 }
 
 #[test]
-fn TestDeliveryBufferedWhenAbsentOrFalse() {
+fn Buffered() {
 	assert!(matches!(Delivery(br#"{"model":"gpt-4o"}"#), RequestDelivery::Buffered));
 	assert!(matches!(
 		Delivery(br#"{"model":"gpt-4o","stream":false}"#),
@@ -43,12 +46,12 @@ fn TestDeliveryBufferedWhenAbsentOrFalse() {
 }
 
 #[test]
-fn TestDeliveryBufferedOnInvalidJSON() {
+fn InvalidJSON() {
 	assert!(matches!(Delivery(b"not json"), RequestDelivery::Buffered));
 }
 
 #[test]
-fn TestDeliveryStreamingWithLargeBody() {
+fn LargeBody() {
 	// The flag sits after a large messages array; the parse is the authority, so
 	// position in the body must not matter.
 	let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
@@ -63,7 +66,7 @@ fn TestDeliveryStreamingWithLargeBody() {
 }
 
 #[test]
-fn TestDeliveryIgnoresFlagInsideAStringValue() {
+fn InString() {
 	// The bytes `"stream": true` inside a message string must not decide
 	// anything - only the parsed top-level field does.
 	let body = br#"{"messages":[{"role":"user","content":"the docs say \"stream\": true"}]}"#;
@@ -75,7 +78,7 @@ fn TestDeliveryIgnoresFlagInsideAStringValue() {
 // both of these, so a request could be forwarded on the streaming client (no
 // total timeout) AND be cached. ──
 #[test]
-fn TestDeliveryNestedStreamFlagDoesNotMakeRequestStreaming() {
+fn NestedStream() {
 	// `stream` at the top level is false; a nested object carries a true one.
 	let body = br#"{"model":"m","stream":false,"meta":{"stream": true}}"#;
 
@@ -83,7 +86,7 @@ fn TestDeliveryNestedStreamFlagDoesNotMakeRequestStreaming() {
 }
 
 #[test]
-fn TestDeliveryStreamOptionsIsNotTheStreamFlag() {
+fn StreamOptions() {
 	// `stream_options` is a different field; its nested `"stream":true` is not
 	// the top-level flag.
 	let body = br#"{"model":"m","messages":[],"stream_options":{"stream":true}}"#;
@@ -95,20 +98,20 @@ fn TestDeliveryStreamOptionsIsNotTheStreamFlag() {
 // UTF-8 char (multibyte header values in the dev-mode request log) - the
 // char-boundary panic class the reporter saw in the binary's string table. ──
 #[test]
-fn TestTruncateCharSafeNeverSplitsMultibyte() {
+fn Multibyte() {
 	// All-2-byte chars: 100 bytes, byte 80 lands exactly on a boundary
 	// (char 40) - must truncate to exactly 80 bytes.
-	let Multibyte = "é".repeat(50);
-	let t = TruncateCharSafe(&Multibyte, 80);
+	let Text = "é".repeat(50);
+	let t = Truncate(&Text, 80);
 
 	assert_eq!(t.len(), 80);
-	assert!(Multibyte.starts_with(t), "truncation must be a prefix");
+	assert!(Text.starts_with(t), "truncation must be a prefix");
 	assert!(t.is_char_boundary(t.len()));
 
 	// Mixed 1+2-byte chars so byte 80 lands INSIDE a char: property holds
 	// regardless of where the walk lands.
 	let Mixed = "aé".repeat(40); // 120 bytes, 3-byte units
-	let T2 = TruncateCharSafe(&Mixed, 80);
+	let T2 = Truncate(&Mixed, 80);
 
 	assert!(T2.len() <= 80, "must never exceed the budget: {}", T2.len());
 	assert!(T2.len() >= 77, "must not over-truncate (max 3-byte walk): {}", T2.len());
@@ -116,16 +119,16 @@ fn TestTruncateCharSafeNeverSplitsMultibyte() {
 	assert!(T2.is_char_boundary(T2.len()));
 
 	// Short input and pure-ASCII input pass through unchanged.
-	assert_eq!(TruncateCharSafe("abc", 80), "abc");
-	assert_eq!(TruncateCharSafe(&"x".repeat(100), 80).len(), 80);
+	assert_eq!(Truncate("abc", 80), "abc");
+	assert_eq!(Truncate(&"x".repeat(100), 80).len(), 80);
 }
 
 #[tokio::test]
-async fn TestBodyCapRejectsOverLimitWith413() {
-	let State = Arc::new(TestStateWithMaximumBody(16));
+async fn OverLimit() {
+	let State = Arc::new(WithLimit(16));
 	let Request = axum::extract::Request::builder()
 		.method("POST")
-		.uri(format!("http://x{ChatCompletionsPath}"))
+		.uri(format!("http://x{Path}"))
 		.body(Body::from(vec![b'x'; 32]))
 		.unwrap();
 	let Rejection = CappedBody::from_request(Request, &State).await.unwrap_err();
@@ -135,12 +138,12 @@ async fn TestBodyCapRejectsOverLimitWith413() {
 }
 
 #[tokio::test]
-async fn TestBodyCapAcceptsBodyAtOrUnderLimit() {
-	let State = Arc::new(TestStateWithMaximumBody(16));
+async fn UnderLimit() {
+	let State = Arc::new(WithLimit(16));
 	let body = vec![b'x'; 16];
 	let Request = axum::extract::Request::builder()
 		.method("POST")
-		.uri(format!("http://x{ChatCompletionsPath}"))
+		.uri(format!("http://x{Path}"))
 		.body(Body::from(body.clone()))
 		.unwrap();
 	let Extracted = CappedBody::from_request(Request, &State).await.unwrap();
@@ -149,14 +152,14 @@ async fn TestBodyCapAcceptsBodyAtOrUnderLimit() {
 }
 
 #[tokio::test]
-async fn TestBodyCapNoneIsNoCap() {
+async fn NoCap() {
 	// `max_request_body_size: None` (the default) must read the whole body -
 	// byte-identical current behavior.
 	let State = Arc::new(TestState());
 	let body = vec![b'x'; 8192];
 	let Request = axum::extract::Request::builder()
 		.method("POST")
-		.uri(format!("http://x{ChatCompletionsPath}"))
+		.uri(format!("http://x{Path}"))
 		.body(Body::from(body.clone()))
 		.unwrap();
 	let Extracted = CappedBody::from_request(Request, &State).await.unwrap();

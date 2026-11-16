@@ -8,13 +8,16 @@
 /// about it.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Struct {
-	/// Retrieval guidance level (`minimal`/`standard`/`verbose`).
+	/// `[prompts] retrieve_guidance`; how much retrieval explanation is
+	/// injected per turn (`minimal`/`standard`/`verbose`). `None` = `minimal`.
 	#[serde(rename = "retrieve_guidance")]
-	pub RetrieveGuidance:Option<String>,
-	/// Show the marker hint line alongside compressed output.
+	pub Guidance:Option<String>,
+	/// `[prompts] ccr_marker_hint`; show the marker hint line alongside
+	/// compressed output. `None` = no hint line.
 	#[serde(rename = "ccr_marker_hint")]
-	pub CCRMarkerHint:Option<bool>,
-	/// Annotate recall-catalog rows with `intent=read`.
+	pub Hint:Option<bool>,
+	/// `[prompts] catalog_intent_hints`; annotate recall-catalog rows with
+	/// `intent=read`. `None` = no annotation.
 	#[serde(rename = "catalog_intent_hints")]
-	pub CatalogIntentHints:Option<bool>,
+	pub Intent:Option<bool>,
 }

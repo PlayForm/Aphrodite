@@ -15,9 +15,13 @@ use crate::Tool::Registry;
 /// `|args| {...}` literal. A handler may not panic - the C ABI wraps every call
 /// in `catch_unwind`, so a panic degrades to an error JSON rather than aborting
 /// the host process, but it also loses the caller's real result.
-pub type ToolHandler = fn(args:&serde_json::Value) -> Value;
+pub type Handler = fn(args:&serde_json::Value) -> Value;
 
 /// Dispatch a tool by name. Returns `{"error": "..."}` for unknown tools.
+///
+/// `Raw` is the argument JSON exactly as Hermes sent it: parsed once here, never
+/// logged (args can carry a whole file body), and `""` degrades to an
+/// `invalid args` error object rather than a panic.
 ///
 /// An unknown name and an unparseable payload are both reported as `error`
 /// objects rather than `null`, because a tool result that is not an object reads
@@ -30,7 +34,7 @@ pub type ToolHandler = fn(args:&serde_json::Value) -> Value;
 /// the current turn's (`Debug::Session::Last`) - the same resolution
 /// `Session::With::Fn::with_shared` uses, hoisted here so a tool call and the
 /// state it touches are attributed to one session in the log.
-pub fn Fn(Name:&str, ArgsJSON:&str) -> Value {
+pub fn Fn(Name:&str, Raw:&str) -> Value {
 	// First real body a tool call runs through: install the subscriber here as
 	// well as on the hook path, because a host may call a tool before any hook
 	// fires (`Debug::Init` is a no-op on the second call).
@@ -44,7 +48,7 @@ pub fn Fn(Name:&str, ArgsJSON:&str) -> Value {
 
 	match Handlers.get(Name) {
 		Some(Handler) => {
-			let Args:Value = match serde_json::from_str(ArgsJSON) {
+			let Args:Value = match serde_json::from_str(Raw) {
 				Ok(Args) => Args,
 				Err(e) => {
 					// The message names the failure, never the payload: args can

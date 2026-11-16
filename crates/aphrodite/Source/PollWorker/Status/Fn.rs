@@ -9,20 +9,24 @@ use crate::{
 	PollWorker::{
 		Registry::{Iterate::Fn::Fn as Iterate, ReadFrom::Fn::Fn as ReadFrom},
 		Status::Detail::Fn::Fn as Detail,
-		Task::{Status::Enum::BgStatus, Struct::BgTask},
+		Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 	},
 	State::Struct::AphroditeState,
 };
 
 /// Render bg task status lines for injection into `BuildTurnContext`.
 /// Returns empty string if no active tasks.
-pub fn RenderBgTaskStatus(State:&AphroditeState) -> String {
+///
+/// The empty string is the contract, not a fallback: a turn with no running task
+/// renders no section at all, so a quiet turn stays byte-identical to a turn from
+/// before the poll worker existed.
+pub fn Fn(State:&AphroditeState) -> String {
 	let Tasks = ReadFrom(&State.BgTasks);
 	// The feature flag is part of the renderer's contract, not a caller's: a disabled
 	// poll worker renders no section at all, so "the feature is off" and "nothing is
 	// running" produce the same empty string and cannot drift apart.
-	let Active:Vec<&BgTask> = Iterate(&Tasks)
-		.filter(|Task| State.PollWorkerEnabled && Task.Status == BgStatus::Running)
+	let Active:Vec<&Record> = Iterate(&Tasks)
+		.filter(|Task| State.PollWorkerEnabled && Task.Status == Status::Running)
 		.collect();
 
 	Active

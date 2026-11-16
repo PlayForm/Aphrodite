@@ -1,4 +1,4 @@
-//! `EmitDebugRecord`: the same record, into the `tracing` stack.
+//! `Emit`: the same record, into the `tracing` stack.
 
 /// Emit one already-formatted debug record as a `tracing` event.
 ///

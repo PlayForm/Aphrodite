@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use crate::Debug::{
 	Runtime,
-	Session::{Record::Resolve, State::LAST_SESSION},
+	Session::{Record::Resolve, State::Current},
 };
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
@@ -26,11 +26,11 @@ pub(crate) fn Fn(Session:&str, Parent:&str) {
 	(!Session.is_empty())
 		.then(|| {
 			{
-				let mut Last = LAST_SESSION
+				let mut Held = Current
 					.get_or_init(|| Mutex::new(String::new()))
 					.lock()
 					.unwrap_or_else(std::sync::PoisonError::into_inner);
-				*Last = Session.to_string();
+				*Held = Session.to_string();
 			}
 
 			// Persist across process restarts: a fresh Hermes process (and every

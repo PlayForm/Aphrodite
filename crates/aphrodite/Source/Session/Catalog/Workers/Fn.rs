@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::PollWorker::Task::{Status::Enum::BgStatus, Struct::BgTask};
+use crate::PollWorker::Task::{Status::Enum::Enum as Status, Struct::Struct as Record};
 
 /// How many poll workers are still running, when the feature is on and any are.
 ///
@@ -12,8 +12,8 @@ use crate::PollWorker::Task::{Status::Enum::BgStatus, Struct::BgTask};
 /// The line names the verb the agent should use (`process(action='poll')`)
 /// because a running task is useless information without it: the model would
 /// otherwise wait for a completion notification that never arrives.
-pub(crate) fn Fn(Enabled:bool, Tasks:&VecDeque<BgTask>) -> Option<String> {
-	let Active = Tasks.iter().filter(|Task| Task.Status == BgStatus::Running).count();
+pub(crate) fn Fn(Enabled:bool, Tasks:&VecDeque<Record>) -> Option<String> {
+	let Active = Tasks.iter().filter(|Task| Task.Status == Status::Running).count();
 
 	(Enabled && Active > 0).then(|| format!("{Active} active poll worker(s). Use process(action='poll')."))
 }

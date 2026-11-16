@@ -13,20 +13,20 @@
 //! from a retrieve bug.
 
 use crate::{
-	Prefetch::{Arrival::Struct::LiveArrival, Prepared::Struct::Prepared, Record::Enum::Record},
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	Prefetch::{Arrival::Struct::Struct as Arrival, Prepared::Struct::Prepared, Record::Enum::Record},
+	State::{Marker::Struct::Struct as Entry, Struct::AphroditeState},
 };
 
 /// Put the content in the store, record its marker and file entry, report it loaded.
 pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared, ArrivedAtUnix:u64) -> Record {
 	let Prepared { Path, Content, Hash, Type, Preview, Size } = Prepared;
 
-	State.InlineStorePut(Hash.as_str().to_string(), Content);
+	State.Put(Hash.as_str().to_string(), Content);
 
 	// The store decides whether the content is still there: an entry the budget
 	// evicted immediately is a listed hash that cannot resolve, so the hash it lost
 	// is what the warning reports.
-	(!State.InlineStoreContains(Hash.as_str()))
+	(!State.Contains(Hash.as_str()))
 		.then_some(Hash.as_str())
 		.into_iter()
 		.for_each(|Hash| {
@@ -37,7 +37,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared, ArrivedAtUnix:u64
 			);
 		});
 
-	State.RecordMarker(MarkerEntry {
+	State.RecordMarker(Entry {
 		hash:Hash.as_str().to_string(),
 		CCRType:Type.clone(),
 		Size,
@@ -56,7 +56,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared, ArrivedAtUnix:u64
 			// only `path` (byte-identical current behavior).
 			let Live = State
 				.LiveContainer
-				.then(|| LiveArrival::Arrived(Size as u64, ArrivedAtUnix))
+				.then(|| Arrival::Arrived(Size as u64, ArrivedAtUnix))
 				.into_iter()
 				.flat_map(|Arrival| {
 					[

@@ -25,5 +25,5 @@ use crate::ABI::{Boundary::Handle::Fn::Fn as HandleID, Handle::Registry::Const::
 /// there is no allocation to release.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn AphroditeDestroy(Handle:*const c_char) {
-	let _ = unsafe { HandleID(Handle) }.map(|Hid| Handles.Remove(Hid));
+	let _ = unsafe { HandleID(Handle) }.map(|Identity| Handles.Remove(Identity));
 }

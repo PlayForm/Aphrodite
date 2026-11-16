@@ -6,7 +6,7 @@ use aphrodite::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
 
 use crate::{
 	Boot::{Route, State::Listener::Bound},
-	Guard::Token::Fn::MgmtToken,
+	Guard::Token::Fn::Fn as MgmtToken,
 };
 
 /// The one-time notice printed when the management routes carry no credential.
@@ -39,9 +39,9 @@ pub async fn Serve(Bound:Bound, mut ShutdownRx:tokio::sync::watch::Receiver<bool
 		name = %Name,
 		Listen = %CLI.Listen,
 		Mode = %ModeStr,
-		APIURL = %CLI.APIURL,
+		APIURL = %CLI.URL,
 		Model = %CLI.Model,
-		ToolRelay = CLI.ToolRelay,
+		ToolRelay = CLI.Relay,
 		"proxy starting"
 	);
 

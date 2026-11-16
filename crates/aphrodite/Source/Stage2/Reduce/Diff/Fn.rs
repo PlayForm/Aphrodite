@@ -25,7 +25,7 @@ const FilesShown:usize = 50;
 /// The file sections go through the same bounded sample as every other reducer, because a
 /// generated diff can carry thousands of files: the header keeps the exact file count while only
 /// the first `FilesShown` sections are retained, and a section past the cap is never formatted.
-pub fn ReduceDiff(Content:&str) -> Option<String> {
+pub fn Fn(Content:&str) -> Option<String> {
 	let mut State = State::new();
 	let mut Files = Sample::<Summary, FilesShown>::new();
 
@@ -47,7 +47,7 @@ fn Render(Files:Sample<Summary, FilesShown>) -> String {
 
 	Parts.extend(
 		Files
-			.IntoSample()
+			.Take()
 			.into_iter()
 			.map(|File| format!("  {} ({} hunks)", File.Header, File.Hunks)),
 	);

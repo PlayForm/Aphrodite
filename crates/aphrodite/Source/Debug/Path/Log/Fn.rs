@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::Debug::{Path::ForRoot::Fn::Fn as LogPathForRoot, Root::Current::Fn::Fn as CurrentRootSession};
+use crate::Debug::{Path::ForRoot::Fn::Fn as ForRoot, Root::Current::Fn::Fn as Current};
 
 /// The per-session debug log path; `None` until a root session is known
 /// (the bridge publishes it on the first `PreLLMCall`).
@@ -13,7 +13,7 @@ use crate::Debug::{Path::ForRoot::Fn::Fn as LogPathForRoot, Root::Current::Fn::F
 /// and `then` is what expresses it - the empty id produces no path rather than a
 /// path that has to be rejected downstream.
 pub(crate) fn Fn() -> Option<PathBuf> {
-	let Root = CurrentRootSession();
+	let Root = Current();
 
-	(!Root.is_empty()).then(|| LogPathForRoot(&Root))
+	(!Root.is_empty()).then(|| ForRoot(&Root))
 }

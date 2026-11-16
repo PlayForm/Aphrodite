@@ -6,20 +6,24 @@
 //! `aphrodite.toml`. It takes the configuration as an argument now.
 
 use crate::Session::{
-	Registry::Struct::session_state,
-	Watcher::{Apply::Fn::Fn as apply, Continue::Fn::Fn as keep_watching, Outcome},
+	Registry::Get,
+	Watcher::{self, Outcome},
 };
 
 const PROBE_SESSION:&str = "probe-apply";
 
-fn config_from(Toml:&str) -> aphrodite::ConfigurationLoader::Configuration::Struct::Struct {
+/// Load a configuration from a TOML string, through a throwaway file.
+///
+/// `Configuration::Load::File::Read` takes a path, so the probe writes one and
+/// removes it immediately: the point is the PARSED document, not the file.
+fn Load(Toml:&str) -> aphrodite::ConfigurationLoader::Configuration::Struct::Struct {
 	let Stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
 		.as_nanos();
 	let Path = std::env::temp_dir().join(format!("aphrodite-watcher-apply-{Stamp}.toml"));
 	std::fs::write(&Path, Toml).unwrap();
-	let Configuration = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(Path.to_str().unwrap());
+	let Configuration = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Read(Path.to_str().unwrap());
 	let _ = std::fs::remove_file(&Path);
 
 	Configuration
@@ -27,21 +31,22 @@ fn config_from(Toml:&str) -> aphrodite::ConfigurationLoader::Configuration::Stru
 
 // ── A good config reaches the session: the reload must apply new thresholds
 // while leaving the runtime-owned directive selection alone (the contract
-// `apply_config_reload` owns, asserted here at the watcher's own entry point). ──
+// `Configuration::Reload::Fn::Fn` owns, asserted here at the watcher's own
+// entry point). ──
 #[test]
 fn probe_apply_reaches_the_registered_session() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 
-	let State = session_state(PROBE_SESSION);
+	let State = Get::Fn::Fn(PROBE_SESSION);
 	State
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
 		.TerminalThreshold = 1024;
 
-	let Configuration = config_from("[compression]\nterminal_threshold = 2048\n");
+	let Configuration = Load("[compression]\nterminal_threshold = 2048\n");
 	assert!(Configuration.ParseFailure.is_none(), "the probe config must parse");
 
-	let Pass = apply(&Configuration);
+	let Pass = Watcher::Apply::Fn::Fn(&Configuration);
 
 	match &Pass {
 		Outcome::Enum::Enum::Applied(Report) => {
@@ -58,7 +63,7 @@ fn probe_apply_reaches_the_registered_session() {
 			// matters is that the report cannot claim more reload-wanting
 			// sessions than it reached.
 			assert!(
-				Report.WantsReload <= Report.Applied,
+				Report.Reload <= Report.Applied,
 				"the reload count must be a subset of the sessions the sweep reached"
 			);
 		},
@@ -79,17 +84,17 @@ fn probe_apply_reaches_the_registered_session() {
 fn probe_apply_reports_a_parse_failure_and_keeps_watching() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 
-	let State = session_state(PROBE_SESSION);
+	let State = Get::Fn::Fn(PROBE_SESSION);
 	{
 		let mut Guard = State.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		Guard.TerminalThreshold = 1024;
 		Guard.ConfigurationError = None;
 	}
 
-	let Broken = config_from("[compression\nterminal_threshold = 2048\n");
+	let Broken = Load("[compression\nterminal_threshold = 2048\n");
 	assert!(Broken.ParseFailure.is_some(), "the probe config must fail to parse");
 
-	let Pass = apply(&Broken);
+	let Pass = Watcher::Apply::Fn::Fn(&Broken);
 
 	let Guard = State.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	assert!(
@@ -97,7 +102,7 @@ fn probe_apply_reports_a_parse_failure_and_keeps_watching() {
 		"a parse failure must be a Failed pass, never an Applied one that applied nothing"
 	);
 	assert!(
-		keep_watching(&Pass),
+		Watcher::Continue::Fn::Fn(&Pass),
 		"a parse failure must keep watching: the next successful write clears it"
 	);
 	assert_eq!(Guard.TerminalThreshold, 1024, "a broken file must keep the previous values");

@@ -15,12 +15,22 @@ pub enum Enum {
 	/// proxy.
 	Setup {
 		/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
-		#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
-		APIKey:Option<String>,
+		#[arg(
+			long = "api-key",
+			value_name = "API_KEY",
+			env = "APHRODITE_API_KEY",
+			hide_env_values = true
+		)]
+		Key:Option<String>,
 
 		/// Upstream API base URL.
-		#[arg(long, env = "APHRODITE_API_URL", default_value = "")]
-		APIURL:String,
+		#[arg(
+			long = "apiurl",
+			value_name = "APIURL",
+			env = "APHRODITE_API_URL",
+			default_value = ""
+		)]
+		URL:String,
 
 		/// Model name to forward.
 		#[arg(long, env = "APHRODITE_MODEL", default_value = "")]
@@ -28,20 +38,30 @@ pub enum Enum {
 
 		/// Cache proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
-		#[arg(long, env = "APHRODITE_CACHE_PORT", default_value = "9797")]
-		CachePort:u16,
+		#[arg(
+			long = "cache-port",
+			value_name = "CACHE_PORT",
+			env = "APHRODITE_CACHE_PORT",
+			default_value = "9797"
+		)]
+		Cache:u16,
 
 		/// Token proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
-		#[arg(long, env = "APHRODITE_TOKEN_PORT", default_value = "9798")]
-		TokenPort:u16,
+		#[arg(
+			long = "token-port",
+			value_name = "TOKEN_PORT",
+			env = "APHRODITE_TOKEN_PORT",
+			default_value = "9798"
+		)]
+		Token:u16,
 
 		/// Skip launching the proxy after setup.
-		#[arg(long)]
+		#[arg(long = "no-launch")]
 		NoLaunch:bool,
 
 		/// Force re-setup even if already installed.
-		#[arg(long)]
+		#[arg(long = "force")]
 		Force:bool,
 	},
 }

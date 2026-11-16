@@ -7,7 +7,7 @@
 
 use std::sync::Mutex;
 
-use crate::Debug::{Runtime, Session::State::LAST_SESSION};
+use crate::Debug::{Runtime, Session::State::Current};
 
 /// The most recently seen session id (the current LLM turn's session, set by
 /// `pre_llm_call`). Fallback for hooks Hermes does NOT thread session_id
@@ -15,7 +15,7 @@ use crate::Debug::{Runtime, Session::State::LAST_SESSION};
 /// returncode/task_id/env_type (terminal_tool_result.py:144), so the terminal
 /// arm falls back to this instead of losing the session scope.
 ///
-/// Persists across process restarts: `record_session` also writes the id to
+/// Persists across process restarts: `Record::Fn::Fn` also writes the id to
 /// a tiny file in the runtime home, and a fresh process (or separate shim
 /// exec) starts with empty Rust statics and falls back to reading that file.
 /// Without this, terminal output with no prior `pre_llm_call` would have no
@@ -25,16 +25,19 @@ use crate::Debug::{Runtime, Session::State::LAST_SESSION};
 /// so two concurrent Hermes processes share one `session.current` and the
 /// fallback can name the other process's session. That is accepted - the
 /// fallback only applies before this process has seen a turn.
+///
+/// An empty string means "nothing recorded and nothing persisted", which the
+/// callers read as no session context rather than inventing one.
 pub(crate) fn Fn() -> String {
 	{
-		let last = LAST_SESSION
+		let Guard = Current
 			.get_or_init(|| Mutex::new(String::new()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
 
-		match last.as_str() {
+		match Guard.as_str() {
 			"" => {},
-			session => return session.to_string(),
+			Session => return Session.to_string(),
 		}
 	}
 

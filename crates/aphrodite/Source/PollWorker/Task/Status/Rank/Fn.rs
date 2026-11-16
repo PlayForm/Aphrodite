@@ -5,13 +5,13 @@
 //! the agent still expects to poll - so evicting a running task is the last
 //! resort it always was.
 
-use crate::PollWorker::Task::Status::Enum::BgStatus;
+use crate::PollWorker::Task::Status::Enum::Enum as Status;
 
 /// Eviction rank: lower is evicted sooner.
-pub(crate) fn Fn(Status:&BgStatus) -> u8 {
+pub(crate) fn Fn(Status:&Status) -> u8 {
 	match Status {
-		BgStatus::Stale => 0,
-		BgStatus::Done { .. } | BgStatus::Failed { .. } => 1,
-		BgStatus::Running => 2,
+		Status::Stale => 0,
+		Status::Done { .. } | Status::Failed { .. } => 1,
+		Status::Running => 2,
 	}
 }

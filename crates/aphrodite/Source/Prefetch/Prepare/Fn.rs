@@ -1,6 +1,6 @@
 //! Turn a read file into a prepared one, with no state access.
 
-use crate::{Prefetch::Prepared::Struct::Prepared, State::Identity::Content::Struct::ContentHash};
+use crate::{Prefetch::Prepared::Struct::Prepared, State::Identity::Content::Struct::Struct as Digest};
 
 /// Classify, hash and preview `Content`, and record its length.
 ///
@@ -13,7 +13,7 @@ pub(crate) fn Fn(Path:String, Content:String) -> Prepared {
 		.content_type
 		.as_str()
 		.to_string();
-	let Hash = ContentHash::from(headroom_core::ccr::compute_key(Content.as_bytes()));
+	let Hash = Digest::from(headroom_core::ccr::compute_key(Content.as_bytes()));
 	let Preview = crate::Preview::Builder::Entry::Fn(&Type, &Content);
 	let Size = Content.len();
 

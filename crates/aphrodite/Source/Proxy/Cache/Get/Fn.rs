@@ -33,7 +33,7 @@ use crate::Proxy::{
 pub(crate) fn Fn(State:&AppState, Identity:&CacheIdentity, Now:Instant) -> Option<Bytes> {
 	State.ResponseCache.lock().ok().and_then(|mut Cache| {
 		let Standing = Cache.peek(Identity).map_or(Freshness::Expired, |Entry| {
-			ClassifyFreshness(Entry.StoredAt, Now, State.ResponseCacheTtl)
+			ClassifyFreshness(Entry.StoredAt, Now, State.CacheTtl)
 		});
 
 		match Standing {

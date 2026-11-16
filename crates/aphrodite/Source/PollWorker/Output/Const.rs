@@ -6,4 +6,4 @@
 /// taken before an append cannot bound an append whose size it never looked at,
 /// which is how the accumulator used to exceed its own stated cap by one whole
 /// poll payload.
-pub(crate) const MaximumAccumulatedBytes:usize = 256 * 1024;
+pub(crate) const Maximum:usize = 256 * 1024;

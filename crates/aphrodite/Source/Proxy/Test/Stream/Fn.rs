@@ -6,18 +6,18 @@ use std::sync::Arc;
 use axum::response::IntoResponse;
 
 use crate::Proxy::{
-	Cache::{Get::Fn::Fn as ResponseCacheGet, Identity::Struct::Struct as CacheIdentity},
+	Cache::{Get::Fn::Fn as Get, Identity::Struct::Struct as CacheIdentity},
 	Handle::Proxy::Fn::Fn as ProxyHandler,
+	Request::Route::Chat::Const::Path,
 	Test::Support::{
 		State::Fn::TestState,
-		Upstream::Fn::{HeaderValue, SpawnMockUpstream, TestRequest},
+		Upstream::Fn::{HeaderValue, Spawn, TestRequest},
 	},
-	Threshold::Const::ChatCompletionsPath,
 	Upstream::Media::{Enum::Enum as UpstreamMedia, Fn::Fn as ClassifyMedia},
 };
 
 #[test]
-fn TestClassifyMediaExactMatch() {
+fn Exact() {
 	assert!(matches!(
 		ClassifyMedia(Some(&HeaderValue("text/event-stream"))),
 		UpstreamMedia::EventStream
@@ -25,7 +25,7 @@ fn TestClassifyMediaExactMatch() {
 }
 
 #[test]
-fn TestClassifyMediaPrefixMatchWithCharset() {
+fn Charset() {
 	assert!(matches!(
 		ClassifyMedia(Some(&HeaderValue("text/event-stream; charset=utf-8"))),
 		UpstreamMedia::EventStream
@@ -33,7 +33,7 @@ fn TestClassifyMediaPrefixMatchWithCharset() {
 }
 
 #[test]
-fn TestClassifyMediaRejectsNonEventStreamContentTypes() {
+fn Reject() {
 	assert!(matches!(
 		ClassifyMedia(Some(&HeaderValue("application/json"))),
 		UpstreamMedia::Buffered
@@ -50,13 +50,13 @@ fn TestClassifyMediaRejectsNonEventStreamContentTypes() {
 }
 
 #[test]
-fn TestClassifyMediaMissingHeaderIsBuffered() {
+fn Missing() {
 	assert!(matches!(ClassifyMedia(None), UpstreamMedia::Buffered));
 }
 
 #[tokio::test]
-async fn TestSSEResponseIsStreamedWithHeaderAndNotCached() {
-	let Addr = SpawnMockUpstream(
+async fn Streamed() {
+	let Addr = Spawn(
 		"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nConnection: close\r\n\r\ndata: \
 		 {\"delta\":\"hi\"}\n\ndata: [DONE]\n\n",
 	)
@@ -68,7 +68,7 @@ async fn TestSSEResponseIsStreamedWithHeaderAndNotCached() {
 
 	// Non-streaming request body (no "stream": true) - proves the SSE
 	// path is driven by the upstream's Content-Type, not the request.
-	let (s, m, p, h, b) = TestRequest(State.clone(), ChatCompletionsPath, r#"{"model":"x","messages":[]}"#);
+	let (s, m, p, h, b) = TestRequest(State.clone(), Path, r#"{"model":"x","messages":[]}"#);
 	let response = ProxyHandler(s, m, p, h, b).await.into_response();
 
 	assert_eq!(
@@ -88,17 +88,15 @@ async fn TestSSEResponseIsStreamedWithHeaderAndNotCached() {
 	let Identity = CacheIdentity::New(&serde_json::json!({"model":"x","messages":[]}), State.APIKey.Expose());
 
 	assert!(
-		ResponseCacheGet(&State, &Identity, std::time::Instant::now()).is_none(),
+		Get(&State, &Identity, std::time::Instant::now()).is_none(),
 		"SSE response must not be cached"
 	);
 }
 
 #[tokio::test]
-async fn TestNonSSEResponseIsNotStreamed() {
-	let Addr = SpawnMockUpstream(
-		"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}",
-	)
-	.await;
+async fn Plain() {
+	let Addr =
+		Spawn("HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}").await;
 
 	let mut State = TestState();
 	State.APIURL = format!("http://{Addr}");

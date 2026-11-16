@@ -30,7 +30,7 @@ const LineShown:usize = 200;
 ///
 /// It is not a compiler: nothing is resolved, and a line that starts with `error:` is counted by
 /// the summary group rather than the error group.
-pub fn ReduceBuild(Content:&str) -> Option<String> {
+pub fn Fn(Content:&str) -> Option<String> {
 	let mut Summaries = Sample::<String, SummariesShown>::new();
 	let mut Errors = Sample::<String, ErrorsShown>::new();
 	let mut Warnings = Sample::<String, WarningsShown>::new();
@@ -53,9 +53,9 @@ pub fn ReduceBuild(Content:&str) -> Option<String> {
 	// One entry per group: its header and the lines it kept. A group that kept nothing has no
 	// entry, so the table decides what the reduction holds instead of three tests deciding it.
 	let Parts:Vec<String> = [
-		HasSummaries.then(|| ("[build summary]".to_string(), Summaries.IntoSample())),
-		HasErrors.then(|| (format!("[{} errors]", Errors.Total()), Errors.IntoSample())),
-		HasWarnings.then(|| (format!("[{} warnings]", Warnings.Total()), Warnings.IntoSample())),
+		HasSummaries.then(|| ("[build summary]".to_string(), Summaries.Take())),
+		HasErrors.then(|| (format!("[{} errors]", Errors.Total()), Errors.Take())),
+		HasWarnings.then(|| (format!("[{} warnings]", Warnings.Total()), Warnings.Take())),
 	]
 	.into_iter()
 	.flatten()

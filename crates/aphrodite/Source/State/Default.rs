@@ -1,7 +1,7 @@
 //! The seed state every session starts from.
 //!
 //! The hermes bridge clones a config-seeded `AphroditeState` per session, so
-//! these values are the defaults a session has before `ApplyCompression` runs
+//! these values are the defaults a session has before `Apply::Startup::Fn` runs
 //! over it. Two of them are deliberately NOT the shipped configuration:
 //! `ChainSplitEnabled` and `AutoExpand` start false here so the shipped
 //! default is reachable through the config layer alone, and a missing config

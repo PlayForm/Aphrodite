@@ -74,7 +74,7 @@ pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
 				Plan.Context.PluginDirectory.display()
 			);
 		},
-		Ownership::Enum::Enum::Dev | Ownership::Enum::Enum::DevStaleSymlink => {
+		Ownership::Enum::Enum::Dev | Ownership::Enum::Enum::Stale => {
 			println!("  hooks registered (loader only): {}", Plan.Context.PluginDirectory.display());
 		},
 	}

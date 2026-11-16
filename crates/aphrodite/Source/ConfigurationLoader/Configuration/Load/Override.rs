@@ -9,5 +9,5 @@ impl Struct {
 	/// consulted first in every resolution chain, ahead of the environment
 	/// itself, so setting one is the way to force a value that the process
 	/// environment and the file would otherwise disagree about.
-	pub fn SetOverride(&mut self, Key:&str, Value:&str) { self.Overrides.insert(Key.to_string(), Value.to_string()); }
+	pub fn Set(&mut self, Key:&str, Value:&str) { self.Overrides.insert(Key.to_string(), Value.to_string()); }
 }

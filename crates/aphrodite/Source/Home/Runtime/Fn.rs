@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::Opt::Fn::Fn as RuntimeHomeOpt;
+use super::Opt::Fn::Fn as Opt;
 
 /// Runtime home (the user-data folder that holds `aphrodite.toml`,
 /// `binaries/`, `directives/`, `ccr.db`, logs).
@@ -11,4 +11,4 @@ use super::Opt::Fn::Fn as RuntimeHomeOpt;
 /// for callers that need it. The `.` fallback is not a usable home: it exists
 /// so a misconfigured process reads a relative path and fails on the first
 /// file operation instead of panicking during resolution.
-pub fn Fn() -> PathBuf { RuntimeHomeOpt().unwrap_or_else(|| PathBuf::from(".")) }
+pub fn Fn() -> PathBuf { Opt().unwrap_or_else(|| PathBuf::from(".")) }

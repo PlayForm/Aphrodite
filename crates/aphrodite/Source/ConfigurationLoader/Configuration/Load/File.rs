@@ -3,20 +3,20 @@
 use std::collections::HashMap;
 
 use super::super::Struct::Struct;
-use crate::ConfigurationLoader::Warn::Fn::WarnParseFailure;
+use crate::ConfigurationLoader::Warn::Fn::Fn as Warn;
 
 impl Struct {
 	/// Load from an explicit TOML file path, bypassing `load()`'s search
 	/// paths - used by `AphroditeInit` (01-F4/F9) so the handle-based C ABI
 	/// init path shares this type's parsing/section/env-override logic
 	/// instead of hand-parsing four `[compression]` keys directly (which had
-	/// silently drifted from `ApplyCompression`'s own key names and never
+	/// silently drifted from `Apply::Startup::Fn`'s own key names and never
 	/// honored env var overrides at all).
 	///
 	/// Unlike `load()` there is no next candidate to fall through to: a file
 	/// that exists but does not parse degrades to defaults immediately, with
 	/// the parse error warned about and recorded on `ParseFailure`.
-	pub fn LoadFrom(path:&str) -> Self {
+	pub fn Read(path:&str) -> Self {
 		match std::fs::read_to_string(path) {
 			Ok(Content) => {
 				match Content.parse::<toml::Table>() {
@@ -26,7 +26,7 @@ impl Struct {
 						// as `load()` - the explicit-path init used to silently
 						// fall back to defaults on a broken file. `ParseFailure`
 						// is recorded so `AphroditeStats` can self-diagnose.
-						WarnParseFailure(std::path::Path::new(path), &Error, "using defaults");
+						Warn(std::path::Path::new(path), &Error, "using defaults");
 
 						Self {
 							raw:toml::Table::new(),

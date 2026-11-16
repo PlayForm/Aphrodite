@@ -1,6 +1,6 @@
-//! `CurrentRootSession`: the in-process id, or the persisted one.
+//! `Current`: the in-process id, or the persisted one.
 
-use crate::Debug::{Path::Runtime::Fn::Fn as DebugRuntimeHome, Root::Const::RootSession};
+use crate::Debug::{Path::Runtime::Fn::Fn as Runtime, Root::Const::RootSession};
 
 /// Resolve the current root session id: the in-process static, falling back
 /// to the `session.current` file the bridge persists across restarts.
@@ -26,7 +26,7 @@ pub fn Fn() -> String {
 	};
 
 	InProcess.unwrap_or_else(|| {
-		std::fs::read_to_string(DebugRuntimeHome().join("session.current"))
+		std::fs::read_to_string(Runtime().join("session.current"))
 			.ok()
 			.map(|s| s.trim().to_string())
 			.unwrap_or_default()

@@ -10,7 +10,9 @@ use crate::State::Struct::AphroditeState;
 /// Build the one-shot first-turn injection from the configured `SessionInject`
 /// template. Returns empty string if `state.session_inject` is empty or the
 /// turn has advanced past 0 (first-turn only).
-pub fn BuildFirstTurnInjection(State:&AphroditeState) -> String {
+///
+/// Empty string = no section this turn.
+pub fn Fn(State:&AphroditeState) -> String {
 	// The template is the value: it is present only on turn 0 with a configured
 	// injection, and the substitution runs only when it is.
 	let Template = (!State.SessionInject.is_empty() && State.TurnCounter == 0).then_some(State.SessionInject.as_str());

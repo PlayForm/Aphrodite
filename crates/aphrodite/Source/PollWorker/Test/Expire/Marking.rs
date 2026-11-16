@@ -2,15 +2,15 @@
 //! polls that must not trip it.
 
 use crate::{
-	PollWorker::{Expire::Fn::ExpireStaleTasks, Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus},
+	PollWorker::{Expire::Fn::Fn as Expire, Insert::Fn::Fn as Insert, Task::Status::Enum::Enum as Status},
 	State::Struct::AphroditeState,
 };
 
 #[test]
-fn TestExpireStaleTasks() {
+fn All() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 20;
-	InsertBgTask(
+	Insert(
 		&mut State,
 		"stale".into(),
 		"terminal".into(),
@@ -20,25 +20,25 @@ fn TestExpireStaleTasks() {
 	// Never polled - gap from turn 20 to last_poll 10 = 10 > STALE_TURN_AGE(8).
 	State.BgTasks[0].LastPollTurn = 10;
 
-	ExpireStaleTasks(&mut State);
+	Expire(&mut State);
 	assert_eq!(
 		State.BgTasks[0].Status,
-		BgStatus::Stale,
+		Status::Stale,
 		"unpolled task at turn 20 should be stale (last poll: turn 10, gap=10 > 8)"
 	);
 }
 
 #[test]
-fn TestExpireStaleDoesNotTouchRecentlyPolledTasks() {
+fn Recent() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 20;
-	InsertBgTask(&mut State, "active".into(), "terminal".into(), "recent-cmd".into(), 15);
+	Insert(&mut State, "active".into(), "terminal".into(), "recent-cmd".into(), 15);
 	State.BgTasks[0].LastPollTurn = 19; // polled just one turn ago
 
-	ExpireStaleTasks(&mut State);
+	Expire(&mut State);
 	assert_eq!(
 		State.BgTasks[0].Status,
-		BgStatus::Running,
+		Status::Running,
 		"recently polled task must not be marked stale"
 	);
 }

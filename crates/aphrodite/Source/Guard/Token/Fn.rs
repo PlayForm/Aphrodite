@@ -1,7 +1,10 @@
 //! Reading `APHRODITE_MGMT_TOKEN` - the one credential the management routes
 //! check.
 
-/// 02-F1: `LoopbackOnly`'s peer-IP + Host check stops a remote peer and a
+/// Environment contract: `APHRODITE_MGMT_TOKEN`, read fresh on every request;
+/// `None` means unset or empty, which disables the bearer gate entirely.
+///
+/// 02-F1: `Loopback::Middleware::Fn`'s peer-IP + Host check stops a remote peer and a
 /// DNS-rebinding *read* - but a hostile local page can still issue a CORS
 /// "simple request" write (`fetch(..., {method:"POST", mode:"no-cors"})`
 /// never preflights, and the browser genuinely is a loopback client with a
@@ -21,4 +24,4 @@
 /// Back-compat default: if `APHRODITE_MGMT_TOKEN` is unset, every request
 /// passes (unchanged behavior) - `run_single` logs one startup `warn!` so an
 /// operator relying on that default isn't silently unprotected.
-pub fn MgmtToken() -> Option<String> { std::env::var("APHRODITE_MGMT_TOKEN").ok().filter(|s| !s.is_empty()) }
+pub fn Fn() -> Option<String> { std::env::var("APHRODITE_MGMT_TOKEN").ok().filter(|Token| !Token.is_empty()) }

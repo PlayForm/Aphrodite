@@ -18,17 +18,9 @@ use super::super::Enum::Enum;
 /// describe a parse failure.
 pub(crate) fn Fn(Second:Option<&str>) -> Option<Enum> {
 	(Second == Some("setup")).then(CLI::parse).and_then(|CLI:CLI| {
-		match CLI.command {
-			Some(Command::Setup { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force }) => {
-				Some(Enum::Setup(SetupArgs {
-					APIKey,
-					APIURL,
-					Model,
-					CachePort,
-					TokenPort,
-					NoLaunch,
-					Force,
-				}))
+		match CLI.Command {
+			Some(Command::Setup { Key, URL, Model, Cache, Token, NoLaunch, Force }) => {
+				Some(Enum::Setup(SetupArgs { Key, URL, Model, Cache, Token, NoLaunch, Force }))
 			},
 			Some(Command::Run) | None => None,
 		}

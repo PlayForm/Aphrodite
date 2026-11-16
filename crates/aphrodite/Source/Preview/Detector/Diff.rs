@@ -13,13 +13,13 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// themselves). It is not a change summary: nothing is applied and no file is
 /// read.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	let HasDiffGit = Inp.NonEmpty.iter().any(|l| l.trim_start().starts_with("diff --git "));
-	let HasAbHeaders = {
+	let Git = Inp.NonEmpty.iter().any(|l| l.trim_start().starts_with("diff --git "));
+	let Unified = {
 		let a = Inp.NonEmpty.iter().any(|l| l.trim_start().starts_with("--- "));
 		let b = Inp.NonEmpty.iter().any(|l| l.trim_start().starts_with("+++ "));
 		a && b
 	};
-	let HasHunk = {
+	let Hunk = {
 		let h = Inp.NonEmpty.iter().any(|l| l.trim_start().starts_with("@@ "));
 		let Delta = Inp
 			.NonEmpty
@@ -31,5 +31,5 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 			.count();
 		h && Delta >= 1
 	};
-	HasDiffGit || HasAbHeaders || HasHunk
+	Git || Unified || Hunk
 }

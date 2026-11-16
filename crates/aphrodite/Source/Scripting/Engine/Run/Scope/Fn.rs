@@ -12,11 +12,11 @@ use crate::Scripting::Payload::Struct::Struct as HookPayload;
 /// to trust.
 ///
 /// Every missing field is seeded as the empty string or zero, never as a Rhai error: the
-/// hook surfaces do not all carry the same facts (`OnCompress` has no hash, `OnMarker`
+/// hook surfaces do not all carry the same facts (`Compress` has no hash, `Marker`
 /// has no size), and a script written for one surface must still run on another.
 ///
 /// `preview` mirrors the CURRENT content rather than the payload's original, which is
-/// what makes the pre-Rust `OnMarker` scripts - which chain on the preview - behave
+/// what makes the pre-Rust `on_marker` scripts - which chain on the preview - behave
 /// identically to the ones that chain on the content.
 pub(crate) fn Fn(Payload:&HookPayload, Hook:&str, Content:&str) -> Scope<'static> {
 	let mut Scope = Scope::new();
@@ -25,7 +25,7 @@ pub(crate) fn Fn(Payload:&HookPayload, Hook:&str, Content:&str) -> Scope<'static
 	// Result is deliberately ignored.
 	let _ = Scope.push("content", Content.to_string());
 	let _ = Scope.push("hook", Hook.to_string());
-	let _ = Scope.push("content_type", Payload.ContentType.clone().unwrap_or_default());
+	let _ = Scope.push("content_type", Payload.Type.clone().unwrap_or_default());
 	let _ = Scope.push("size", Payload.Size.map(|Size| Size as i64).unwrap_or(0));
 	let _ = Scope.push("hash", Payload.Hash.clone().unwrap_or_default());
 	let _ = Scope.push("metadata", Payload.Metadata.clone().unwrap_or_default());

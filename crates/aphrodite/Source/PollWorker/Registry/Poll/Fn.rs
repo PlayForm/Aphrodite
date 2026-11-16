@@ -19,8 +19,8 @@
 //! `Apply::Fn` answers `None` when it finds nothing.
 
 use crate::PollWorker::{
-	Apply::Applied::{Enum::Applied, Finished::Struct::Finished, Subject::Struct::Subject},
-	Event::Struct::PollEvent,
+	Apply::Applied::{Enum::Enum as Outcome, Finished::Struct::Finished, Subject::Struct::Subject},
+	Event::Struct::Struct as Wire,
 	Output::Append::Fn::Fn as Append,
 	Registry::Struct::Registry,
 };
@@ -30,12 +30,12 @@ use crate::PollWorker::{
 /// The caller must have selected a RUNNING task: this function cannot check it
 /// without re-reading a status the selection already filtered, and a status check here
 /// would be a second attribution rule.
-pub(crate) fn Fn(This:&mut Registry, Index:usize, Event:&PollEvent<'_>, Turn:usize) -> Option<Applied> {
+pub(crate) fn Fn(This:&mut Registry, Index:usize, Event:&Wire<'_>, Turn:usize) -> Option<Outcome> {
 	let Task = This.Tasks.get_mut(Index)?;
 
 	Task.LastPollTurn = Turn;
 	Task.PollCount += 1;
-	Task.ExecutionID = Event.ExecutionID.clone().or_else(|| Task.ExecutionID.clone());
+	Task.Execution = Event.Execution.clone().or_else(|| Task.Execution.clone());
 
 	let Appended = Append(&mut Task.AccumulatedOutput, Event.Output.as_ref());
 
@@ -51,7 +51,7 @@ pub(crate) fn Fn(This:&mut Registry, Index:usize, Event:&PollEvent<'_>, Turn:usi
 	let Subject = Subject { Index, ID:Task.ID.clone(), Command:Task.command.clone() };
 
 	Some(match Event.ExitCode {
-		Some(ExitCode) => Applied::Completed(Finished { Subject, Output:Task.AccumulatedOutput.Take(), ExitCode }),
-		None => Applied::Progressed(Subject),
+		Some(ExitCode) => Outcome::Completed(Finished { Subject, Output:Task.AccumulatedOutput.Take(), ExitCode }),
+		None => Outcome::Progressed(Subject),
 	})
 }

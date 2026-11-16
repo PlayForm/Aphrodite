@@ -14,7 +14,7 @@ use crate::Health::Build::Identity;
 /// `git describe --always --dirty`, so a dirty build says so instead of
 /// claiming a revision it does not match. When no revision was stamped (a
 /// published crate with no `.git`, a build script that could not reach git) the
-/// stamp does not pretend: `identity` reports `VersionOnly`, and the health
+/// stamp does not pretend: `identity` reports `Version`, and the health
 /// payload says `"identifies": "version-only"` rather than presenting a version
 /// as if it were a build identity.
 pub(crate) struct Struct {
@@ -36,7 +36,7 @@ impl Struct {
 	pub(crate) fn identity(&self) -> Identity::Enum::Enum {
 		match self.Commit {
 			Some(_) => Identity::Enum::Enum::Commit,
-			None => Identity::Enum::Enum::VersionOnly,
+			None => Identity::Enum::Enum::Version,
 		}
 	}
 
@@ -49,7 +49,7 @@ impl Struct {
 	pub(crate) fn json(&self) -> serde_json::Value {
 		let Identifies = match self.identity() {
 			Identity::Enum::Enum::Commit => "commit",
-			Identity::Enum::Enum::VersionOnly => "version-only",
+			Identity::Enum::Enum::Version => "version-only",
 		};
 
 		serde_json::json!({

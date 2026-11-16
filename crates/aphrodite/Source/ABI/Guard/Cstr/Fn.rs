@@ -3,7 +3,7 @@
 use std::{cmp::Ordering, ffi::CStr, os::raw::c_char, ptr::NonNull};
 
 use super::Enum::Enum as Decoded;
-use crate::ABI::Guard::Content::Const::MaximumContent;
+use crate::ABI::Guard::Content::Const::Maximum;
 
 /// Decode a caller-supplied C string pointer, refusing it above the ingress cap
 /// before any allocation happens.
@@ -42,7 +42,7 @@ pub(crate) unsafe fn Fn<'a>(Ptr:*const c_char) -> Decoded<'a> {
 
 	// The refusal is the comparison, and it happens before the copy: an oversize
 	// argument never reaches `to_string_lossy`.
-	match Raw.to_bytes().len().cmp(&MaximumContent) {
+	match Raw.to_bytes().len().cmp(&Maximum) {
 		Ordering::Greater => Decoded::Oversize,
 		Ordering::Equal | Ordering::Less => Decoded::Text(Raw.to_string_lossy()),
 	}

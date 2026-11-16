@@ -2,7 +2,7 @@
 //!
 //! An env var cannot be used: the gateway process env is frozen at launch, so a
 //! mid-session toggle has to be an artifact on disk. This module owns the
-//! naming (`FLAG_PREFIX`), the two paths (scoped and global), the cached read,
+//! naming (`Const::Prefix`), the two paths (scoped and global), the cached read,
 //! the three-valued answer it gives, and the resolution that walks the session
 //! tree.
 //!

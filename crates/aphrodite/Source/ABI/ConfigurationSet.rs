@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State},
-	Configuration::{ApplyUpdate::Fn::Fn as ApplyUpdate, ParseUpdate::Fn::Fn as ParseUpdate},
+	Configuration::{Apply::Fn::Fn as Apply, Parse::Fn::Fn as Parse},
 	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 };
 
@@ -16,7 +16,7 @@ use crate::ABI::{
 /// rejected write from an applied one by the response alone - it has to read the
 /// value back with `AphroditeConfigurationGet`.
 ///
-/// "Silently" is about the response, not about the code: `ParseUpdate` answers a
+/// "Silently" is about the response, not about the code: `Parse` answers a
 /// typed `Outcome` naming which of the two happened, so a reader of this file
 /// learns the acceptance rules from the type instead of from a `_ => {}` arm.
 /// The envelope stays `ok` in all three cases because it always has.
@@ -39,13 +39,13 @@ pub unsafe extern "C" fn AphroditeConfigurationSet(
 	// field write and nothing else. The refusal is carried to the closure rather
 	// than answered here, because the boundary owns the envelope.
 	let Parsed = match (Optional(Key), Optional(Value)) {
-		(Ok(Key), Ok(Value)) => Ok(ParseUpdate(&Key, &Value)),
+		(Ok(Key), Ok(Value)) => Ok(Parse(&Key, &Value)),
 		(Err(Error), _) => Err(Error),
 		(_, Err(Error)) => Err(Error),
 	};
 
 	State(Handle, move |s| {
-		let _Outcome = ApplyUpdate(s, Parsed?);
+		let _Outcome = Apply(s, Parsed?);
 
 		Ok(Answer::JSON(serde_json::json!({"status":"ok"})))
 	})

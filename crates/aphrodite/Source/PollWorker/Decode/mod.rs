@@ -1,4 +1,4 @@
-//! Wire text to `PollEvent`, one field rule per leaf.
+//! Wire text to `Wire`, one field rule per leaf.
 
 pub mod ExitCode;
 pub mod Fn;

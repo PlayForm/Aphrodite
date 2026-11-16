@@ -23,11 +23,10 @@ use crate::Configuration::Template::Plain as Seed;
 /// template, so one session behaves exactly as before).
 ///
 /// The build happens OUTSIDE the session registry's lock (see
-/// `Session::Registry::Struct::session_state`): it reads a file and may start a
-/// thread, and the registry lock is the one lock every session in the gateway
-/// shares.
-pub(crate) fn config_template() -> &'static AphroditeState {
-	static TEMPLATE:OnceLock<AphroditeState> = OnceLock::new();
+/// `Session::Registry::Get::Fn`): it reads a file and may start a thread, and the
+/// registry lock is the one lock every session in the gateway shares.
+pub(crate) fn Fn() -> &'static AphroditeState {
+	static Built:OnceLock<AphroditeState> = OnceLock::new();
 
-	TEMPLATE.get_or_init(Seed::Fn::Fn)
+	Built.get_or_init(Seed::Fn::Fn)
 }

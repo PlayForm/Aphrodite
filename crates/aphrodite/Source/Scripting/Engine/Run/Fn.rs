@@ -2,7 +2,7 @@
 
 use crate::Scripting::{
 	Engine::{
-		Run::Chain::{Finish, Step, Struct as Chain},
+		Run::Chain::{Finish, Step, Struct::Struct as Chain},
 		Struct::Struct,
 	},
 	Payload::Struct::Struct as HookPayload,
@@ -23,7 +23,7 @@ impl Struct {
 	/// out of step, and there is no early `return` inside a `for_each` for a reader to
 	/// trace. `Finish` is the one place the accumulator becomes the hook's answer.
 	pub fn Run(&self, Hook:&str, Payload:&HookPayload) -> Option<String> {
-		self.CheckReload();
+		self.Check();
 
 		let Scripts = self.Scripts.lock().unwrap_or_else(|Error| Error.into_inner());
 

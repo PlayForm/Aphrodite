@@ -1,6 +1,6 @@
 //! A file's content and everything derived from it, before the lock is taken.
 
-use crate::State::Identity::Content::Struct::ContentHash;
+use crate::State::Identity::Content::Struct::Struct as Digest;
 
 /// One file's content plus the facts the store, the marker and the report need.
 ///
@@ -21,7 +21,7 @@ pub(crate) struct Prepared {
 	/// The content itself, read in full.
 	pub Content:String,
 	/// Content identity: the CCR hash of the bytes.
-	pub Hash:ContentHash,
+	pub Hash:Digest,
 	/// Detected content type, as the marker and the report name it.
 	pub Type:String,
 	/// The preview built from the content.

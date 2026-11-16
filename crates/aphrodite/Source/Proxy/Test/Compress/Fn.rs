@@ -15,12 +15,12 @@ use headroom_core::ccr::compute_key;
 use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
 	Proxy::{
-		Compress::Chat::Fn::Fn as CompressChatCompletion,
+		Compress::Chat::Fn::Fn as Chat,
 		State::{CCR::Get::Fn::Fn as CCRGet, Struct::Struct as AppState},
 		Test::Support::{
-			Chat::Fn::ChatCompletionBody,
+			Chat::Fn::Payload,
 			Context::Fn::Fn as TestContext,
-			State::Fn::{TestStateWithCCR, TestStateWithFailingCCR},
+			State::Fn::{FailingCCR, WithCCR},
 		},
 	},
 };
@@ -33,7 +33,7 @@ fn Compress(State:&Arc<AppState>, body:&[u8], HeadroomBudget:Option<&str>) -> Op
 
 	tokio::runtime::Runtime::new()
 		.unwrap()
-		.block_on(CompressChatCompletion(&Context, body, HeadroomBudget))
+		.block_on(Chat(&Context, body, HeadroomBudget))
 		.map(|Outcome| Outcome.Response)
 }
 
@@ -45,7 +45,7 @@ fn Rewritten(State:&Arc<AppState>, body:&[u8], HeadroomBudget:Option<&str>) -> b
 
 	tokio::runtime::Runtime::new()
 		.unwrap()
-		.block_on(CompressChatCompletion(&Context, body, HeadroomBudget))
+		.block_on(Chat(&Context, body, HeadroomBudget))
 		.map(|Outcome| Outcome.Compressed())
 		.unwrap_or(false)
 }
@@ -53,10 +53,10 @@ fn Rewritten(State:&Arc<AppState>, body:&[u8], HeadroomBudget:Option<&str>) -> b
 // ── T4 (F4): a failed ccr_put must leave content uncompressed, not silently
 // swapped for an unresolvable marker. ──
 #[test]
-fn TestCompressChatCompletionCCRPutFailureLeavesContentUncompressed() {
-	let State = Arc::new(TestStateWithFailingCCR());
+fn PutFailure() {
+	let State = Arc::new(FailingCCR());
 	let Content = "fn answer() -> i32 { 42 }\n".repeat(200); // well above threshold
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
 	// Nothing could be safely compressed (the only candidate's store write
 	// failed), so the whole response must come back `None` (unmodified
@@ -69,12 +69,12 @@ fn TestCompressChatCompletionCCRPutFailureLeavesContentUncompressed() {
 
 // ── T4: compress_chat_completion ────────────────────────────
 #[test]
-fn TestCompressChatCompletionAboveThresholdProducesMarker() {
+fn Above() {
 	// Token mode base threshold is 1024B; a large repeated text block stays well
 	// above any auto-tuned multiplier of it.
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
-	let body = ChatCompletionBody(&Content);
-	let State = Arc::new(TestStateWithCCR());
+	let body = Payload(&Content);
+	let State = Arc::new(WithCCR());
 
 	let response = Compress(&State, &body, None).expect("content above threshold must be compressed");
 	let NewContent = response["choices"][0]["message"]["content"].as_str().unwrap();
@@ -91,15 +91,15 @@ fn TestCompressChatCompletionAboveThresholdProducesMarker() {
 
 // ── Auto-expand (pre-Rust port): `[compression] auto_expand` resolves the
 // just-stored content inline instead of emitting a marker, capped at
-// `AutoExpandLimit`; over-limit falls back to the marker; disabled (default)
+// `ExpandLimit`; over-limit falls back to the marker; disabled (default)
 // emits markers byte-identically. ──
 #[test]
-fn TestCompressChatCompletionAutoExpandReturnsInlineContent() {
-	let State = Arc::new(TestStateWithCCR());
+fn Inline() {
+	let State = Arc::new(WithCCR());
 	State.AutoExpand.store(true, std::sync::atomic::Ordering::Relaxed);
-	State.AutoExpandLimit.store(1_000_000, std::sync::atomic::Ordering::Relaxed);
+	State.ExpandLimit.store(1_000_000, std::sync::atomic::Ordering::Relaxed);
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
 	// Nothing was removed from the wire, so the outcome must not report a
 	// compression - the client receives the ORIGINAL content, not a marker.
@@ -118,17 +118,17 @@ fn TestCompressChatCompletionAutoExpandReturnsInlineContent() {
 }
 
 #[test]
-fn TestCompressChatCompletionAutoExpandReturnsInlineContentCacheMode() {
+fn InlineCache() {
 	// Same inline contract on the cache-mode compress path (the branch sits
 	// before the mode-dependent marker renderer, so both `CacheMarker` and
 	// `SmartMarker` paths must honour it).
-	let mut State = TestStateWithCCR();
+	let mut State = WithCCR();
 	State.Mode = ProxyMode::Cache;
 	let State = Arc::new(State);
 	State.AutoExpand.store(true, std::sync::atomic::Ordering::Relaxed);
-	State.AutoExpandLimit.store(1_000_000, std::sync::atomic::Ordering::Relaxed);
+	State.ExpandLimit.store(1_000_000, std::sync::atomic::Ordering::Relaxed);
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(300); // > 8KB cache threshold
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
 	assert!(
 		!Rewritten(&State, &body, None),
@@ -138,12 +138,12 @@ fn TestCompressChatCompletionAutoExpandReturnsInlineContentCacheMode() {
 }
 
 #[test]
-fn TestCompressChatCompletionAutoExpandOverLimitFallsBackToMarker() {
-	let State = Arc::new(TestStateWithCCR());
+fn OverLimit() {
+	let State = Arc::new(WithCCR());
 	State.AutoExpand.store(true, std::sync::atomic::Ordering::Relaxed);
-	State.AutoExpandLimit.store(100, std::sync::atomic::Ordering::Relaxed); // far below content
+	State.ExpandLimit.store(100, std::sync::atomic::Ordering::Relaxed); // far below content
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
 	let response = Compress(&State, &body, None).expect("over-limit content must fall back to the marker path");
 	let NewContent = response["choices"][0]["message"]["content"].as_str().unwrap();
@@ -155,11 +155,11 @@ fn TestCompressChatCompletionAutoExpandOverLimitFallsBackToMarker() {
 }
 
 #[test]
-fn TestCompressChatCompletionAutoExpandDisabledEmitsMarker() {
+fn Disabled() {
 	// Default (flag false) is byte-identical current behavior: markers.
-	let State = Arc::new(TestStateWithCCR()); // auto_expand defaults to false
+	let State = Arc::new(WithCCR()); // auto_expand defaults to false
 	let Content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
 	let response = Compress(&State, &body, None).expect("content above threshold must be compressed");
 	let NewContent = response["choices"][0]["message"]["content"].as_str().unwrap();
@@ -168,16 +168,16 @@ fn TestCompressChatCompletionAutoExpandDisabledEmitsMarker() {
 }
 
 #[test]
-fn TestCompressChatCompletionBelowThresholdIsNone() {
+fn Below() {
 	let Content = "short reply";
-	let body = ChatCompletionBody(Content);
-	let State = Arc::new(TestStateWithCCR());
+	let body = Payload(Content);
+	let State = Arc::new(WithCCR());
 
 	assert!(Compress(&State, &body, None).is_none(), "short content must not be compressed");
 }
 
 #[test]
-fn TestCompressChatCompletionToolCallArgumentsPassThroughUntouched() {
+fn Arguments() {
 	// 02-F3: `tool_calls[].function.arguments` is JSON the client feeds straight
 	// into its own tool executor, not model-facing prose - it must never be
 	// replaced by an unresolvable-to-the-client CCR marker, no matter how large.
@@ -199,7 +199,7 @@ fn TestCompressChatCompletionToolCallArgumentsPassThroughUntouched() {
 	})
 	.to_string()
 	.into_bytes();
-	let State = Arc::new(TestStateWithCCR());
+	let State = Arc::new(WithCCR());
 
 	let response = Compress(&State, &body, None).expect("large message content must still be compressed");
 	let NewContent = response["choices"][0]["message"]["content"].as_str().unwrap();
@@ -220,15 +220,15 @@ fn TestCompressChatCompletionToolCallArgumentsPassThroughUntouched() {
 }
 
 #[test]
-fn TestCompressChatCompletionBudgetHeaderLowersEffectiveThreshold() {
+fn Budget() {
 	// A large-but-moderate payload: compressed when the budget header requests
 	// aggressive compression (fill=0 -> 0.5x multiplier), but left alone with no
 	// budget header (multiplier 1.0x) if it sits between the two thresholds.
 	let Content = "line of moderate length text content here.\n".repeat(40); // ~1760B
-	let body = ChatCompletionBody(&Content);
+	let body = Payload(&Content);
 
-	let NoBudget = Rewritten(&Arc::new(TestStateWithCCR()), &body, None);
-	let LowBudget = Rewritten(&Arc::new(TestStateWithCCR()), &body, Some("0"));
+	let NoBudget = Rewritten(&Arc::new(WithCCR()), &body, None);
+	let LowBudget = Rewritten(&Arc::new(WithCCR()), &body, Some("0"));
 
 	// A lower budget must never compress *less* than no budget at all.
 	NoBudget.then(|| assert!(LowBudget, "lower budget must compress at least as much as no budget"));

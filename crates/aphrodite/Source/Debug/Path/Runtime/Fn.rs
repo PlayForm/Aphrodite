@@ -1,4 +1,4 @@
-//! `DebugRuntimeHome`: the directory the log is written into.
+//! `Runtime`: the directory the log is written into.
 
 use std::path::PathBuf;
 

@@ -3,45 +3,45 @@
 
 use aphrodite::State::Struct::AphroditeState;
 
-use crate::Configuration::Reload::Fn::apply_config_reload;
+use crate::Configuration::Reload;
 
 // ── Config auto-reload: a fresh `Config` re-applied to the session
 // state must update config fields (thresholds) while PRESERVING the
 // runtime-owned directive selection (map + active list) - the exact
-// contract of the opt-in watcher (spawn_config_watcher). CCR stores
+// contract of the opt-in watcher (`Watcher::Apply::Fn::Fn`). CCR stores
 // and telemetry are untouched by `apply_compression` itself. ──
 #[test]
 fn test_config_reload_preserves_directives_and_applies_thresholds() {
 	let _g = crate::Session::Guard::Fn::test_guard();
 
-	let stamp = std::time::SystemTime::now()
+	let Stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
 		.as_nanos();
-	let path = std::env::temp_dir().join(format!("aphrodite-cfg-reload-{stamp}.toml"));
-	std::fs::write(&path, "[compression]\nterminal_threshold = 2048\n").unwrap();
-	let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(path.to_str().unwrap());
-	let _ = std::fs::remove_file(&path);
-	assert!(cfg.ParseFailure.is_none());
+	let Path = std::env::temp_dir().join(format!("aphrodite-cfg-reload-{Stamp}.toml"));
+	std::fs::write(&Path, "[compression]\nterminal_threshold = 2048\n").unwrap();
+	let Configuration = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Read(Path.to_str().unwrap());
+	let _ = std::fs::remove_file(&Path);
+	assert!(Configuration.ParseFailure.is_none());
 
-	let mut state = AphroditeState::default();
-	state.TerminalThreshold = 1024;
+	let mut State = AphroditeState::default();
+	State.TerminalThreshold = 1024;
 	// Simulate a live session that swapped in a runtime directive set.
-	state.Directives.insert(
+	State.Directives.insert(
 		"focus".into(),
 		aphrodite::Directive::Model::Struct { name:"focus".into(), Content:"stay targeted".into() },
 	);
-	state.ActiveDirectives = vec!["focus".into()];
+	State.ActiveDirectives = vec!["focus".into()];
 
-	apply_config_reload(&cfg, &mut state);
+	Reload::Fn::Fn(&Configuration, &mut State);
 
-	assert_eq!(state.TerminalThreshold, 2048, "reload must apply new thresholds");
+	assert_eq!(State.TerminalThreshold, 2048, "reload must apply new thresholds");
 	assert!(
-		state.Directives.contains_key("focus"),
+		State.Directives.contains_key("focus"),
 		"reload must preserve the runtime directive set"
 	);
 	assert_eq!(
-		state.ActiveDirectives,
+		State.ActiveDirectives,
 		vec!["focus".to_string()],
 		"reload must preserve active directives"
 	);

@@ -43,5 +43,5 @@ impl<T, const N: usize> Struct<T, N> {
 	pub(crate) fn IsEmpty(&self) -> bool { self.Total == 0 }
 
 	/// The retained examples, in input order.
-	pub(crate) fn IntoSample(self) -> Vec<T> { self.Sample }
+	pub(crate) fn Take(self) -> Vec<T> { self.Sample }
 }

@@ -7,7 +7,7 @@
 
 use std::sync::mpsc::channel;
 
-use crate::Session::Watcher::Debounce::Fn::Fn as debounce;
+use crate::Session::Watcher::Debounce;
 
 // ── A closed channel ends the watch: `recv` fails and the caller's loop
 // stops instead of blocking the watcher thread forever. ──
@@ -16,7 +16,10 @@ fn probe_debounce_reports_a_closed_channel() {
 	let (Sender, Receiver) = channel::<()>();
 	drop(Sender);
 
-	assert!(!debounce(&Receiver), "a closed channel must end the watch, not block on it");
+	assert!(
+		!Debounce::Fn::Fn(&Receiver),
+		"a closed channel must end the watch, not block on it"
+	);
 }
 
 // ── A burst is ONE tick, and the events that arrived during the settle window
@@ -27,7 +30,7 @@ fn probe_debounce_collapses_a_burst_into_one_tick() {
 	let (Sender, Receiver) = channel::<()>();
 	(0..5).for_each(|_| Sender.send(()).unwrap());
 
-	assert!(debounce(&Receiver), "a pending event must yield a tick");
+	assert!(Debounce::Fn::Fn(&Receiver), "a pending event must yield a tick");
 	assert!(
 		Receiver.try_recv().is_err(),
 		"the burst must be drained by the tick that consumed it"

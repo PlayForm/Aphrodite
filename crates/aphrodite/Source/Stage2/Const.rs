@@ -6,5 +6,6 @@
 //! the floor in its own file makes the one number that decides "is this worth
 //! reducing at all" impossible to miss or to duplicate.
 
-/// Minimum content size before attempting reduction.
-pub(crate) const MinimumStage2Size:usize = 80;
+/// Smallest content size that is reduced at all: eighty bytes. Below it the marker
+/// and header overhead would make the result larger than the input.
+pub(crate) const Minimum:usize = 80;

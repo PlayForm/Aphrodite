@@ -1,6 +1,6 @@
 //! The registry state.
 
-use crate::State::Template::Struct::TemplatesConfiguration;
+use crate::State::Template::Struct::Struct as TemplatesConfiguration;
 
 /// Process-global template registry: the parsed `[templates]` section plus
 /// the `[previews] model_family` selector (default `"code_first"` when

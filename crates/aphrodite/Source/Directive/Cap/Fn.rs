@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use super::MaximumDirectiveChars::Const::Const as MaximumDirectiveChars;
+use super::Single::Const::Const as Maximum;
 
 /// Cut a directive body to the per-file cap, appending `...` when it was cut.
 ///
@@ -16,7 +16,7 @@ use super::MaximumDirectiveChars::Const::Const as MaximumDirectiveChars;
 /// shape compared `Content.len()` (bytes) and then cut by characters, which cut
 /// content that fit the character budget.
 pub(crate) fn Fn(Content:&str) -> Cow<'_, str> {
-	match Content.char_indices().nth(MaximumDirectiveChars) {
+	match Content.char_indices().nth(Maximum) {
 		Some((Offset, _Char)) => Cow::Owned(format!("{}...", &Content[..Offset])),
 		None => Cow::Borrowed(Content),
 	}

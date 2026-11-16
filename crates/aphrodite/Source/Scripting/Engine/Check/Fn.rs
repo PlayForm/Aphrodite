@@ -1,4 +1,4 @@
-//! `CheckReload`: reload when a loaded script changed on disk.
+//! `Check`: reload when a loaded script changed on disk.
 
 use crate::Scripting::Engine::Struct::Struct;
 
@@ -14,7 +14,7 @@ impl Struct {
 	/// `false` for that entry rather than aborting the scan: a deleted script is a reload
 	/// trigger only when its metadata is still readable, and the next `Reload` drops it
 	/// either way.
-	pub(crate) fn CheckReload(&self) {
+	pub(crate) fn Check(&self) {
 		let Needs = self
 			.Scripts
 			.lock()

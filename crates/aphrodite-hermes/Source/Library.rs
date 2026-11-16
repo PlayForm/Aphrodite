@@ -45,6 +45,12 @@
 // so the snake_case module lint is switched off crate-wide rather than
 // renamed away at every declaration.
 #![allow(non_snake_case)]
+// The same convention reaches constants and statics: a one-word name is
+// `Prefix` / `Parent` / `Timeout`, not `FLAG_PREFIX` / `SESSION_PARENTS` /
+// `READY_TIMEOUT` - the uppercase form is a second spelling of the same
+// identifier, and the leaf path already says which item it is. Matches the
+// core crate's `Library.rs`, which carries the same gate.
+#![allow(non_upper_case_globals)]
 // House style: acronyms stay uppercase inside identifiers (`JSON`, `ID`, `URL`,
 // `ABI`) - `JSON` is the name, `Json` is a spelling of it. That is the opposite
 // of `upper_case_acronyms`' default, so the lint is switched off crate-wide

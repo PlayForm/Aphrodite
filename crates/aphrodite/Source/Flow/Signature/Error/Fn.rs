@@ -10,7 +10,7 @@ use crate::Flow::Hash::Fn::Fnv1a;
 /// FNV-1a signature of an error: `ErrorType` + first line of `ErrorMessage`
 /// (P2/P7). Distinct compiler errors differ on line 1, so this stays
 /// discriminating without over-matching.
-pub fn ErrorSig(ErrorType:Option<&str>, ErrorMessage:Option<&str>) -> u64 {
+pub fn Fn(ErrorType:Option<&str>, ErrorMessage:Option<&str>) -> u64 {
 	let mut Buffer = String::new();
 	Buffer.push_str(ErrorType.unwrap_or(""));
 	Buffer.push('\u{1}');

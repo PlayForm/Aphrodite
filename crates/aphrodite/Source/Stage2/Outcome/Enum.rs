@@ -16,7 +16,7 @@ use crate::Stage2::Reduction::Struct::Struct as Reduction;
 pub(crate) enum Enum {
 	/// The candidate was strictly shorter and is the replacement.
 	Accepted(Reduction),
-	/// Content is below `Const::MinimumStage2Size`.
+	/// Content is below `Const::Minimum`.
 	TooSmall,
 	/// No reducer is registered for the CCR type.
 	NoReducer,

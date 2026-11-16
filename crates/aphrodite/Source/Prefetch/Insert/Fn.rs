@@ -13,10 +13,10 @@
 use crate::{
 	Prefetch::{
 		Apply::Fn::Fn as Apply,
-		Clock::Fn::UnixNow,
-		Outcome::Enum::ReadOutcome,
+		Clock::Fn::Fn as Clock,
+		Outcome::Enum::Enum as Outcome,
 		Prepare::Fn::Fn as Prepare,
-		Read::Const::MaximumPrefetchSize,
+		Read::Const::Maximum,
 		Record::Enum::Record,
 		Report::Fn::Fn as Report,
 	},
@@ -29,20 +29,20 @@ use crate::{
 /// One clock read stamps the whole batch: every entry this call loads shares one
 /// arrival second, so a reader comparing two entries of the same prefetch never sees
 /// them arrive in different seconds because the loop took that long.
-pub fn InsertOutcomes(State:&mut AphroditeState, Outcomes:Vec<(String, ReadOutcome)>) -> serde_json::Value {
-	let ObservedAtUnix = UnixNow();
+pub fn Fn(State:&mut AphroditeState, Outcomes:Vec<(String, Outcome)>) -> serde_json::Value {
+	let ObservedAtUnix = Clock();
 
 	let Records:Vec<Record> = Outcomes
 		.into_iter()
 		.map(|(Path, Outcome)| {
 			match Outcome {
-				ReadOutcome::Loaded { Content } => Apply(State, Prepare(Path, Content), ObservedAtUnix),
-				ReadOutcome::SkippedSize { Size } => Record::Skipped { Path, Size, Maximum:MaximumPrefetchSize },
-				ReadOutcome::Refused { Reason } => Record::Refused { Path, Reason },
-				ReadOutcome::Missing | ReadOutcome::Error => Record::Missing { Path },
+				Outcome::Loaded { Content } => Apply(State, Prepare(Path, Content), ObservedAtUnix),
+				Outcome::SkippedSize { Size } => Record::Skipped { Path, Size, Maximum },
+				Outcome::Refused { Reason } => Record::Refused { Path, Reason },
+				Outcome::Missing | Outcome::Error => Record::Missing { Path },
 			}
 		})
 		.collect();
 
-	Report(Records, State.InlineStoreBytes(), State.InlineStoreByteBudget())
+	Report(Records, State.Bytes(), State.Budget())
 }

@@ -11,8 +11,8 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// Two or more `|`-prefixed lines with at least one separator row. It is not a
 /// CSV detector - a comma-separated grid has no pipes and is handled separately.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	let MdTableLines = Inp.NonEmpty.iter().filter(|l| l.trim_start().starts_with('|')).count();
-	let HasTableSep = Inp.NonEmpty.iter().any(|l| {
+	let Lines = Inp.NonEmpty.iter().filter(|l| l.trim_start().starts_with('|')).count();
+	let Separator = Inp.NonEmpty.iter().any(|l| {
 		let Cells = l.trim().trim_matches('|');
 		!Cells.is_empty()
 			&& Cells.split('|').all(|c| {
@@ -20,5 +20,5 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 				!t.is_empty() && t.chars().all(|Character| matches!(Character, '-' | ':' | ' '))
 			})
 	});
-	MdTableLines >= 2 && HasTableSep
+	Lines >= 2 && Separator
 }

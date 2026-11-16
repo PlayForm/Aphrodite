@@ -25,11 +25,11 @@ use crate::{
 pub(crate) fn Fn(Result:&Value, Session:&str) -> Value {
 	match Resolve::Fn::Fn(Result) {
 		Enum::Chain(Joined) => Value::String(Joined),
-		Enum::Expanded(ExpandedText) => Value::String(ExpandedText.to_string()),
-		Enum::Marker(MarkerText) => {
+		Enum::Expanded(Text) => Value::String(Text.to_string()),
+		Enum::Marker(Text) => {
 			Value::String(match Debug::Log::Line::Fn::Fn(Result, Session) {
-				Some(Line) => format!("{Line}\n{MarkerText}"),
-				None => MarkerText.to_string(),
+				Some(Line) => format!("{Line}\n{Text}"),
+				None => Text.to_string(),
 			})
 		},
 		Enum::Passthrough => Value::Null,

@@ -9,7 +9,7 @@
 ///   - `Installed` - this crate won the install, and its fmt layer is
 ///     target-restricted to this crate, so an event of ours is guaranteed to
 ///     reach stderr;
-///   - `HostOwned` - the host installed its dispatcher first. Our events go
+///   - `Host` - the host installed its dispatcher first. Our events go
 ///     wherever the host routes them, which may be nowhere: a host filter that
 ///     does not name this crate's target drops them silently.
 ///
@@ -19,6 +19,7 @@
 pub(crate) enum Enum {
 	/// This crate installed the process-global subscriber.
 	Installed,
-	/// A host already owned the dispatcher; this crate logs through it.
-	HostOwned,
+	/// A host already owned the dispatcher; this crate logs through it. The
+	/// host owns the dispatcher, so this crate's events may be filtered away.
+	Host,
 }

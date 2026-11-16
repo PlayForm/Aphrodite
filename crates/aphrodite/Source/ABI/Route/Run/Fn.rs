@@ -19,16 +19,14 @@ use crate::{
 /// immediately instead of receiving an empty result.
 pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json::Value {
 	match Prepared {
-		Prepared::Prefetch { Outcomes } => crate::Prefetch::Insert::Fn::InsertOutcomes(State, Outcomes),
+		Prepared::Prefetch { Outcomes } => crate::Prefetch::Insert::Fn::Fn(State, Outcomes),
 		Prepared::Ready(Command) => {
 			match Command {
 				Command::SessionStart => crate::Hook::Session::Fn::Fn(State),
 				Command::TransformToolResult { Content, Tool } => {
-					crate::Hook::ToolResult::Entry::Fn::TransformToolResult(State, Content, Tool)
+					crate::Hook::ToolResult::Entry::Fn::Fn(State, Content, Tool)
 				},
-				Command::TransformTerminalOutput { Content } => {
-					crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(State, Content)
-				},
+				Command::TransformTerminalOutput { Content } => crate::Hook::Terminal::Entry::Fn::Fn(State, Content),
 				Command::PreLLMCall => crate::Hook::LLM::Pre::Fn::Fn(State),
 				Command::PostLLMCall => crate::Hook::LLM::Post::Fn::Fn(State),
 				Command::Catalog { Mode } => crate::Catalog::Build::Fn::Fn(State, Mode),
@@ -42,18 +40,18 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json
 					})
 				},
 				Command::Directive { Action, Name } => crate::Directive::Action::Fn(State, Action, Name),
-				Command::Search { Query, TypeFilter } => {
+				Command::Search { Query, Filter } => {
 					let Query = Query.to_lowercase();
 					let Results:Vec<serde_json::Value> = State
 						.RecentMarkers
 						.iter()
 						.filter(|Marker| {
-							let MatchesQuery = Query.is_empty()
+							let Contains = Query.is_empty()
 								|| Marker.Preview.to_lowercase().contains(&Query)
 								|| Marker.CCRType.to_lowercase().contains(&Query);
-							let MatchesType = TypeFilter.is_none_or(|Type| Marker.CCRType == Type);
+							let Kind = Filter.is_none_or(|Type| Marker.CCRType == Type);
 
-							MatchesQuery && MatchesType
+							Contains && Kind
 						})
 						.take(20)
 						.map(|Marker| {
@@ -89,9 +87,9 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json
 					serde_json::json!({"files":Files,"total":Files.len()})
 				},
 				Command::Classify { Content } => {
-					let Ct = headroom_core::transforms::content_detector::detect_content_type(Content).content_type;
+					let Type = headroom_core::transforms::content_detector::detect_content_type(Content).content_type;
 
-					serde_json::json!({"type":Ct.as_str(),"lines":Content.lines().count(),"bytes":Content.len()})
+					serde_json::json!({"type":Type.as_str(),"lines":Content.lines().count(),"bytes":Content.len()})
 				},
 				Command::Unknown { Name } => serde_json::json!({"error": format!("unknown hook: {}", Name)}),
 				// `Prepare` consumes `Prefetch` into `Prepared::Prefetch`, so this

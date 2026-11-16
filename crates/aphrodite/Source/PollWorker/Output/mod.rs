@@ -1,4 +1,4 @@
-//! The bounded accumulator behind `BgTask::AccumulatedOutput`.
+//! The bounded accumulator behind `Record::AccumulatedOutput`.
 
 pub mod Append;
 pub mod Const;

@@ -5,13 +5,13 @@
 //! bridge exposes the identical action set and error shape - one implementation,
 //! two transports.
 
-use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
+use crate::Tool::{Arg, Dispatch::Fn::Handler};
 
 /// The `aphrodite_directive` handler.
 ///
 /// A missing `action` defaults to `list`, which is the only safe default: every
 /// other action mutates the active set.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_directive", |Args| {
 		let Action = match Arg::Fn::Fn(Args, "action") {
 			"" => "list",

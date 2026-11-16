@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 
-use crate::{Hook::Call::Input::Struct::Struct, Session::Registry::Struct::DEFAULT_SESSION};
+use crate::{Hook::Call::Input::Struct::Struct, Session::Registry::Const::Fallback};
 
 /// Parse the hook kwargs into the call's [`Struct`].
 ///
@@ -31,10 +31,10 @@ pub(crate) fn Fn(Args:&str) -> anyhow::Result<Struct> {
 			let Last = crate::Debug::Session::Last::Fn::Fn();
 
 			match Last.is_empty() {
-				true => DEFAULT_SESSION.to_string(),
+				true => Fallback.to_string(),
 				false => Last,
 			}
 		});
 
-	Ok(Struct { Parsed, Session, ArgsLength:Args.len() })
+	Ok(Struct { Parsed, Session, Length:Args.len() })
 }

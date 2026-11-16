@@ -20,7 +20,7 @@ use crate::State::Struct::AphroditeState;
 pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// ── [templates] section (pre-Rust port): preview families, marker
 	// block, prompt templates, reverse key map ──
-	let Templates = Configuration.GetTemplates();
+	let Templates = Configuration.Template();
 	State.Templates = Templates.clone();
 
 	// ── First-turn session injection (templates.prompts.session_inject) ──
@@ -38,11 +38,11 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 					match Templates.as_ref().and_then(|t| t.Prompts.get("session_inject")) {
 						Some(t) => t.clone(),
 						None => {
-							Configuration.GetString(
+							Configuration.Text(
 								"APHRODITE_SESSION_INJECT",
 								"prompts",
 								"session_inject",
-								crate::Flow::Prompt::Const::ShippedSessionInject,
+								crate::Flow::Prompt::Const::Shipped,
 							)
 						},
 					}

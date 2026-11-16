@@ -18,7 +18,7 @@ pub struct Struct {
 	/// The parsed TOML table. Empty when no file was found or the file failed
 	/// to parse - an empty table resolves every knob to its default.
 	pub(crate) raw:toml::Table,
-	/// Runtime overrides set through `SetOverride`, keyed by env-var name.
+	/// Runtime overrides set through `Load::Override::Set`, keyed by env-var name.
 	/// They outrank both the environment and the TOML file, which is what
 	/// makes them usable as a test and operator escape hatch.
 	pub(crate) Overrides:HashMap<String, String>,

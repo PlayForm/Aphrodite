@@ -1,6 +1,6 @@
 //! The hook's answer.
 
-use super::Struct::Struct;
+use super::super::Struct::Struct;
 
 /// The transformed content, or `None` when no script touched the payload.
 ///

@@ -1,6 +1,6 @@
 //! `aphrodite_stats` - live session counters plus proxy health.
 
-use crate::{Health::Proxy::Fn::proxy_health, Tool::Dispatch::Fn::ToolHandler};
+use crate::{Health::Proxy::Fn::proxy_health, Tool::Dispatch::Fn::Handler};
 
 /// The `aphrodite_stats` handler.
 ///
@@ -10,7 +10,7 @@ use crate::{Health::Proxy::Fn::proxy_health, Tool::Dispatch::Fn::ToolHandler};
 ///
 /// The telemetry fields (`chain_split_*`) are diagnostics only - nothing here is
 /// rendered into the model's conversational view.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_stats", |_Args| {
 		let mut Stats = crate::Session::With::Fn::with_shared(|State| {
 			serde_json::json!({

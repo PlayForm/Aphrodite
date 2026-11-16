@@ -35,8 +35,9 @@ impl Enum {
 		}
 	}
 
-	/// Consume the state and take its text.
-	pub(crate) fn IntoText(self) -> String {
+	/// Consume the state and take its text. `Owned` is the counterpart of `Text`:
+	/// the same content, moved out instead of borrowed.
+	pub(crate) fn Owned(self) -> String {
 		match self {
 			Enum::Loaded(Text) | Enum::Complete(Text) => Text,
 		}

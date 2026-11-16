@@ -20,8 +20,8 @@ use crate::Directive::Resolve::{Explicit, Home, Loader, Runtime};
 /// Resolve the target directives directory for provisioning.
 ///
 /// Precedence (first non-empty wins):
-///   1. `HomeParam` - explicit caller-supplied home (the FFI argument);
-///      directives go to `<HomeParam>/directives/`.
+///   1. `Override` - explicit caller-supplied home (the FFI argument);
+///      directives go to `<Override>/directives/`.
 ///   2. `$APHRODITE_DIRECTIVES_DIR` - the directive loader's exact-directory
 ///      override (core crate candidate 0); materialize straight into it.
 ///   3. `$APHRODITE_HOME` - home-level override; directives go to
@@ -35,11 +35,11 @@ use crate::Directive::Resolve::{Explicit, Home, Loader, Runtime};
 ///
 /// Returns `(directives_dir, warnings)`.
 ///
-/// It is not a validator: a caller-supplied `HomeParam` is taken verbatim,
+/// It is not a validator: a caller-supplied `Override` is taken verbatim,
 /// never checked for existence, so provisioning reports a create failure as a
 /// warning instead of refusing the call.
-pub(crate) fn Fn(HomeParam:&str) -> (PathBuf, Vec<String>) {
-	let Resolved = Explicit::Fn::Fn(HomeParam)
+pub(crate) fn Fn(Override:&str) -> (PathBuf, Vec<String>) {
+	let Resolved = Explicit::Fn::Fn(Override)
 		.or_else(Loader::Fn::Fn)
 		.or_else(Home::Fn::Fn)
 		.or_else(Runtime::Fn::Fn);

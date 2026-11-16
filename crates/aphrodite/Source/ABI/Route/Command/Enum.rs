@@ -16,19 +16,39 @@
 /// `Prefetch` is the one variant that owns, because its paths are handed to a
 /// reader that runs before the lock and must outlive the borrow of the args it
 /// was built from.
+///
+/// The variant names are the hook names themselves (`transform_tool_result`,
+/// `pre_llm_call`, ...), which is why they keep their compound spelling: they are
+/// an external contract - the strings a host puts on the wire - not an internal
+/// identifier that the path could qualify. `Route::Decode::Fn` maps each literal
+/// to exactly one variant below.
 pub(crate) enum Enum<'a> {
+	/// `on_session_start` or `session_start`.
 	SessionStart,
+	/// `transform_tool_result`.
 	TransformToolResult { Content:&'a str, Tool:&'a str },
+	/// `transform_terminal_output`.
 	TransformTerminalOutput { Content:&'a str },
+	/// `pre_llm_call`.
 	PreLLMCall,
+	/// `post_llm_call`.
 	PostLLMCall,
+	/// `catalog`; `Mode` defaults to `"full"`.
 	Catalog { Mode:&'a str },
+	/// `stats`.
 	Stats,
+	/// `directive`; `Action` defaults to `"list"`, `Name` to the empty string.
 	Directive { Action:&'a str, Name:&'a str },
-	Search { Query:&'a str, TypeFilter:Option<&'a str> },
+	/// `search`; `Filter` is the optional type restriction.
+	Search { Query:&'a str, Filter:Option<&'a str> },
+	/// `diff`.
 	Diff,
+	/// `files`.
 	Files,
+	/// `classify`.
 	Classify { Content:&'a str },
+	/// `prefetch`; `Paths` is empty when the argument is absent or not an array.
 	Prefetch { Paths:Vec<String> },
+	/// A hook name the engine does not serve; `Name` is the name as received.
 	Unknown { Name:&'a str },
 }

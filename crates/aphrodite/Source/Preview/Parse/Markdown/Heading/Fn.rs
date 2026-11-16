@@ -1,6 +1,6 @@
 //! Recognise one markdown heading.
 
-use crate::Preview::{Line::MarkdownHeading, Parse::Markdown::Heading::Struct::Struct as Heading};
+use crate::Preview::{Line::Markdown::Heading as Predicate, Parse::Markdown::Heading::Struct::Struct as Heading};
 
 /// Reduce a heading line to its level and text, or `None` when it is not a heading.
 ///
@@ -12,5 +12,5 @@ pub(crate) fn Fn(Line:&str) -> Option<Heading> {
 	let Trimmed = Line.trim_start();
 	let Level = Trimmed.chars().take_while(|Character| *Character == '#').count();
 
-	MarkdownHeading::Fn(Line).then(|| Heading { Level, Text:Trimmed.to_string() })
+	Predicate::Fn(Line).then(|| Heading { Level, Text:Trimmed.to_string() })
 }

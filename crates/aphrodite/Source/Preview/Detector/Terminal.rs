@@ -13,11 +13,11 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// `command not found` / `zsh:` / `bash:` error trace. It is not an
 /// error-message detector: a lone `error: ...` line deliberately does not count.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	let HasExitCode = Inp.raw.lines().any(|l| l.contains("exit code:"));
+	let Exit = Inp.raw.lines().any(|l| l.contains("exit code:"));
 	let PromptMajority = Inp.Majority(|l| l.trim_start().starts_with("$ "), 1);
 	let ShellError = Inp.raw.lines().any(|l| {
 		let t = l.trim();
 		t.starts_with("zsh:") || t.starts_with("bash:") || t.contains("command not found")
 	});
-	HasExitCode || PromptMajority || ShellError
+	Exit || PromptMajority || ShellError
 }

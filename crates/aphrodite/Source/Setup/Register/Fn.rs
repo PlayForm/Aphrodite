@@ -18,13 +18,8 @@ pub(crate) fn Fn() -> Outcome::Enum::Enum {
 	match Command::new("hermes").args(["plugins", "enable", "aphrodite"]).output() {
 		Ok(Out) => {
 			match Out.status.code() {
-				Some(0) => Outcome::Enum::Enum::ExitedZero,
-				Code => {
-					Outcome::Enum::Enum::ExitedNonZero {
-						Code,
-						Stderr:String::from_utf8_lossy(&Out.stderr).into_owned(),
-					}
-				},
+				Some(0) => Outcome::Enum::Enum::Zero,
+				Code => Outcome::Enum::Enum::NonZero { Code, Stderr:String::from_utf8_lossy(&Out.stderr).into_owned() },
 			}
 		},
 		Err(e) => Outcome::Enum::Enum::NotStarted { Cause:e.to_string() },

@@ -1,4 +1,4 @@
-//! `CCRDatabasePath`: the token-mode SQLite CCR database.
+//! `Database`: the token-mode SQLite CCR database.
 
 use std::path::PathBuf;
 

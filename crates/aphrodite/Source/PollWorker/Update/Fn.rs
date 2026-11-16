@@ -22,7 +22,7 @@
 
 use crate::{
 	PollWorker::{
-		Apply::{Applied::Enum::Applied, Fn::Fn as Apply},
+		Apply::{Applied::Enum::Enum as Outcome, Fn::Fn as Apply},
 		Decode::Fn::Fn as Decode,
 		Registry::From::Fn::Fn as Registry,
 		Update::Interpret::Fn::Fn as Interpret,
@@ -35,20 +35,20 @@ use crate::{
 /// `true` when the poll was consumed - it applied to a tracked running task, whether it
 /// progressed or completed it. `false` means the result names no task of ours and the
 /// caller takes the normal compression path.
-pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) -> bool {
-	let ObservedAtUnix = crate::Prefetch::Clock::Fn::UnixNow();
+pub fn Fn(State:&mut AphroditeState, ToolName:&str, Content:&str) -> bool {
+	let ObservedAtUnix = crate::Prefetch::Clock::Fn::Fn();
 	let Turn = State.TurnCounter;
 
-	let Applied:Option<Applied> = Decode(ToolName, Content, ObservedAtUnix).and_then(|Event| {
+	let Outcome:Option<Outcome> = Decode(ToolName, Content, ObservedAtUnix).and_then(|Event| {
 		let mut Tasks = Registry(&mut State.BgTasks);
 
 		Apply(&mut Tasks, &Event, Turn)
 	});
 
-	match Applied {
+	match Outcome {
 		None => false,
-		Some(Applied) => {
-			Interpret(State, Applied);
+		Some(Outcome) => {
+			Interpret(State, Outcome);
 
 			true
 		},

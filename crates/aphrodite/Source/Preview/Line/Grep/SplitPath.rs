@@ -9,11 +9,11 @@
 pub(super) fn Fn(Line:&str) -> Option<(&str, &str)> {
 	let mut Fields = Line.splitn(3, ':');
 	let Path = Fields.next().filter(|Path| !Path.trim().is_empty() && !Path.contains(' '))?;
-	let LineNumber = Fields
+	let Number = Fields
 		.next()
 		.filter(|Field| !Field.is_empty() && Field.chars().all(|Character| Character.is_ascii_digit()))?;
 
 	Fields.next()?;
 
-	Some((Path, LineNumber))
+	Some((Path, Number))
 }

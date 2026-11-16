@@ -17,4 +17,4 @@ use crate::Debug::Flag::State;
 /// The state is three-valued (on / off / absent) because the reader's answer is:
 /// caching a `bool` would make the cache unable to say "this file does not
 /// exist", which is the answer the resolution walks for.
-pub(crate) static FLAG_CACHE:OnceLock<Mutex<HashMap<String, (f64, State::Enum::Enum)>>> = OnceLock::new();
+pub(crate) static Map:OnceLock<Mutex<HashMap<String, (f64, State::Enum::Enum)>>> = OnceLock::new();

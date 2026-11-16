@@ -8,7 +8,7 @@ use axum::{Router, extract::DefaultBodyLimit, routing::any};
 /// `/{*path}` - everything no management route claimed goes upstream.
 ///
 /// Carries its own 64 MB body limit, far larger than the management routes' 1 MB:
-/// config advertises `MaximumContext` up to 1,000,000 tokens, and a chat request at
+/// config advertises `[proxies] max_context` up to 1,000,000 tokens, and a chat request at
 /// even 200k tokens is easily over 1 MB of JSON with tool schemas and history. A
 /// shared 1 MB cap rejected large agent conversations with 413 before
 /// `ProxyHandler` ever ran.

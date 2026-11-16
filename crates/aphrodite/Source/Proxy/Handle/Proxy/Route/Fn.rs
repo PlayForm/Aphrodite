@@ -19,7 +19,7 @@ use axum::http::Method;
 use bytes::Bytes;
 
 use crate::Proxy::{
-	Body::Truncate::Fn::Fn as TruncateCharSafe,
+	Body::Truncate::Fn::Fn as Truncate,
 	Cache::Lookup::{Enum::Enum as CacheLookup, Fn::Fn as LookupCache},
 	Handle::Proxy::Route::Send::Fn::Fn as SendUpstream,
 	Log::Dev::Fn::Fn as DevLog,
@@ -35,7 +35,7 @@ pub(crate) async fn Fn(
 	body:Bytes,
 ) -> axum::response::Response {
 	state.RequestsTotal.fetch_add(1, Ordering::Relaxed);
-	state.RequestBodyBytes.fetch_add(body.len() as u64, Ordering::Relaxed);
+	state.RequestBytes.fetch_add(body.len() as u64, Ordering::Relaxed);
 	let Started = std::time::Instant::now();
 	let RequestID = uuid::Uuid::new_v4().to_string();
 	let ID = RequestID.get(..8).unwrap_or(&RequestID);
@@ -51,7 +51,7 @@ pub(crate) async fn Fn(
 			// header is redacted, every other one is printed truncated.
 			let Rendered = match Name.as_str() {
 				"authorization" => "  authorization: ***".to_string(),
-				Header => format!("  {Header}: {}", TruncateCharSafe(Value.to_str().unwrap_or("?"), 80)),
+				Header => format!("  {Header}: {}", Truncate(Value.to_str().unwrap_or("?"), 80)),
 			};
 
 			HdrLog.push_str(&Rendered);

@@ -55,22 +55,23 @@ impl<'a> Struct<'a> {
 	pub(crate) fn Cap(&self) -> usize { self.State.RecursiveDepth }
 
 	/// Load one hash from the store, through the same primitive every caller uses.
-	pub(crate) fn Load(&mut self, HashValue:&str) -> Option<String> { One::Fn(self.State, HashValue) }
+	pub(crate) fn Load(&mut self, Hash:&str) -> Option<String> { One::Fn(self.State, Hash) }
 
-	/// What this expansion already knows about `HashValue`.
-	pub(crate) fn Cached(&self, HashValue:&str) -> Option<&Expansion::Enum::Enum> { self.Resolved.get(HashValue) }
+	/// What this expansion already knows about `Hash`.
+	pub(crate) fn Cached(&self, Hash:&str) -> Option<&Expansion::Enum::Enum> { self.Resolved.get(Hash) }
 
-	/// Record what `HashValue` produced.
-	pub(crate) fn Cache(&mut self, HashValue:&str, Value:Expansion::Enum::Enum) {
-		let _ = self.Resolved.insert(HashValue.to_string(), Value);
+	/// Record what `Hash` produced.
+	pub(crate) fn Cache(&mut self, Hash:&str, Value:Expansion::Enum::Enum) {
+		let _ = self.Resolved.insert(Hash.to_string(), Value);
 	}
 
-	/// Whether `HashValue` is already on the current path - the cycle test.
-	pub(crate) fn OnPath(&self, HashValue:&str) -> bool { self.Path.iter().any(|OnPath| OnPath == HashValue) }
+	/// Whether `Hash` is already on the current path - the cycle test, so a name that
+	/// says what the answer is FOR rather than what it reads.
+	pub(crate) fn Cycle(&self, Hash:&str) -> bool { self.Path.iter().any(|On| On == Hash) }
 
-	/// Mark `HashValue` as on the path. Its matching `Leave` runs when the hash's own
+	/// Mark `Hash` as on the path. Its matching `Leave` runs when the hash's own
 	/// expansion finishes, whatever it finished with.
-	pub(crate) fn Enter(&mut self, HashValue:&str) { self.Path.push(HashValue.to_string()) }
+	pub(crate) fn Enter(&mut self, Hash:&str) { self.Path.push(Hash.to_string()) }
 
 	/// Take the innermost hash off the path.
 	pub(crate) fn Leave(&mut self) { let _ = self.Path.pop(); }

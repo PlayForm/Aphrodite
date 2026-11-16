@@ -1,6 +1,6 @@
 //! `[defaults]` filling in what a `[[proxies]]` entry omits.
 
-use super::super::{Guard::EnvironmentGuard, MultiConfigurationFromToml};
+use super::super::{Guard::EnvironmentGuard, Toml};
 
 #[test]
 fn TestResolveDefaultsFillInMissingProxyFields() {
@@ -9,7 +9,7 @@ fn TestResolveDefaultsFillInMissingProxyFields() {
 	let _G = EnvironmentGuard();
 	unsafe { std::env::remove_var("APHRODITE_API_URL") };
 	unsafe { std::env::remove_var("APHRODITE_MODEL") };
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[defaults]
 		api_key = "default-key"
@@ -21,7 +21,7 @@ fn TestResolveDefaultsFillInMissingProxyFields() {
 		"#,
 	);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
-	assert_eq!(CLI.APIKey, "default-key");
-	assert_eq!(CLI.APIURL, "https://default.example.com");
+	assert_eq!(CLI.Key, "default-key");
+	assert_eq!(CLI.URL, "https://default.example.com");
 	assert_eq!(CLI.Model, "default-model-name");
 }

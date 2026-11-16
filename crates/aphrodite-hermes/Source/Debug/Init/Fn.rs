@@ -33,7 +33,7 @@ use tracing_subscriber::{
 	util::SubscriberInitExt,
 };
 
-use crate::Debug::Init::{Const::TARGET, Ownership, State::INSTALL};
+use crate::Debug::Init::{Const::TARGET, Level, Ownership, State::Install};
 
 /// Install the process-wide subscriber, once per process, and report who ended
 /// up owning the dispatcher.
@@ -46,17 +46,17 @@ use crate::Debug::Init::{Const::TARGET, Ownership, State::INSTALL};
 ///
 /// The answer is a value, not a side effect: `Installed` means this crate's fmt
 /// layer (target-restricted to [`TARGET`]) owns the dispatcher, so an event of
-/// ours is guaranteed to reach stderr. `HostOwned` means the host got there
-/// first and may drop this crate's events without a word - which is exactly the
-/// case `Debug::Warn` has to know about to add its stderr fallback.
+/// ours is guaranteed to reach stderr. `Host` means the host got there first and
+/// may drop this crate's events without a word - which is exactly the case
+/// `Debug::Warn` has to know about to add its stderr fallback.
 pub(crate) fn Fn() -> &'static Ownership::Enum::Enum {
-	INSTALL.get_or_init(|| {
+	Install.get_or_init(|| {
 		let Filter = std::env::var("RUST_LOG")
 			.ok()
 			.or_else(|| std::env::var("APHRODITE_LOG").ok())
 			.filter(|Spec| !Spec.trim().is_empty())
 			.and_then(|Spec| EnvFilter::try_new(&Spec).ok())
-			.unwrap_or_else(|| EnvFilter::new(LevelName()));
+			.unwrap_or_else(|| EnvFilter::new(Level::Fn::Fn()));
 
 		// OFF by default, TRACE for this crate's targets only: a host dispatcher
 		// may route other crates' events to its own log, and re-printing them
@@ -78,21 +78,7 @@ pub(crate) fn Fn() -> &'static Ownership::Enum::Enum {
 
 		match Subscriber.try_init() {
 			Ok(()) => Ownership::Enum::Enum::Installed,
-			Err(_) => Ownership::Enum::Enum::HostOwned,
+			Err(_) => Ownership::Enum::Enum::Host,
 		}
 	})
-}
-
-/// The filter default when neither env var is set.
-///
-/// Reads the level the engine captured at config load rather than the
-/// environment again: a second read could disagree with the level the debug
-/// file and the flag toggle are gated on, and a log whose filter disagrees with
-/// the feature it logs is worse than no log.
-fn LevelName() -> &'static str {
-	match aphrodite::Debug::Level::Get::Fn::Fn() {
-		0 => "warn",
-		1 => "debug",
-		_ => "trace",
-	}
 }

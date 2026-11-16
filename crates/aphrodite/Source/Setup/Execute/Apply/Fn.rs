@@ -6,11 +6,7 @@ use crate::{
 		Dylib::Copy::Fn::Fn as CopyDylibs,
 		Execute::{Binary, Configuration, Directory, Failure, Plugin, Registration, Report},
 		Plan::{self, Step},
-		Write::{
-			BinaryVersion::Fn as WriteBinaryVersion,
-			InitPy::Fn as WriteInitPy,
-			PluginYAML::Fn as WritePluginYAML,
-		},
+		Write::{BinaryVersion, InitPy, PluginYAML},
 	},
 };
 
@@ -26,17 +22,15 @@ pub(crate) fn Fn(
 	Args:&SetupArgs,
 ) -> Result<(), Failure::Struct::Struct> {
 	let Outcome = match Step {
-		Step::Enum::Enum::CreateDirectories => Directory::Fn::Fn(&Plan.Context),
-		Step::Enum::Enum::PreparePluginDirectory => Plugin::Directory::Fn::Fn(Plan),
-		Step::Enum::Enum::InstallBinary => Binary::Fn::Fn(&Plan.Context),
-		Step::Enum::Enum::InstallDylibs => CopyDylibs(&Plan.Context),
-		Step::Enum::Enum::WriteConfiguration => Configuration::Fn::Fn(&Plan.Context, Args),
-		Step::Enum::Enum::WriteManifest => WritePluginYAML(&Plan.Context, Args),
-		Step::Enum::Enum::WriteLoader => WriteInitPy(&Plan.Context),
-		Step::Enum::Enum::WriteVersionPin => WriteBinaryVersion(&Plan.Context),
-		Step::Enum::Enum::RegisterPlugin => {
-			Registration::Fn::Fn().map(|Registered| Report.Registration = Some(Registered))
-		},
+		Step::Enum::Enum::Create => Directory::Fn::Fn(&Plan.Context),
+		Step::Enum::Enum::Prepare => Plugin::Directory::Fn::Fn(Plan),
+		Step::Enum::Enum::Binary => Binary::Fn::Fn(&Plan.Context),
+		Step::Enum::Enum::Dylib => CopyDylibs(&Plan.Context),
+		Step::Enum::Enum::Configuration => Configuration::Fn::Fn(&Plan.Context, Args),
+		Step::Enum::Enum::Manifest => PluginYAML::Fn(&Plan.Context, Args),
+		Step::Enum::Enum::Loader => InitPy::Fn(&Plan.Context),
+		Step::Enum::Enum::Pin => BinaryVersion::Fn(&Plan.Context),
+		Step::Enum::Enum::Register => Registration::Fn::Fn().map(|Registered| Report.Registration = Some(Registered)),
 	};
 
 	Outcome.map_err(|Error| Failure::Struct::Struct { Completed:std::mem::take(&mut Report.Completed), Error })?;

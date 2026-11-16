@@ -1,13 +1,13 @@
 //! The recent-marker catalog cap and its front-eviction arithmetic.
 
-use crate::State::{Const::RecentMarkersCap, Marker::Struct::MarkerEntry, Struct::AphroditeState};
+use crate::State::{Const::RecentMarkersCap, Marker::Struct::Struct as Entry, Struct::AphroditeState};
 
 #[test]
-fn TestRecordMarkerEviction() {
+fn Eviction() {
 	let mut s = AphroditeState::default();
 	const Recorded:usize = 250;
 	(0..Recorded).for_each(|i| {
-		s.RecordMarker(MarkerEntry {
+		s.RecordMarker(Entry {
 			hash:format!("h{}", i),
 			CCRType:"text".into(),
 			Size:100,

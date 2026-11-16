@@ -5,15 +5,15 @@
 //! simultaneous runs of one command share it, on purpose. `Label` is the short
 //! summary the marker and the nudges show. Neither is an execution identity: that
 //! one is learned from the first poll that names the process and lives on the task
-//! (`Task::Struct::ExecutionID`).
+//! (`Task::Struct::Struct`).
 
-use crate::State::Identity::Command::Struct::CommandID;
+use crate::State::Identity::Command::Struct::Struct as Command;
 
 /// What a backgrounded command is identified by and shown as.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BackgroundPlan {
+pub(crate) struct Struct {
 	/// Command identity: CCR hash of the command line.
-	pub Identity:CommandID,
+	pub Identity:Command,
 	/// Display label: the first 60 characters of the command line.
 	pub Label:String,
 }

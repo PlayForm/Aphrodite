@@ -18,7 +18,7 @@ use crate::ABI::{
 /// host must not stop running over a config file it can simply ignore.
 ///
 /// The file is read and parsed BEFORE the session lock is taken (F9): this fn
-/// used to do the read inside `WithState`'s closure, holding the *global*
+/// used to do the read inside `Guarded`'s closure, holding the *global*
 /// handle-map mutex across disk I/O - on a slow/cold mount, one handle's
 /// reload blocked every other handle's every call, and it was a trap for a
 /// future closure that called back into another `aphrodite_*` fn (non-reentrant

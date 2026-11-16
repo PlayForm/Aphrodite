@@ -2,11 +2,11 @@
 //!
 //! This is the shape callers use when they already hold the state lock for
 //! the whole operation. It is not the shape to reach for when the point is to
-//! keep I/O out of the lock - that caller composes `ReadPaths` and
-//! `InsertOutcomes` itself, which is exactly why the split exists.
+//! keep I/O out of the lock - that caller composes `Paths` and
+//! `Insert` itself, which is exactly why the split exists.
 
 use crate::{
-	Prefetch::{Insert::Fn::InsertOutcomes, Read::Entry::Fn::ReadPaths},
+	Prefetch::{Insert::Fn::Fn as Insert, Read::Entry::Fn::Fn as Paths},
 	State::Struct::AphroditeState,
 };
 
@@ -18,8 +18,6 @@ use crate::{
 /// Callers that already hold a lock across the whole operation (like this
 /// crate's own tests, and `aphrodite-hermes`'s `with_shared`) can keep using
 /// this directly. Callers that want to read files *before* taking their
-/// lock - the point of this split - call `ReadPaths` then `InsertOutcomes`
+/// lock - the point of this split - call `Paths` then `Insert`
 /// separately; see the `AphroditeDispatch` "prefetch" arm in `Library.rs`.
-pub fn PrefetchFiles(State:&mut AphroditeState, Paths:&[String]) -> serde_json::Value {
-	InsertOutcomes(State, ReadPaths(Paths))
-}
+pub fn Fn(State:&mut AphroditeState, List:&[String]) -> serde_json::Value { Insert(State, Paths(List)) }

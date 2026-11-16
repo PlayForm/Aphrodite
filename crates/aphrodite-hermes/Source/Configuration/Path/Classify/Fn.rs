@@ -31,5 +31,5 @@ pub(crate) fn Fn(State:&AphroditeState, Tool:&str, Parsed:&serde_json::Value) ->
 		.or_else(|| State.AutoExpand.then_some(Route::Enum::AutoExpand))
 		.or_else(|| Chained::Fn::Fn(State, Tool, Parsed).then_some(Route::Enum::ChainSplit))
 		.or_else(|| State.LiveContainer.then_some(Route::Enum::LiveContainer))
-		.unwrap_or(Route::Enum::CompressOrPassthrough)
+		.unwrap_or(Route::Enum::Threshold)
 }

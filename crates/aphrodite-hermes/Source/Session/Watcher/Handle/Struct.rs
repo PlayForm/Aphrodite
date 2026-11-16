@@ -18,7 +18,7 @@ use std::{
 /// the thing that makes joining possible.
 ///
 /// `stop` is called on the one path that can replace a running watcher (see
-/// `Watcher::Fn::spawn_config_watcher`); the process-lifetime watcher ends with
+/// `Watcher::Fn::Fn`); the process-lifetime watcher ends with
 /// the process, which is why nothing else calls it. The handle exists so that
 /// "the process exits" is not the ONLY way the thread can end.
 pub(crate) struct Struct {

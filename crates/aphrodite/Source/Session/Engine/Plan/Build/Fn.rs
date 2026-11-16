@@ -20,12 +20,12 @@ use crate::{
 /// The packed entries are the REAL recorded turns (turn → hash/summary/size),
 /// never fabricated message content: the dylib never sees the message list.
 pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, MiddleN:usize) -> Result<Plan, Gate> {
-	// Sorted turns, oldest first (same ordering as `GetConvIndex`).
+	// Sorted turns, oldest first (same ordering as `Index`).
 	let mut Turns:Vec<usize> = State.ConvIndex.keys().copied().collect();
 	Turns.sort_unstable();
 
 	let End = Total.saturating_sub(TailN);
-	let MiddleKeys:Vec<usize> = Turns.get(HeadN..End).ok_or(Gate::MiddleOutOfRange)?.to_vec();
+	let MiddleKeys:Vec<usize> = Turns.get(HeadN..End).ok_or(Gate::OutOfRange)?.to_vec();
 
 	let PackedEntries:Vec<serde_json::Value> = MiddleKeys
 		.iter()
@@ -47,12 +47,9 @@ pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, M
 
 	let Hash = headroom_core::ccr::compute_key(Packed.as_bytes());
 	let Preview = Packed.chars().take(120).collect::<String>();
-	let Marker = crate::Marker::Format::Entry::CCRMarker(&Hash, "context", Packed.len(), &Preview, None, None, None);
-	let Rendered = crate::Flow::Prompt::Render::Fn::RenderPrompt(
-		State,
-		"engine_offload",
-		&[("hash", &Hash), ("tail", &TailN.to_string())],
-	);
+	let Marker = crate::Marker::Format::Entry::Fn(&Hash, "context", Packed.len(), &Preview, None, None, None);
+	let Rendered =
+		crate::Flow::Prompt::Render::Fn::Fn(State, "engine_offload", &[("hash", &Hash), ("tail", &TailN.to_string())]);
 	let Prompt = format!("{Marker}\n{Rendered}");
 
 	Ok(Plan { HeadN, TailN, MiddleN, MiddleKeys, Packed, Hash, Preview, Prompt })

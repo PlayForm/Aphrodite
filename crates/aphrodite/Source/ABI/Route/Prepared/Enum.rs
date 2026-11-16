@@ -1,6 +1,6 @@
 //! A command, with or without its external effects already performed.
 
-use crate::{ABI::Route::Command::Enum::Enum as Command, Prefetch::Outcome::Enum::ReadOutcome};
+use crate::{ABI::Route::Command::Enum::Enum as Command, Prefetch::Outcome::Enum::Enum as Outcome};
 
 /// A command ready to run against a session.
 ///
@@ -15,5 +15,5 @@ pub(crate) enum Enum<'a> {
 	/// No external effect to perform.
 	Ready(Command<'a>),
 	/// The prefetch files were read from disk before the session lock was taken.
-	Prefetch { Outcomes:Vec<(String, ReadOutcome)> },
+	Prefetch { Outcomes:Vec<(String, Outcome)> },
 }

@@ -2,7 +2,7 @@
 
 use crate::{
 	ChainSplit::Prepared::{Claims::Fn::Fn as BatchClaims, Struct::Struct as Prepared},
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// Store every prepared segment, record its marker, and render the payload.
@@ -42,7 +42,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared) -> serde_json::Va
 			// `Size` is read before the text moves into the store; the marker
 			// entry and the payload both describe those same bytes.
 			let Size = Segment.Text.len();
-			State.InlineStorePut(Segment.Hash.clone(), Segment.Text);
+			State.Put(Segment.Hash.clone(), Segment.Text);
 			State.RecordMarker(MarkerEntry {
 				hash:Segment.Hash.clone(),
 				CCRType:Segment.Type.clone(),
@@ -66,7 +66,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared) -> serde_json::Va
 
 	// Tier 1 teaching loop: record the split event so segment retrievals can be
 	// attributed and the split threshold adapted.
-	State.RecordChainSplit(Claims);
+	State.RecordSplit(Claims);
 
 	let Summary = format!(
 		"[chain:{} segs | {} orig → {} markers]",

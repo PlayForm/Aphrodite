@@ -1,6 +1,6 @@
 //! Which task a poll applied to, and what it is called.
 
-use crate::State::Identity::Command::Struct::CommandID;
+use crate::State::Identity::Command::Struct::Struct as Command;
 
 /// The task one poll applied to.
 ///
@@ -15,7 +15,7 @@ pub(crate) struct Subject {
 	/// Position of the task in the registry.
 	pub Index:usize,
 	/// Command identity of that task.
-	pub ID:CommandID,
+	pub ID:Command,
 	/// The command line, for the marker's centre label.
 	pub Command:String,
 }

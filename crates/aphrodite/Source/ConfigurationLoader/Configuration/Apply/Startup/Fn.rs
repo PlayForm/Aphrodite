@@ -1,7 +1,7 @@
 //! Applying a whole document at startup - every section, directives included.
 
 use crate::State::Struct::AphroditeState;
-use super::{super::super::Struct::Struct, Const::Startup};
+use super::{super::super::Struct::Struct, Const::Sequence};
 
 impl Struct {
 	/// Load the whole document into an `AphroditeState` - the startup pass.
@@ -21,10 +21,10 @@ impl Struct {
 	///
 	/// This is not the reload path: a live session already owns its directive set,
 	/// and re-running this against one would overwrite it. That is what
-	/// `ApplyReload` exists for.
-	pub fn ApplyCompression(&self, State:&mut AphroditeState) {
+	/// `Apply::Reload::Fn` exists for.
+	pub fn Startup(&self, State:&mut AphroditeState) {
 		State.ConfigurationError = self.ParseFailure.clone();
 
-		Startup.iter().for_each(|Apply| Apply(self, State));
+		Sequence.iter().for_each(|Apply| Apply(self, State));
 	}
 }

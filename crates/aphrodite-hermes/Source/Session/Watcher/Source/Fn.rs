@@ -37,10 +37,12 @@ pub(crate) fn Fn(Wake:Sender<()>, Paths:&[PathBuf]) -> Result<notify::Recommende
 	})
 	.map_err(|e| format!("config auto-reload watcher failed to start: {e}"))?;
 
-	Paths.iter().for_each(|Dir| {
-		match Notifier.watch(Dir, notify::RecursiveMode::NonRecursive) {
+	Paths.iter().for_each(|Directory| {
+		match Notifier.watch(Directory, notify::RecursiveMode::NonRecursive) {
 			Ok(()) => {},
-			Err(e) => crate::Debug::Warn::Fn::Fn(&format!("config auto-reload: cannot watch {}: {e}", Dir.display())),
+			Err(e) => {
+				crate::Debug::Warn::Fn::Fn(&format!("config auto-reload: cannot watch {}: {e}", Directory.display()))
+			},
 		}
 	});
 

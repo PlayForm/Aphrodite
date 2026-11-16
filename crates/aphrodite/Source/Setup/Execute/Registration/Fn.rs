@@ -24,12 +24,12 @@ pub(crate) fn Fn() -> anyhow::Result<Register::Outcome::Enum::Enum> {
 		Register::Outcome::Enum::Enum::NotStarted { Cause } => {
 			anyhow::bail!("run `hermes plugins enable aphrodite`: {Cause}")
 		},
-		Register::Outcome::Enum::Enum::ExitedNonZero { Stderr, Code } => {
+		Register::Outcome::Enum::Enum::NonZero { Stderr, Code } => {
 			let Status = Code.map_or_else(|| "killed by a signal".to_string(), |Code| format!("exit {Code}"));
 
 			crate::Logging::Stderr::Fn::Fn(&format!("warning: hermes plugins enable aphrodite ({Status}): {Stderr}"));
 		},
-		Register::Outcome::Enum::Enum::ExitedZero => {
+		Register::Outcome::Enum::Enum::Zero => {
 			println!("plugin registered with hermes");
 			println!("  note: setup does not read Hermes' plugin list back - whether the plugin loads is unverified");
 		},

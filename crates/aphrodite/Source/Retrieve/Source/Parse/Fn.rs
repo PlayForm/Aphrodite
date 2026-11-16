@@ -14,7 +14,7 @@ use super::super::Enum;
 /// take ownership of what survives. `map_or` turns the two surviving cases into
 /// the enum, so no caller can hold a `Hash` that is empty.
 pub fn Fn(Hash:Option<&str>) -> Enum::Enum {
-	Hash.map(crate::Marker::Parse::Normalize::NormalizeHash)
+	Hash.map(crate::Marker::Parse::Normalize::Fn)
 		.filter(|Normalized| !Normalized.is_empty())
 		.map(str::to_owned)
 		.map_or(Enum::Enum::Absent, Enum::Enum::Hash)

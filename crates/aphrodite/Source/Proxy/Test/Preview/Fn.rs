@@ -1,7 +1,7 @@
 //! Proxy previews must equal the hook's: the same semantic shape has to
 //! produce the same preview through both paths.
 
-use crate::Proxy::Analysis::Classify::Fn::Fn as ProxyDetectContentType;
+use crate::Proxy::Analysis::Classify::Fn::Fn as Classify;
 
 // ── T3: build_preview ────────────────────────────────────────
 // 1.5.0 (REFACTOR-PLAN §7): `proxy_build_preview` is GONE - the proxy
@@ -9,7 +9,7 @@ use crate::Proxy::Analysis::Classify::Fn::Fn as ProxyDetectContentType;
 // (`crate::Preview::build_preview`, same as the Hermes hook/FFI path),
 // so these pins now exercise the shared builder directly.
 #[test]
-fn TestBuildPreviewCodeHasCtPrefix() {
+fn Code() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let Src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
 	let Preview = crate::Preview::Builder::Entry::Fn("code_rust", Src);
@@ -21,7 +21,7 @@ fn TestBuildPreviewCodeHasCtPrefix() {
 // previews can never drift by construction. The pins below prove the
 // classify → build round-trip still yields enriched `[type:...]` previews.
 #[test]
-fn TestProxyAndHookPreviewsAreIdenticalForSemanticShapes() {
+fn Identical() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let GitStatus = " M src/preview.rs\nA  src/new.rs\nD  src/old.rs\n?? tmp/x\n?? tmp/y";
 	let CargoTest = "test result: ok. 220 passed; 0 failed; 1 ignored; finished in 0.31s";
@@ -30,7 +30,7 @@ fn TestProxyAndHookPreviewsAreIdenticalForSemanticShapes() {
 	[GitStatus, CargoTest, Ripgrep, Ls].into_iter().for_each(|Content| {
 		// Classify via the proxy path, build via the single core builder -
 		// the same call `SmartMarker` makes.
-		let Ct = ProxyDetectContentType(Content);
+		let Ct = Classify(Content);
 		let Preview = crate::Preview::Builder::Entry::Fn(Ct, Content);
 		assert!(Preview.starts_with('['), "expected enriched preview, got {Preview}");
 		assert!(Preview.contains(Ct), "preview must be self-describing for ct={Ct}: {Preview}");
@@ -38,7 +38,7 @@ fn TestProxyAndHookPreviewsAreIdenticalForSemanticShapes() {
 }
 
 #[test]
-fn TestBuildPreviewErrorHasCtPrefixViaErrorLine() {
+fn Error() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let Src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
 	let Preview = crate::Preview::Builder::Entry::Fn("error", Src);
@@ -46,7 +46,7 @@ fn TestBuildPreviewErrorHasCtPrefixViaErrorLine() {
 }
 
 #[test]
-fn TestBuildPreviewDiffHasCtPrefix() {
+fn Diff() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let Src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
 	let Preview = crate::Preview::Builder::Entry::Fn("diff", Src);
@@ -54,7 +54,7 @@ fn TestBuildPreviewDiffHasCtPrefix() {
 }
 
 #[test]
-fn TestBuildPreviewJSONHasCtPrefix() {
+fn JSONPrefix() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let Src = "{\"a\":1,\"b\":2}\n";
 	let Preview = crate::Preview::Builder::Entry::Fn("json", Src);

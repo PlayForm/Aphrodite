@@ -8,15 +8,14 @@ use crate::State::Struct::AphroditeState;
 /// Each knob is resolved independently, so a file that sets only
 /// `EngineMinimumMsgs` still gets every other default.
 pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
-	State.ContextEngineEnabled =
-		Configuration.GetBool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
+	State.ContextEngineEnabled = Configuration.Bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
 	State.EngineThresholdPct =
-		Configuration.GetU64("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45);
-	State.EngineMinimumMsgs = Configuration.GetUsize("APHRODITE_ENGINE_MIN_MSGS", "compression", "engine_min_msgs", 8);
+		Configuration.Number("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45);
+	State.EngineMinimumMsgs = Configuration.Size("APHRODITE_ENGINE_MIN_MSGS", "compression", "engine_min_msgs", 8);
 	State.EngineProtectFirst =
-		Configuration.GetUsize("APHRODITE_ENGINE_PROTECT_FIRST", "compression", "engine_protect_first", 2);
+		Configuration.Size("APHRODITE_ENGINE_PROTECT_FIRST", "compression", "engine_protect_first", 2);
 	State.EngineProtectLast =
-		Configuration.GetUsize("APHRODITE_ENGINE_PROTECT_LAST", "compression", "engine_protect_last", 5);
+		Configuration.Size("APHRODITE_ENGINE_PROTECT_LAST", "compression", "engine_protect_last", 5);
 	// F3: was keyed "tool_threshold" and env var APHRODITE_TOOL_THRESHOLD -
 	// neither exists in any shipped TOML/doc (they use
 	// tool_threshold_token/tool_threshold_cache); wiring this up as-is
@@ -25,9 +24,9 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// cache-vs-token split like the proxy's dual listeners), so it maps
 	// to `ToolThresholdToken`.
 	State.ToolThreshold =
-		Configuration.GetUsize("APHRODITE_TOOL_THRESHOLD_TOKEN", "compression", "tool_threshold_token", 4096);
+		Configuration.Size("APHRODITE_TOOL_THRESHOLD_TOKEN", "compression", "tool_threshold_token", 4096);
 	State.TerminalThreshold =
-		Configuration.GetUsize("APHRODITE_TERMINAL_THRESHOLD", "compression", "terminal_threshold", 1024);
-	State.Model = Configuration.GetString("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
-	State.APIURL = Configuration.GetString("APHRODITE_API_URL", "defaults", "api_url", "");
+		Configuration.Size("APHRODITE_TERMINAL_THRESHOLD", "compression", "terminal_threshold", 1024);
+	State.Model = Configuration.Text("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
+	State.APIURL = Configuration.Text("APHRODITE_API_URL", "defaults", "api_url", "");
 }

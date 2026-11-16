@@ -14,7 +14,7 @@
 
 use crate::Proxy::Analysis::Classify::{
 	Envelope::Fn::Fn as ClassifyEnvelope,
-	FirstLine::Fn::Fn as ClassifyFirstLine,
+	FirstLine::Fn::Fn as Line,
 	Refine::Fn::Fn as RefineName,
 };
 
@@ -22,5 +22,5 @@ use crate::Proxy::Analysis::Classify::{
 pub(crate) fn Fn(Content:&str) -> &'static str {
 	ClassifyEnvelope(Content)
 		.or_else(|| crate::Preview::Detect::SemanticType::Fn(Content).map(|Name| RefineName(Name, Content)))
-		.unwrap_or_else(|| ClassifyFirstLine(Content))
+		.unwrap_or_else(|| Line(Content))
 }

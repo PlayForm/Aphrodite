@@ -3,7 +3,7 @@
 //! base fields when it is on.
 
 use crate::{
-	Prefetch::{Files::Fn::PrefetchFiles, Status::Fn::PrefetchStatus},
+	Prefetch::{Files::Fn::Fn as Files, Status::Fn::Fn as Schedule},
 	State::Struct::AphroditeState,
 };
 
@@ -13,11 +13,11 @@ use crate::{
 // pre-port renderer when off. ──
 
 #[test]
-fn TestPrefetchStatusLiveOffByteIdentical() {
+fn LiveOff() {
 	let mut s = AphroditeState::default();
 	assert!(!s.LiveContainer, "default state must have live_container off");
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
-	let r = PrefetchFiles(&mut s, std::slice::from_ref(&Src));
+	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
 
 	// Reference renderer: the exact algorithm the pre-port bridge
@@ -41,7 +41,7 @@ fn TestPrefetchStatusLiveOffByteIdentical() {
 		"total_ready": ExpectedReady.len(),
 	});
 
-	let Status = PrefetchStatus(&s);
+	let Status = Schedule(&s);
 	assert_eq!(
 		Status, Expected,
 		"live_container off must be byte-identical to the pre-port renderer"
@@ -57,14 +57,14 @@ fn TestPrefetchStatusLiveOffByteIdentical() {
 }
 
 #[test]
-fn TestPrefetchStatusLiveOnSurfacesProgressEta() {
+fn LiveOn() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
-	let r = PrefetchFiles(&mut s, std::slice::from_ref(&Src));
+	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
 
-	let Status = PrefetchStatus(&s);
+	let Status = Schedule(&s);
 	assert_eq!(Status["live_container"], true);
 	let Ready = Status["ready"].as_array().unwrap();
 	assert_eq!(Ready.len(), 1, "one loaded entry: {Status}");
@@ -85,23 +85,23 @@ fn TestPrefetchStatusLiveOnSurfacesProgressEta() {
 }
 
 #[test]
-fn TestPrefetchInstantMarkerContract() {
+fn Instant() {
 	let mut s = AphroditeState::default();
 	s.LiveContainer = true;
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
 	let FileText = std::fs::read_to_string(&Src).unwrap();
-	let r = PrefetchFiles(&mut s, std::slice::from_ref(&Src));
+	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1);
 
 	// Instant marker: the task hash is available immediately in the
 	// prefetch response and on the status surface.
 	let hash = r["results"][0]["hash"].as_str().unwrap().to_string();
 	assert_eq!(hash.len(), 40, "instant hash must be the full 40-char CCR hash");
-	assert_eq!(PrefetchStatus(&s)["ready"][0]["hash"].as_str().unwrap(), hash);
+	assert_eq!(Schedule(&s)["ready"][0]["hash"].as_str().unwrap(), hash);
 
 	// Full content arrives later: stored in the inline store and
 	// retrievable by the instant hash.
-	let Stored = s.InlineStoreGet(&hash);
+	let Stored = s.Get(&hash);
 	assert_eq!(
 		Stored.as_deref(),
 		Some(FileText.as_str()),

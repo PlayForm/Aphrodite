@@ -34,7 +34,7 @@ use crate::Proxy::{
 };
 
 /// A Chat Completions request: a string `model` and a `messages` member.
-fn IsChatCompletion(Value:&Value) -> bool {
+fn IsChat(Value:&Value) -> bool {
 	Value.get("model").and_then(|Model| Model.as_str()).is_some() && Value.get("messages").is_some()
 }
 
@@ -55,8 +55,8 @@ pub(crate) fn Fn(Path:&str, Raw:&[u8], APIKey:&str) -> RequestSemantics {
 	// One shape decision, made once from the parsed value; every arm below reads
 	// it rather than re-testing the body.
 	// `filter`'s predicate sees `&&Value` (the option holds `&Value`), so the
-	// predicate derefs once to hand `IsChatCompletion` the value itself.
-	let Chat = Parsed.as_ref().filter(|Value| IsChatCompletion(Value));
+	// predicate derefs once to hand `IsChat` the value itself.
+	let Chat = Parsed.as_ref().filter(|Value| IsChat(Value));
 
 	// The identity is derived inside the arm that uses it, so a streamed request -
 	// the common case for chat - never pays for canonicalising a body it will not

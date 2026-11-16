@@ -3,7 +3,7 @@
 use crate::State::Struct::AphroditeState;
 
 #[test]
-fn TestRecordFileDedup() {
+fn Dedup() {
 	let mut s = AphroditeState::default();
 	s.RecordFile("/tmp/a".into(), "read".into());
 	s.RecordFile("/tmp/a".into(), "write".into());

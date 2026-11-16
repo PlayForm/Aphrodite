@@ -1,6 +1,6 @@
 //! Environment variables beating the file, and the file beating the default.
 
-use super::super::{Guard::EnvironmentGuard, MultiConfigurationFromToml};
+use super::super::{Guard::EnvironmentGuard, Toml};
 
 // ── T17 (F1): env vars must override TOML values in multi-proxy mode,
 // matching every shipped TOML's own header comment ("Env vars
@@ -19,7 +19,7 @@ fn TestResolveEnvironmentOverridesTomlForAPIURLModelTtlDatabaseNotify() {
 	]
 	.into_iter()
 	.for_each(|(k, v)| unsafe { std::env::set_var(k, v) });
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "token"
@@ -44,12 +44,12 @@ fn TestResolveEnvironmentOverridesTomlForAPIURLModelTtlDatabaseNotify() {
 	]
 	.into_iter()
 	.for_each(|k| unsafe { std::env::remove_var(k) });
-	assert_eq!(CLI.APIURL, "https://env-api.example.com");
+	assert_eq!(CLI.URL, "https://env-api.example.com");
 	assert_eq!(CLI.Model, "env-model");
-	assert_eq!(CLI.CCRTtlSeconds, 42);
-	assert_eq!(CLI.CCRDatabasePath.unwrap().to_string_lossy(), "/tmp/env-ccr.db");
-	assert_eq!(CLI.NotifyURL.as_deref(), Some("https://env-notify.example.com"));
-	assert_eq!(CLI.NotifyKey.as_deref(), Some("env-notify-key"));
+	assert_eq!(CLI.TTL, 42);
+	assert_eq!(CLI.Database.unwrap().to_string_lossy(), "/tmp/env-ccr.db");
+	assert_eq!(CLI.Callback.as_deref(), Some("https://env-notify.example.com"));
+	assert_eq!(CLI.Auth.as_deref(), Some("env-notify-key"));
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn TestResolveFallsBackToTomlWhenEnvironmentUnset() {
 	["APHRODITE_API_URL", "APHRODITE_MODEL", "APHRODITE_CCR_TTL", "APHRODITE_DB"]
 		.into_iter()
 		.for_each(|k| unsafe { std::env::remove_var(k) });
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "token"
@@ -70,9 +70,9 @@ fn TestResolveFallsBackToTomlWhenEnvironmentUnset() {
 		"#,
 	);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
-	assert_eq!(CLI.APIURL, "https://toml-api.example.com");
+	assert_eq!(CLI.URL, "https://toml-api.example.com");
 	assert_eq!(CLI.Model, "toml-model");
-	assert_eq!(CLI.CCRTtlSeconds, 111);
+	assert_eq!(CLI.TTL, 111);
 }
 
 /// Store retention caps: env > `[compression]` > shipped default, and the
@@ -97,25 +97,25 @@ fn TestResolveStoreRetentionCapsEnvironmentTomlDefaults() {
 		api_key = "test-key"
 		"#;
 
-	let Mc = MultiConfigurationFromToml(toml);
+	let Mc = Toml(toml);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
-	assert_eq!(CLI.StoreMaximumEntries, 1234);
-	assert_eq!(CLI.StoreMaximumBytes, 5678);
+	assert_eq!(CLI.Entries, 1234);
+	assert_eq!(CLI.Bytes, 5678);
 
 	unsafe {
 		std::env::set_var("APHRODITE_STORE_MAX_ENTRIES", "9");
 		std::env::set_var("APHRODITE_STORE_MAX_BYTES", "10");
 	}
-	let Mc = MultiConfigurationFromToml(toml);
+	let Mc = Toml(toml);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
 	unsafe {
 		std::env::remove_var("APHRODITE_STORE_MAX_ENTRIES");
 		std::env::remove_var("APHRODITE_STORE_MAX_BYTES");
 	}
-	assert_eq!(CLI.StoreMaximumEntries, 9);
-	assert_eq!(CLI.StoreMaximumBytes, 10);
+	assert_eq!(CLI.Entries, 9);
+	assert_eq!(CLI.Bytes, 10);
 
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "token"
@@ -124,6 +124,6 @@ fn TestResolveStoreRetentionCapsEnvironmentTomlDefaults() {
 		"#,
 	);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
-	assert_eq!(CLI.StoreMaximumEntries, 100_000);
-	assert_eq!(CLI.StoreMaximumBytes, 536_870_912);
+	assert_eq!(CLI.Entries, 100_000);
+	assert_eq!(CLI.Bytes, 536_870_912);
 }

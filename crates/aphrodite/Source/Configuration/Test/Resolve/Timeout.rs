@@ -1,10 +1,10 @@
 //! The upstream timeout ceiling.
 
-use super::super::MultiConfigurationFromToml;
+use super::super::Toml;
 
 #[test]
 fn TestResolveTimeoutClampedTo600() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "slow"
@@ -18,7 +18,7 @@ fn TestResolveTimeoutClampedTo600() {
 
 #[test]
 fn TestResolveTimeoutUnderMaximumIsUnchanged() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "normal"

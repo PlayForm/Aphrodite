@@ -33,11 +33,8 @@ pub(crate) fn Fn(Dir:&Path, Entry:&Entry::Struct::Struct) -> Outcome::Enum::Enum
 		Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
 			match fs::write(&Destination, Entry.Content.as_bytes()) {
 				Ok(()) => Outcome::Enum::Enum::Written(File),
-				Err(WriteError) => {
-					Outcome::Enum::Enum::Warned {
-						Message:format!("could not write directives/{File}: {WriteError}"),
-						File,
-					}
+				Err(Error) => {
+					Outcome::Enum::Enum::Warned { Message:format!("could not write directives/{File}: {Error}"), File }
 				},
 			}
 		},

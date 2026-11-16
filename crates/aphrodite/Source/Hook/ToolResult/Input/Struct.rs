@@ -1,6 +1,6 @@
 //! What a tool-result transform was asked to do.
 
-use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
+use crate::Hook::Meta::Struct::Struct as Call;
 
 /// The input of one tool-result transform.
 ///
@@ -20,5 +20,5 @@ pub struct Struct<'a> {
 	/// Caller-supplied `(content_to_classify, type)`, when the caller knows.
 	pub Classify:Option<(&'a str, &'a str)>,
 	/// Hermes-supplied call metadata.
-	pub Meta:&'a ToolCallMeta<'a>,
+	pub Meta:&'a Call<'a>,
 }

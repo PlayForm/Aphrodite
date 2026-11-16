@@ -55,7 +55,7 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 
 		match (!Name.is_empty()).then_some(Name) {
 			Some(Name) => {
-				Declaration::Declaration {
+				Declaration::Present {
 					Kind:"fn",
 					Name,
 					Parameters:Some(Parameters),
@@ -66,6 +66,6 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 		}
 	}) {
 		Some(Declaration) => Declaration,
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

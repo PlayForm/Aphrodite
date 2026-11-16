@@ -11,10 +11,15 @@
 
 use std::collections::HashMap;
 
-/// TOML template strings (pre-Rust port): preview families, marker block,
-/// prompt templates, reverse key map.
+/// The `[templates]` section of `aphrodite.toml`: preview families, marker
+/// block, prompt templates, reverse key map.
+///
+/// The field names are the TOML keys and are pinned by `#[serde(rename = ...)]`,
+/// so renaming a field here cannot rename a key. An absent section, or an absent
+/// key inside it, deserializes to an empty table - which is the signal that the
+/// hardcoded per-arm builders stay in force.
 #[derive(Debug, Clone, Default, serde::Deserialize)]
-pub struct TemplatesConfiguration {
+pub struct Struct {
 	#[serde(default)]
 	#[serde(rename = "preview")]
 	pub Preview:HashMap<String, HashMap<String, String>>,

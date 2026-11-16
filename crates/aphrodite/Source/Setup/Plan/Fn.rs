@@ -51,24 +51,24 @@ pub(crate) fn Fn(Args:&SetupArgs) -> anyhow::Result<Struct::Struct> {
 
 	let Ownership = Ownership::Fn::Fn(&PluginDirectory, &HermesHome);
 
-	let SetupOwnsDirectory = matches!(Ownership, Ownership::Enum::Enum::Dev | Ownership::Enum::Enum::DevStaleSymlink);
+	let Owned = matches!(Ownership, Ownership::Enum::Enum::Dev | Ownership::Enum::Enum::Stale);
 
 	let ConfigurationPath = Context.AphroditeDirectory.join("aphrodite.toml");
 	let WriteConfiguration = !ConfigurationPath.exists() || Args.Force;
 
 	let Steps:Vec<Step::Enum::Enum> = vec![
-		Step::Enum::Enum::CreateDirectories,
-		Step::Enum::Enum::PreparePluginDirectory,
-		Step::Enum::Enum::InstallBinary,
-		Step::Enum::Enum::InstallDylibs,
+		Step::Enum::Enum::Create,
+		Step::Enum::Enum::Prepare,
+		Step::Enum::Enum::Binary,
+		Step::Enum::Enum::Dylib,
 	]
 	.into_iter()
-	.chain(WriteConfiguration.then_some(Step::Enum::Enum::WriteConfiguration))
+	.chain(WriteConfiguration.then_some(Step::Enum::Enum::Configuration))
 	// The loader and the manifest are the only two artifacts that go into the Hermes
 	// home, so they are the only two a directory setup does not own makes report-only.
-	.chain(SetupOwnsDirectory.then_some(Step::Enum::Enum::WriteManifest))
-	.chain(SetupOwnsDirectory.then_some(Step::Enum::Enum::WriteLoader))
-	.chain([Step::Enum::Enum::WriteVersionPin, Step::Enum::Enum::RegisterPlugin])
+	.chain(Owned.then_some(Step::Enum::Enum::Manifest))
+	.chain(Owned.then_some(Step::Enum::Enum::Loader))
+	.chain([Step::Enum::Enum::Pin, Step::Enum::Enum::Register])
 	.collect();
 
 	Ok(Struct::Struct { Context, Ownership, Steps })

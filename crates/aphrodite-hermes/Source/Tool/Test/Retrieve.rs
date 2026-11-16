@@ -60,7 +60,7 @@ fn test_retrieve_path_within_workspace_ok() {
 		&serde_json::json!({"path": concat!(env!("CARGO_MANIFEST_DIR"), "/Source/Tool/Read/Fn.rs")}).to_string(),
 	);
 	assert_eq!(r["found"], true, "in-workspace path read should succeed: {r:?}");
-	assert!(r["content"].as_str().unwrap().contains("MAX_PATH_READ"));
+	assert!(r["content"].as_str().unwrap().contains("CAP"));
 }
 
 #[test]

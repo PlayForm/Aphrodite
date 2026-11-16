@@ -14,4 +14,4 @@ use crate::Session::Watcher::Handle;
 /// The slot is also what gives the thread an owner. A detached thread's only
 /// owner is the process; a handle in a static can be taken by a host that wants
 /// the thread gone before it unloads this image.
-pub(crate) static RUNNING:OnceLock<Mutex<Option<Handle::Struct::Struct>>> = OnceLock::new();
+pub(crate) static Running:OnceLock<Mutex<Option<Handle::Struct::Struct>>> = OnceLock::new();

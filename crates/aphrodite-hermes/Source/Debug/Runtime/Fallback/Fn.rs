@@ -19,9 +19,9 @@ pub(crate) fn Fn() -> PathBuf {
 		// Hermetic tests: route debug flags / session persistence away from the
 		// real runtime home so the live session's toggle and `session.current`
 		// can never leak into (or be polluted by) the test process.
-		let scratch = std::env::temp_dir().join("aphrodite-hermes-test-home");
-		let _ = std::fs::create_dir_all(&scratch);
-		scratch
+		let Scratch = std::env::temp_dir().join("aphrodite-hermes-test-home");
+		let _ = std::fs::create_dir_all(&Scratch);
+		Scratch
 	}
 	#[cfg(not(test))]
 	{

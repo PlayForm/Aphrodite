@@ -6,7 +6,7 @@
 
 use crate::Preview::{
 	Input::Struct::Struct as Input,
-	Line::Code::{StrongLine, VoteLine},
+	Line::Code::{Strong, Vote},
 };
 
 /// True when the content looks like source code.
@@ -17,7 +17,7 @@ use crate::Preview::{
 /// accumulate two votes, which is why the majority gate exists rather than a
 /// single-line test.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	let CodeStrong = Inp.NonEmpty.iter().any(|l| StrongLine::Fn(l.trim_start()));
-	let CodeVotes = Inp.NonEmpty.iter().filter(|l| VoteLine::Fn(l.trim_start())).count();
+	let CodeStrong = Inp.NonEmpty.iter().any(|l| Strong::Fn(l.trim_start()));
+	let CodeVotes = Inp.NonEmpty.iter().filter(|l| Vote::Fn(l.trim_start())).count();
 	CodeStrong || CodeVotes >= 2
 }

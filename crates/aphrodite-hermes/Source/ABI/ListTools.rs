@@ -3,7 +3,7 @@
 use std::os::raw::c_char;
 
 use crate::{
-	Guard::{Fn::guarded, ToJSON::Fn::Fn as to_json},
+	Guard::{Fn::guarded, ToJSON},
 	Schema,
 };
 
@@ -13,5 +13,5 @@ use crate::{
 /// instead of the empty string `unwrap_or_default()` used to hand the caller.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
-	guarded(|| to_json(&serde_json::json!(Schema::All::Fn::Fn())))
+	guarded(|| ToJSON::Fn::Fn(&serde_json::json!(Schema::All::Fn::Fn())))
 }

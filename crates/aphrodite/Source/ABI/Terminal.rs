@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::MaximumContent};
+use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::Maximum};
 
 stateful!(
 	/// Transform captured terminal output through the terminal hook and answer
@@ -20,12 +20,8 @@ stateful!(
 	/// `AphroditeFreeString`.
 	AphroditeTerminal,
 	|s, Content:*const c_char| {
-		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
-			anyhow::anyhow!("content exceeds 16MB limit")
-		})?;
+		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > Maximum, || anyhow::anyhow!("content exceeds 16MB limit"))?;
 
-		Ok(Answer::JSON(crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(
-			s, &Content,
-		)))
+		Ok(Answer::JSON(crate::Hook::Terminal::Entry::Fn::Fn(s, &Content)))
 	}
 );

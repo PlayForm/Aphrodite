@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::MaximumContent};
+use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::Maximum};
 
 stateful!(
 	/// Transform a tool result through the live hook pipeline and answer with
@@ -20,12 +20,8 @@ stateful!(
 	/// released with `AphroditeFreeString`.
 	AphroditeTransform,
 	|s, Content:*const c_char, Tool:*const c_char| {
-		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
-			anyhow::anyhow!("content exceeds 16MB limit")
-		})?;
+		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > Maximum, || anyhow::anyhow!("content exceeds 16MB limit"))?;
 
-		Ok(Answer::JSON(crate::Hook::ToolResult::Entry::Fn::TransformToolResult(
-			s, &Content, &Tool,
-		)))
+		Ok(Answer::JSON(crate::Hook::ToolResult::Entry::Fn::Fn(s, &Content, &Tool)))
 	}
 );

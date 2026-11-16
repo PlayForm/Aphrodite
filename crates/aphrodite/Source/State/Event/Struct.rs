@@ -3,7 +3,7 @@
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
 /// stored, never raw args, so no PII lands in state.
 #[derive(Debug, Clone)]
-pub struct ToolEvent {
+pub struct Struct {
 	/// Turn on which the call happened.
 	pub Turn:usize,
 	/// Tool name (or `"terminal"` for terminal output).

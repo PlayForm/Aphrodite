@@ -3,38 +3,38 @@
 
 use crate::{
 	PollWorker::{
-		Insert::Fn::InsertBgTask,
-		Status::Fn::RenderBgTaskStatus,
-		Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+		Insert::Fn::Fn as Insert,
+		Status::Fn::Fn as Render,
+		Task::Status::{Enum::Enum as Status, Stored::Struct::Struct as Payload},
 	},
-	State::{Identity::Content::Struct::ContentHash, Struct::AphroditeState},
+	State::{Identity::Content::Struct::Struct as Digest, Struct::AphroditeState},
 };
 
-fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
+fn Finished() -> Payload { Payload { Hash:Digest::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 #[test]
-fn TestRenderBgTaskStatusHonoursTheFeatureFlag() {
+fn Flag() {
 	// A disabled poll worker renders no section even with a running task: the flag is
 	// the renderer's contract, so the two ways of having nothing to say agree.
 	let mut State = AphroditeState::default();
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 	State.PollWorkerEnabled = false;
 
-	assert_eq!(RenderBgTaskStatus(&State), "");
+	assert_eq!(Render(&State), "");
 }
 
 #[test]
-fn TestRenderBgTaskStatusEmpty() {
+fn Empty() {
 	let State = AphroditeState::default();
-	assert_eq!(RenderBgTaskStatus(&State), "");
+	assert_eq!(Render(&State), "");
 }
 
 #[test]
-fn TestRenderBgTaskStatusWithTasks() {
+fn Tasks() {
 	let mut State = AphroditeState::default();
-	InsertBgTask(&mut State, "task1".into(), "terminal".into(), "cargo build".into(), 5);
-	InsertBgTask(&mut State, "task2".into(), "terminal".into(), "npm install".into(), 6);
-	let Rendered = RenderBgTaskStatus(&State);
+	Insert(&mut State, "task1".into(), "terminal".into(), "cargo build".into(), 5);
+	Insert(&mut State, "task2".into(), "terminal".into(), "npm install".into(), 6);
+	let Rendered = Render(&State);
 	assert!(Rendered.contains("[poll workers]"));
 	assert!(Rendered.contains("cargo build"));
 	assert!(Rendered.contains("npm install"));
@@ -42,15 +42,15 @@ fn TestRenderBgTaskStatusWithTasks() {
 }
 
 #[test]
-fn TestRenderBgTaskStatusWithMixedStates() {
+fn Mixed() {
 	let mut State = AphroditeState::default();
-	InsertBgTask(&mut State, "r1".into(), "terminal".into(), "running1".into(), 1);
-	InsertBgTask(&mut State, "r2".into(), "terminal".into(), "running2".into(), 2);
+	Insert(&mut State, "r1".into(), "terminal".into(), "running1".into(), 1);
+	Insert(&mut State, "r2".into(), "terminal".into(), "running2".into(), 2);
 	// Mark one as done.
-	State.BgTasks[1].Status = BgStatus::Done { Output:Finished() };
-	InsertBgTask(&mut State, "r3".into(), "terminal".into(), "running3".into(), 3);
+	State.BgTasks[1].Status = Status::Done { Output:Finished() };
+	Insert(&mut State, "r3".into(), "terminal".into(), "running3".into(), 3);
 
-	let Rendered = RenderBgTaskStatus(&State);
+	let Rendered = Render(&State);
 	assert!(Rendered.contains("[poll workers]"));
 	assert!(Rendered.contains("2 active task(s)"), "only running tasks count: {}", Rendered);
 	// r3 is running, r1 is running = 2 active.
@@ -63,17 +63,17 @@ fn TestRenderBgTaskStatusWithMixedStates() {
 // enabled (off-path byte-identical). ──
 
 #[test]
-fn TestRenderLiveContainerLineOnlyWhenEnabled() {
+fn Live() {
 	// Off (default): byte-identical to the pre-port renderer.
 	let mut State = AphroditeState::default();
 	assert!(!State.LiveContainer, "default state must have live_container off");
-	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
+	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 	let Expected = "[poll workers] 1 active task(s):\n  · `cargo build` - running since turn 1 (not polled yet)";
-	assert_eq!(RenderBgTaskStatus(&State), Expected, "off-path render must be byte-identical");
+	assert_eq!(Render(&State), Expected, "off-path render must be byte-identical");
 
 	// On: a live-container line with byte progress appears.
 	State.LiveContainer = true;
-	let Rendered = RenderBgTaskStatus(&State);
+	let Rendered = Render(&State);
 	assert!(
 		Rendered.contains("[live container]"),
 		"live mode must add a container line: {Rendered}"

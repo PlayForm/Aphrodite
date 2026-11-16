@@ -16,13 +16,7 @@ use crate::{
 
 /// Emit the `pre_turn_sections` line: one label + byte size per surviving section, the
 /// flow budget, the floor, and the cumulative metrics snapshot.
-pub(crate) fn LogPreTurn(
-	State:&AphroditeState,
-	T0:Option<std::time::Instant>,
-	Budget:usize,
-	Floor:usize,
-	Sections:&[Section],
-) {
+pub(crate) fn Fn(State:&AphroditeState, T0:Option<std::time::Instant>, Budget:usize, Floor:usize, Sections:&[Section]) {
 	let _ = T0.inspect(|T0| {
 		let Us = T0.elapsed().as_micros() as u64;
 		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::PreTurn, Us);

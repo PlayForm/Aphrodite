@@ -3,11 +3,11 @@
 
 use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
-	Proxy::Test::Support::State::Fn::{TestState, TestStateWithCCR},
+	Proxy::Test::Support::State::Fn::{TestState, WithCCR},
 };
 
 #[test]
-fn TestStatsJSONModes() {
+fn Modes() {
 	let Cache = TestState();
 	let Stats = Cache.StatsJSON();
 	assert_eq!(Stats["mode"], "cache");
@@ -23,7 +23,7 @@ fn TestStatsJSONModes() {
 // must both be visible - a duplicate JSON key used to let the stats
 // object silently shadow the boolean. ──
 #[test]
-fn TestStatsJSONToolRelayEnabledFlagNotShadowed() {
+fn Flag() {
 	let mut State = TestState();
 	State.ToolRelay = true;
 	let Stats = State.StatsJSON();
@@ -40,8 +40,8 @@ fn TestStatsJSONToolRelayEnabledFlagNotShadowed() {
 /// `entries: 0` - the same "telemetry that lies" class as `FillPct`
 /// being read as store occupancy. They must reflect the live backend.
 #[test]
-fn TestStatsJSONCCRStoreReportsLiveValues() {
-	let State = TestStateWithCCR();
+fn Live() {
+	let State = WithCCR();
 	let ccr = State.ccr.clone().expect("test state has a store");
 	assert!(ccr.put_checked("live-entry", "payload"));
 

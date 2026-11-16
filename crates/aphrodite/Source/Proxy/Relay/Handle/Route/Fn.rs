@@ -22,16 +22,16 @@ use axum::{
 
 use crate::Proxy::{
 	Relay::{
-		Execute::Fn::Fn as ExecuteToolRelay,
+		Execute::Fn::Fn as Execute,
 		Handle::Route::Sync::Fn::Fn as ExecuteSynchronously,
-		Request::Struct::Struct as ToolRelayRequest,
-		Response::Struct::Struct as ToolRelayResponse,
+		Request::Struct::Struct as RelayRequest,
+		Response::Struct::Struct as RelayResponse,
 	},
 	State::Struct::Struct as AppState,
 };
 
-pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Response {
-	state.ToolRelayCalls.fetch_add(1, Ordering::Relaxed);
+pub(crate) async fn Fn(state:Arc<AppState>, Request:RelayRequest) -> Response {
+	state.RelayCalls.fetch_add(1, Ordering::Relaxed);
 	tracing::info!(Tool = %Request.Tool, "tool_relay");
 
 	// Validate aphrodite_retrieve: a request with only `Query` and no `hash` is
@@ -41,7 +41,7 @@ pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Respons
 	let Some(()) = Acceptable.then_some(()) else {
 		return (
 			StatusCode::BAD_REQUEST,
-			Json(ToolRelayResponse {
+			Json(RelayResponse {
 				Success:false,
 				Result:None,
 				error:Some(
@@ -69,7 +69,7 @@ pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Respons
 
 		return (
 			StatusCode::BAD_REQUEST,
-			Json(ToolRelayResponse {
+			Json(RelayResponse {
 				Success:false,
 				Result:None,
 				error:Some("callback_url must use the https scheme".into()),
@@ -90,15 +90,15 @@ pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Respons
 		// synchronous path returns, so an `{"Ok": ...}` / `{"Err": "..."}`
 		// envelope reaches the callback URL either way; only the error's
 		// representation changes, and `{e:#}` keeps the whole anyhow chain.
-		let Result = ExecuteToolRelay(&state, &Tool, &Params).await.map_err(|e| format!("{e:#}"));
+		let Result = Execute(&state, &Tool, &Params).await.map_err(|e| format!("{e:#}"));
 		// F13: the execute result itself was never counted on this async path -
 		// only the synchronous path incremented these, so
 		// `tool_relay_success + tool_relay_failure` silently diverged from
-		// `ToolRelayCalls` for every async callback request.
+		// `RelayCalls` for every async callback request.
 		let _ = Result
 			.is_ok()
-			.then_some(&state.ToolRelaySuccess)
-			.unwrap_or(&state.ToolRelayFailure)
+			.then_some(&state.RelaySuccess)
+			.unwrap_or(&state.RelayFailure)
 			.fetch_add(1, Ordering::Relaxed);
 
 		let _ = state
@@ -110,5 +110,5 @@ pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Respons
 			.await;
 	});
 
-	Json(ToolRelayResponse { Success:true, Result:None, error:None, AsyncCall:true }).into_response()
+	Json(RelayResponse { Success:true, Result:None, error:None, AsyncCall:true }).into_response()
 }

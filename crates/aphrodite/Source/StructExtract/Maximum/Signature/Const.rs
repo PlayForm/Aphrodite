@@ -1,6 +1,6 @@
 //! The cap on one signature line.
 //!
-//! Named `Const` because the file name carries the domain, per the house style.
+//! Named `Const` because the path carries the domain, per the house style.
 #![allow(non_upper_case_globals)]
 
 /// Characters one rendered signature line may occupy: 60.

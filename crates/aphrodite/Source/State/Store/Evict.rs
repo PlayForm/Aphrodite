@@ -36,7 +36,7 @@ impl AphroditeState {
 	/// satisfied. `inline_order.pop_lru` removes the LRU in O(1); the pass ends
 	/// when the order is empty (map and order are kept in sync, so this guards
 	/// against divergence rather than a reachable state).
-	pub(super) fn EvictOverBudget(&mut self) {
+	pub(super) fn Evict(&mut self) {
 		let Passes = self.InlineOrder.len();
 
 		// One entry leaves the order per step, so its length bounds the steps this

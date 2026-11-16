@@ -9,15 +9,15 @@
 //! supplied sink, so the destination never has to be redirected at all.
 
 use crate::Debug::{
-	Flag::{Read::Fn::Fn as read, State as FlagState},
-	Init::{Fn::Fn as install, Ownership},
-	Log::Bridge::At::Fn::Fn as bridge_at,
-	Warn::Fn::Fn as warn,
+	Flag::{Read, State},
+	Init::{Fn, Ownership},
+	Log::Bridge::At,
+	Warn,
 };
 
 /// A scratch flag file with a unique name, so the mtime cache cannot confuse one
 /// probe with another.
-fn scratch(Tag:&str, Text:&str) -> std::path::PathBuf {
+fn Scratch(Tag:&str, Text:&str) -> std::path::PathBuf {
 	let Stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
@@ -34,15 +34,15 @@ fn scratch(Tag:&str, Text:&str) -> std::path::PathBuf {
 // new one. `try_init` is what makes that true when a host got there first. ──
 #[test]
 fn probe_subscriber_install_is_idempotent() {
-	install();
-	let First = install();
+	Fn::Fn();
+	let First = Fn::Fn();
 
 	assert!(
 		Ownership::Fn::Fn().is_some(),
 		"the install must record who owns the dispatcher, not merely perform it"
 	);
 	assert!(
-		std::ptr::eq(First, install()),
+		std::ptr::eq(First, Fn::Fn()),
 		"a second install must return the recorded decision, not compute a new one"
 	);
 }
@@ -53,9 +53,9 @@ fn probe_subscriber_install_is_idempotent() {
 // Neither may panic. ──
 #[test]
 fn probe_warn_survives_before_and_after_the_install() {
-	warn("logging-pass probe: before any install");
-	install();
-	warn("logging-pass probe: after the install");
+	Warn::Fn::Fn("logging-pass probe: before any install");
+	Fn::Fn();
+	Warn::Fn::Fn("logging-pass probe: after the install");
 }
 
 // ── The bridge's decision, asserted at the seam that makes it a decision: an
@@ -63,23 +63,24 @@ fn probe_warn_survives_before_and_after_the_install() {
 // event name and the caller's fields in the caller's order. ──
 #[test]
 fn probe_bridge_hands_the_record_to_its_sink() {
-	let mut State = crate::Configuration::Template::Fn::config_template().clone();
+	let mut State = crate::Configuration::Template::Fn::Fn().clone();
 	// A non-zero level wins over the flag file, so this probe reads no
 	// filesystem and depends on no session.
 	State.DebugLevel = 1;
 
 	let Captured = std::cell::RefCell::new(Vec::new());
 
-	bridge_at(
+	At::Fn::Fn(
 		&State,
 		"probe-root",
 		"bridge_probe",
 		&[("k", "v".to_string())],
-		|Level, Event, Kv| {
+		|Level, Event, Fields| {
 			Captured.borrow_mut().push((
 				Level,
 				Event.to_string(),
-				Kv.iter()
+				Fields
+					.iter()
 					.map(|(Key, Value)| ((*Key).to_string(), Value.clone()))
 					.collect::<Vec<_>>(),
 			));
@@ -101,11 +102,11 @@ fn probe_bridge_hands_the_record_to_its_sink() {
 // never called, so the cost of a disabled debug channel is one level read. ──
 #[test]
 fn probe_bridge_stays_silent_at_level_zero() {
-	let mut State = crate::Configuration::Template::Fn::config_template().clone();
+	let mut State = crate::Configuration::Template::Fn::Fn().clone();
 	State.DebugLevel = 0;
 
 	let mut Called = false;
-	bridge_at(&State, "probe-quiet-no-flag-file", "quiet", &[], |_, _, _| Called = true);
+	At::Fn::Fn(&State, "probe-quiet-no-flag-file", "quiet", &[], |_, _, _| Called = true);
 
 	assert!(!Called, "level 0 with no flag file for the session must not reach the sink");
 }
@@ -115,10 +116,10 @@ fn probe_bridge_stays_silent_at_level_zero() {
 // trailing newline, so the first log line can be fused onto the flag value. ──
 #[test]
 fn probe_flag_read_tolerates_a_fused_log_line() {
-	let Path = scratch("fused", "on[2026-01-01T00:00:00.000000Z] [aphrodite-debug] lvl=1 event=x\n");
+	let Path = Scratch("fused", "on[2026-01-01T00:00:00.000000Z] [aphrodite-debug] lvl=1 event=x\n");
 
 	assert!(
-		matches!(read(&Path), FlagState::Enum::Enum::On),
+		matches!(Read::Fn::Fn(&Path), State::Enum::Enum::On),
 		"a flag fused with the first log line must still read as on"
 	);
 
@@ -130,10 +131,10 @@ fn probe_flag_read_tolerates_a_fused_log_line() {
 // returning a `bool`. ──
 #[test]
 fn probe_flag_read_distinguishes_off_from_absent() {
-	let Off = scratch("off", "off\n");
+	let Off = Scratch("off", "off\n");
 
 	assert!(
-		matches!(read(&Off), FlagState::Enum::Enum::Off),
+		matches!(Read::Fn::Fn(&Off), State::Enum::Enum::Off),
 		"an explicit off must read as off"
 	);
 
@@ -143,7 +144,7 @@ fn probe_flag_read_distinguishes_off_from_absent() {
 	let _ = std::fs::remove_file(&Absent);
 
 	assert!(
-		matches!(read(&Absent), FlagState::Enum::Enum::Absent),
+		matches!(Read::Fn::Fn(&Absent), State::Enum::Enum::Absent),
 		"a missing flag file must read as absent, never as an explicit off"
 	);
 }

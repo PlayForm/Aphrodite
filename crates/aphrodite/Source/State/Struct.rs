@@ -13,11 +13,11 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::State::{
-	ChainSplit::Struct::SplitEvent,
-	Directive::Struct::ActiveDirective,
-	Event::Struct::ToolEvent,
-	Marker::Struct::MarkerEntry,
-	Template::Struct::TemplatesConfiguration,
+	ChainSplit::Struct::Struct as Split,
+	Directive::Struct::Struct as Nudge,
+	Event::Struct::Struct as Call,
+	Marker::Struct::Struct as Entry,
+	Template::Struct::Struct as Templates,
 };
 
 /// Session state - one per loaded dylib instance.
@@ -35,27 +35,27 @@ pub struct AphroditeState {
 	pub InlineStore:HashMap<String, String>,
 	/// LRU recency order of `InlineStore` keys (unit values). Capacity is
 	/// `INLINE_MAX + 1` so the cache never self-evicts before the explicit
-	/// `EvictOverBudget` pass in `InlineStorePut` (fix 1: previously a
+	/// `Evict` pass in `Put` (fix 1: previously a
 	/// `VecDeque` whose promotion/upsert needed an O(n) `retain` scan).
 	pub InlineOrder:lru::LruCache<String, ()>,
 	/// Running total of `content.len()` across every entry in `InlineStore`,
-	/// maintained incrementally by `InlineStorePut` so eviction doesn't
+	/// maintained incrementally by `Put` so eviction doesn't
 	/// need an O(n) rescan on every insert (report 05 F11).
 	pub(super) InlineStoreBytes:usize,
 	/// Byte budget for `InlineStore`; entries are evicted from the back
 	/// (oldest/least-recently-used) until the running total is at or under
 	/// this, in addition to the existing `InlineMaximum` entry-count cap.
 	/// Defaults to [`super::DEFAULT_INLINE_BYTE_BUDGET`]; see
-	/// `InlineStoreByteBudget`/`SetInlineStoreByteBudget`.
+	/// `Budget`/`Set`.
 	pub(super) InlineStoreByteBudget:usize,
 	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}].
 	/// `VecDeque` (fix 6): `RecordMarker` pushes back and pops the front
 	/// while over `RecentMarkersCap`, so the oldest marker always sits at
 	/// index 0.
-	pub RecentMarkers:VecDeque<MarkerEntry>,
+	pub RecentMarkers:VecDeque<Entry>,
 	/// Conversation index: {turn_num: (hash, summary, size)} - the last
 	/// marker archived per turn by `Session::archive_turn`, called from
-	/// `Hook::LLM::Post::Fn::Fn` (report 06 F11/T13: previously `ArchiveTurn`
+	/// `Hook::LLM::Post::Fn::Fn` (report 06 F11/T13: previously `Archive`
 	/// was never called from any hook, so this stayed empty forever and
 	/// `aphrodite_diff` always returned zero turns).
 	pub ConvIndex:HashMap<usize, (String, String, usize)>,
@@ -106,7 +106,7 @@ pub struct AphroditeState {
 	/// Ephemeral (one-shot / TTL) directives - inline nudges that render once
 	/// (or for a bounded number of turns) then self-purge (P3/T9). Distinct
 	/// from `ActiveDirectives` (permanent-until-removed named entries).
-	pub EphemeralDirectives:Vec<ActiveDirective>,
+	pub EphemeralDirectives:Vec<Nudge>,
 	// ── Flow context assembler (P1) ──
 	/// Hard cap for ALL per-turn injected context assembled by
 	/// `Flow::build_turn_context` (default 4000 chars, `[flow] budget_chars`).
@@ -117,7 +117,7 @@ pub struct AphroditeState {
 	pub SessionInject:String,
 	/// `[templates]` section (pre-Rust port) - preview families, marker block,
 	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
-	pub Templates:Option<TemplatesConfiguration>,
+	pub Templates:Option<Templates>,
 	/// `[compression] auto_expand` (pre-Rust port): when true, compressed
 	/// tool outputs are resolved inline instead of emitting markers (capped
 	/// by `AutoExpandLimit` bytes). Default false = markers appear.
@@ -148,11 +148,11 @@ pub struct AphroditeState {
 	// ── Turn-telemetry spine (P2) ──
 	/// Bounded ring of per-tool-call events (cap 200, evict front). Feeds phase
 	/// detection, error-loop breaking, delta previews, checkpoints (P6-P11).
-	pub ToolEvents:VecDeque<ToolEvent>,
+	pub ToolEvents:VecDeque<Call>,
 	// ── Poll-worker auto-backgrounding ──
 	/// Background tasks created by the poll-worker auto-backgrounding
 	/// heuristic (cap 4, evict oldest completed/stale on overflow).
-	pub BgTasks:VecDeque<crate::PollWorker::Task::Struct::BgTask>,
+	pub BgTasks:VecDeque<crate::PollWorker::Task::Struct::Struct>,
 	/// Master on/off for poll-worker auto-backgrounding. When false,
 	/// no tool output is auto-backgrounded (existing bg_tasks still
 	/// receive lifecycle nudges and expiry). Default true. Env:
@@ -162,7 +162,7 @@ pub struct AphroditeState {
 	/// (`a && b && c`) with segment markers and split the output into
 	/// per-segment CCR entries, so the agent sees N compact previews
 	/// instead of one giant blob. Struct default false (fix 2), matching
-	/// the shipped config default; `ApplyCompression` resolves the TOML/env
+	/// the shipped config default; `Apply::Startup::Fn` resolves the TOML/env
 	/// override (opt-in per session via `APHRODITE_CHAIN_SPLIT=1` or TOML
 	/// `[compression] chain_split`). Env: `APHRODITE_CHAIN_SPLIT`, TOML:
 	/// `[compression] chain_split`.
@@ -187,7 +187,7 @@ pub struct AphroditeState {
 	/// later retrieved. Bounded ring (cap `SplitEventCap`); oldest
 	/// evicted. `SplitSegmentMap` maps each produced segment hash to its
 	/// event id so a resolve can be attributed to the right event.
-	pub SplitEvents:VecDeque<SplitEvent>,
+	pub SplitEvents:VecDeque<Split>,
 	/// Segment hash → split-event id, for retrieval attribution. A hash
 	/// resolves at most once (removed after counting), so re-retrieving the
 	/// same marker never double-counts.

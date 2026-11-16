@@ -17,10 +17,10 @@
 
 use crate::{
 	Flow::{
-		Engine::Offload::Fn::EngineOffloadBlock,
-		FirstTurn::Fn::BuildFirstTurnInjection,
-		Nudge::Render::Fn::RenderNudges,
-		Retrieval::{AutoExpand::Fn::AutoExpandGuidanceBlock, Guidance::Fn::RetrievalGuidanceBlock},
+		Engine::Offload::Block::Fn::Fn as Offload,
+		FirstTurn::Fn::Fn as FirstTurn,
+		Nudge::Render::Fn::Fn as Nudge,
+		Retrieval::{AutoExpand::Fn::Fn as Expand, Guidance::Fn::Fn as Guidance},
 		Section::Struct::Struct as Section,
 	},
 	State::Struct::AphroditeState,
@@ -34,33 +34,33 @@ use crate::{
 /// poll-worker status and the recall catalog are `Optional` (dropped from the
 /// bottom when the turn is too big). A section that rendered nothing is not a
 /// candidate at all, so the budget never protects text that does not exist.
-pub(crate) fn CollectSections(State:&mut AphroditeState) -> Vec<Section> {
+pub(crate) fn Fn(State:&mut AphroditeState) -> Vec<Section> {
 	// ── First-turn session injection (always-survive, top priority) ──
-	let SessionInject = BuildFirstTurnInjection(State);
+	let SessionInject = FirstTurn(State);
 
 	// ── Always-survive sections (top priority) ──
 	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
-	let Nudges = RenderNudges(State);
+	let Nudges = Nudge(State);
 
 	// ── Context-engine trigger + offload prompt (fires only when the engine
 	// archived messages this turn; runs before the recall summary so any engine
 	// state mutation lands before the catalog reads the markers) ──
-	let EngineOffload = EngineOffloadBlock(State);
+	let EngineOffload = Offload(State);
 
 	// ── Retrieval guidance (opt-in via [prompts] retrieve_guidance; drops before
 	// bg status / recall under budget pressure) ──
-	let Retrieve = RetrievalGuidanceBlock(State);
+	let Retrieve = Guidance(State);
 
 	// ── Auto-expand guidance (opt-in via state.auto_expand; drops before bg status
 	// / recall under budget pressure) ──
-	let AutoExpand = AutoExpandGuidanceBlock(State);
+	let AutoExpand = Expand(State);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
-	let Recall = crate::Session::Catalog::Fn::CatalogSummary(State);
+	let Recall = crate::Session::Catalog::Fn::Fn(State);
 
 	// ── Poll-worker status (above recall, dropped after recall). The renderer owns
 	// the feature flag, so a disabled poll worker is an empty section here. ──
-	let BgStatus = crate::PollWorker::Status::Fn::RenderBgTaskStatus(State);
+	let BgStatus = crate::PollWorker::Status::Fn::Fn(State);
 
 	[
 		(!SessionInject.is_empty())

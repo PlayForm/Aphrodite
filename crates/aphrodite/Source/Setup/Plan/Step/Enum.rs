@@ -13,21 +13,21 @@
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Enum {
 	/// Create the runtime home and its `binaries/` directory.
-	CreateDirectories,
+	Create,
 	/// Take the plugin directory, unless a catalog install owns it.
-	PreparePluginDirectory,
+	Prepare,
 	/// Copy the running binary into `binaries/`.
-	InstallBinary,
+	Binary,
 	/// Copy or download both dylibs into `binaries/`.
-	InstallDylibs,
+	Dylib,
 	/// Write `aphrodite.toml` - absent, or `--force`.
-	WriteConfiguration,
+	Configuration,
 	/// Write the generated `plugin.yaml` manifest.
-	WriteManifest,
+	Manifest,
 	/// Write the `__init__.py` loader.
-	WriteLoader,
+	Loader,
 	/// Pin the crate version into `BINARY_VERSION`.
-	WriteVersionPin,
+	Pin,
 	/// Run `hermes plugins enable aphrodite`.
-	RegisterPlugin,
+	Register,
 }

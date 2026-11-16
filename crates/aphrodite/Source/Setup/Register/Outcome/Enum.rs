@@ -25,7 +25,7 @@ pub(crate) enum Enum {
 	},
 	/// The CLI started and exited non-zero. It has already told the user why on
 	/// stderr; the plugin may still be discovered on Hermes' next scan.
-	ExitedNonZero {
+	NonZero {
 		/// The exit code, or `None` when the process was killed by a signal.
 		Code:Option<i32>,
 		/// The command's own stderr, verbatim.
@@ -33,5 +33,5 @@ pub(crate) enum Enum {
 	},
 	/// The CLI started and exited zero. The command succeeded; whether the plugin
 	/// loads is not known here.
-	ExitedZero,
+	Zero,
 }

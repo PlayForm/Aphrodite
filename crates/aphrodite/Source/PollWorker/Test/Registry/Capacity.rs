@@ -1,28 +1,28 @@
 //! Capacity is a non-zero type, and admission never exceeds it.
 
 use crate::{
-	PollWorker::{Insert::Fn::InsertBgTask, Registry::Capacity::Struct::Capacity, Task::Const::MaximumBgTasks},
-	State::{Identity::Command::Struct::CommandID, Struct::AphroditeState},
+	PollWorker::{Insert::Fn::Fn as Insert, Registry::Capacity::Struct::Capacity, Task::Const::Maximum},
+	State::{Identity::Command::Struct::Struct as Command, Struct::AphroditeState},
 };
 
 #[test]
-fn TestCapacityIsThePolicyBoundAndNonZero() {
-	assert_eq!(Capacity::Policy.Get(), MaximumBgTasks);
+fn Policy() {
+	assert_eq!(Capacity::Policy.Get(), Maximum);
 	assert!(Capacity::Policy.Get() > 0, "a zero capacity is not a representable state");
 }
 
 #[test]
-fn TestAdmissionNeverExceedsCapacity() {
+fn Admission() {
 	let mut State = AphroditeState::default();
-	(0..MaximumBgTasks + 3).for_each(|i| {
-		InsertBgTask(
+	(0..Maximum + 3).for_each(|i| {
+		Insert(
 			&mut State,
-			CommandID::from(format!("task{i}")),
+			Command::from(format!("task{i}")),
 			"terminal".into(),
 			format!("cmd{i}"),
 			i,
 		);
 	});
 
-	assert_eq!(State.BgTasks.len(), MaximumBgTasks);
+	assert_eq!(State.BgTasks.len(), Maximum);
 }

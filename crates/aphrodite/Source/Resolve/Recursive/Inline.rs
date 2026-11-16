@@ -5,7 +5,7 @@ use crate::{
 	State::Struct::AphroditeState,
 };
 
-/// Resolve `HashValue` and every nested marker, but only when the result fits.
+/// Resolve `Hash` and every nested marker, but only when the result fits.
 ///
 /// The contract for auto-expand: the same `RecursiveDepth` limit, and the resolved content
 /// returned ONLY when it fits within `Limit` bytes (pre-Rust `_resolve.py` and
@@ -26,8 +26,8 @@ use crate::{
 /// It is not a second resolver - every resolution rule lives in [`Recursive::Fn`], and a
 /// divergence between the two would mean the same hash expands differently depending on who
 /// asked.
-pub fn Fn(State:&mut AphroditeState, HashValue:&str, Limit:usize) -> Option<String> {
-	Recursive::Fn(&mut Traversal::Bounded(State, Limit), HashValue, 0)
+pub fn Fn(State:&mut AphroditeState, Hash:&str, Limit:usize) -> Option<String> {
+	Recursive::Fn(&mut Traversal::Bounded(State, Limit), Hash, 0)
 		.ok()
-		.map(Expansion::Enum::Enum::IntoText)
+		.map(Expansion::Enum::Enum::Owned)
 }

@@ -42,8 +42,8 @@ pub(crate) fn Fn(Name:&str, Input:&Struct) -> serde_json::Value {
 	);
 
 	match Name {
-		"transform_tool_result" => serde_json::Value::String(Input.ToolContent().to_string()),
-		"transform_terminal_output" => serde_json::Value::String(Input.TermContent().to_string()),
+		"transform_tool_result" => serde_json::Value::String(Input.Content().to_string()),
+		"transform_terminal_output" => serde_json::Value::String(Input.Output().to_string()),
 		_ => serde_json::Value::Null,
 	}
 }

@@ -19,7 +19,7 @@ pub(crate) enum Enum {
 	/// The key is settable and its value parsed: the session was mutated.
 	Applied,
 	/// The key is settable but the value did not parse for its field's type.
-	IgnoredInvalidValue,
+	Invalid,
 	/// The key is not settable by this export.
-	IgnoredUnknownKey,
+	Unknown,
 }

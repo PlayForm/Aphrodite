@@ -1,3 +1,3 @@
-//! The `OnMarker` surface.
+//! The `Marker` surface.
 
 pub mod Fn;

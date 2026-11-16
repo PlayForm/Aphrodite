@@ -26,7 +26,7 @@ use crate::{Prefetch::Status::Live::Fn::Fn as LiveFields, State::Struct::Aphrodi
 /// prefetch wrote, and its absence means the marker came from some other
 /// transform. The live fields are an optional overlay rather than a second entry
 /// shape, so flipping the flag cannot change which entries appear.
-pub fn PrefetchStatus(State:&AphroditeState) -> serde_json::Value {
+pub fn Fn(State:&AphroditeState) -> serde_json::Value {
 	let Ready:Vec<serde_json::Value> = State
 		.RecentMarkers
 		.iter()

@@ -18,9 +18,9 @@ use crate::StructExtract::Declaration::Reason::Enum::Enum as Reason;
 /// parsed, and a declaration split across lines yields only the half that carries the keyword.
 pub(crate) enum Enum<'a> {
 	/// The line is not a declaration of this shape.
-	NotDeclaration,
+	Absent,
 	/// The line declares something of this shape.
-	Declaration {
+	Present {
 		Kind:&'static str,
 		Name:&'a str,
 		Parameters:Option<&'a str>,

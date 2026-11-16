@@ -1,6 +1,6 @@
 //! `aphrodite_reclassify` - re-detect type and preview for stored markers.
 
-use crate::Tool::Dispatch::Fn::ToolHandler;
+use crate::Tool::Dispatch::Fn::Handler;
 
 /// The `aphrodite_reclassify` handler.
 ///
@@ -8,7 +8,7 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// concurrent record appended during the pass cannot be half-reclassified. The
 /// stored content and its hash are never touched - only `ccr_type` and `preview`
 /// on the catalogue row.
-pub(crate) fn Fn() -> (&'static str, ToolHandler) {
+pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_reclassify", |Args| {
 		let Only = Args.get("hash").and_then(|v| v.as_str());
 
@@ -35,7 +35,7 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 /// `None` means nothing was updated: the content is gone from the inline store, or
 /// the row was removed while the pass ran.
 fn Reclassify(State:&mut aphrodite::State::Struct::AphroditeState, Hash:&str) -> Option<()> {
-	let Content = State.InlineStoreGet(Hash)?;
+	let Content = State.Get(Hash)?;
 	let Detected = aphrodite::Preview::Detect::Type::Fn(&Content);
 	let Preview = aphrodite::Preview::Builder::Entry::Fn(&Detected, &Content);
 	let Marker = State.RecentMarkers.iter_mut().find(|Marker| Marker.hash == Hash)?;

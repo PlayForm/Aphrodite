@@ -1,6 +1,6 @@
 //! Classify one line of marked output.
 
-use crate::ChainSplit::{Const::SegMarker, Marked::Output::Line::Enum::Enum};
+use crate::ChainSplit::{Marked::Output::Line::Enum::Enum, Segment::Const::Marker};
 
 /// A line is a boundary when its trimmed form is the segment marker, and text
 /// otherwise.
@@ -10,7 +10,7 @@ use crate::ChainSplit::{Const::SegMarker, Marked::Output::Line::Enum::Enum};
 /// instead of re-testing the line.
 pub(crate) fn Fn(Line:&str) -> Enum<'_> {
 	match Line.trim() {
-		SegMarker => Enum::Boundary,
+		Marker => Enum::Boundary,
 		_ => Enum::Text(Line),
 	}
 }

@@ -11,7 +11,7 @@
 use std::path::Path;
 
 use crate::Prefetch::Read::{
-	Guard::Fn::GuardAbsolute,
+	Guard::Fn::Fn as Guard,
 	Refuse::{
 		Home::Fn::Fn as UnderHome,
 		NonFile::Fn::Fn as NonFile,
@@ -40,9 +40,9 @@ use crate::Prefetch::Read::{
 /// never canonicalised or stat'ed. `~`-expansion and canonicalisation are the most
 /// expensive thing this guard does, and a `.env` in the cwd is refused without
 /// them.
-pub(in crate::Prefetch) fn RefuseReason(path:&Path) -> Option<String> {
+pub(in crate::Prefetch) fn Fn(path:&Path) -> Option<String> {
 	Sensitive(path).or_else(|| {
-		let Canon = GuardAbsolute(path);
+		let Canon = Guard(path);
 		let HermesHome = crate::Home::Hermes::Fn::Fn();
 		let HermesHome = HermesHome.canonicalize().unwrap_or(HermesHome);
 

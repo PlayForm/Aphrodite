@@ -10,12 +10,12 @@
 //!
 //! - `Update/` - one configuration write, already parsed into its field's type.
 //! - `Outcome/` - what became of a write, including the two ignored cases.
-//! - `ParseUpdate/` - key and value text to `Update`, before the lock.
-//! - `ApplyUpdate/` - `Update` to session state, under the lock.
+//! - `Parse/` - key and value text to `Update`, before the lock.
+//! - `Apply/` - `Update` to session state, under the lock.
 //! - `Reload/` - the file assessment and its application.
 
-pub mod ApplyUpdate;
+pub mod Apply;
 pub mod Outcome;
-pub mod ParseUpdate;
+pub mod Parse;
 pub mod Reload;
 pub mod Update;

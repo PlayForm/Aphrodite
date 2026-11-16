@@ -5,7 +5,7 @@
 //! flag file is a per-session-tree decision made mid-run and is a boolean. This
 //! leaf is the single place they are reconciled.
 
-use crate::Debug::Flag::Resolve::Fn::Fn as enabled_for;
+use crate::Debug::Flag;
 
 /// Effective debug level for a session: the env-gated level (captured at
 /// launch) wins; otherwise the session flag-file toggle applies (level 1).
@@ -19,7 +19,7 @@ use crate::Debug::Flag::Resolve::Fn::Fn as enabled_for;
 /// the zero arm calls it.
 pub(crate) fn Fn(State:&aphrodite::State::Struct::AphroditeState, Session:&str) -> u8 {
 	match State.DebugLevel {
-		0 => u8::from(enabled_for(Session)),
+		0 => u8::from(Flag::Resolve::Fn::Fn(Session)),
 		Level => Level,
 	}
 }

@@ -1,4 +1,4 @@
-//! `GetPreviewFamily`: the registered model family.
+//! `Template::Family::Get::Fn`: the registered model family.
 
 use crate::Template::State::Fn::Fn as State;
 

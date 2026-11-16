@@ -3,8 +3,8 @@
 use aphrodite::{
 	Configuration::{
 		CLI::Struct::Struct as CLI,
-		Environment::Bool::Fn::EnvironmentBool,
-		Proxy::Multi::Struct::Struct as MultiConfiguration,
+		Environment::Bool::Fn::Fn as Bool,
+		Proxy::Multi::Struct::Struct as Multi,
 	},
 	ConfigurationLoader::Configuration::Apply::Global::{Publish, Rendering},
 };
@@ -30,7 +30,7 @@ use super::{
 pub(crate) fn Fn(Resolved:&Path::Resolved::Struct::Struct) -> anyhow::Result<Loaded::Struct::Struct> {
 	match Resolved.Found {
 		Path::Found::Enum::Enum::Present => {
-			let Configuration = MultiConfiguration::Load(&Resolved.Path)?;
+			let Configuration = Multi::Load(&Resolved.Path)?;
 
 			// Publish every process-global rendering setting in one call: the
 			// preview builder, the marker builder and the template renderer have
@@ -47,7 +47,7 @@ pub(crate) fn Fn(Resolved:&Path::Resolved::Struct::Struct) -> anyhow::Result<Loa
 
 			Ok(Loaded::Struct::Struct {
 				Source:Source::Enum::Enum::Multi(Configuration),
-				LogCompact:EnvironmentBool("APHRODITE_LOG_COMPACT"),
+				LogCompact:Bool("APHRODITE_LOG_COMPACT"),
 			})
 		},
 		Path::Found::Enum::Enum::Absent => {
@@ -55,7 +55,7 @@ pub(crate) fn Fn(Resolved:&Path::Resolved::Struct::Struct) -> anyhow::Result<Loa
 			// Resolved before the source takes ownership of `CLI`: the flag has two
 			// spellings on this path, `--log-compact` on the command line and the
 			// environment variable the file path also honours, and either one turns it on.
-			let LogCompact = CLI.LogCompact || EnvironmentBool("APHRODITE_LOG_COMPACT");
+			let LogCompact = CLI.LogCompact || Bool("APHRODITE_LOG_COMPACT");
 
 			Ok(Loaded::Struct::Struct { Source:Source::Enum::Enum::Standalone(CLI), LogCompact })
 		},

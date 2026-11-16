@@ -11,15 +11,15 @@ use crate::Proxy::{
 	Handle::Proxy::{
 		Forward::Fn::Fn as ForwardUpstream,
 		Respond::Fn::Fn as RespondUpstream,
-		Route::Url::Fn::Fn as BuildUpstreamUrl,
+		Route::Url::Fn::Fn as Url,
 	},
 	Request::Context::Struct::Struct as RequestContext,
 };
 
 /// Send the request upstream and render the answer.
 pub(crate) async fn Fn(Context:&RequestContext<'_>, Path:&axum::extract::OriginalUri, Body:Bytes) -> Response {
-	let Url = BuildUpstreamUrl(Context.State, Path);
-	let Forwarded = ForwardUpstream(Context, &Url, Body).await;
+	let Target = Url(Context.State, Path);
+	let Forwarded = ForwardUpstream(Context, &Target, Body).await;
 
 	RespondUpstream(Context, Forwarded).await
 }

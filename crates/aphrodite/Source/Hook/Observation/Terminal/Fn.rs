@@ -16,12 +16,12 @@ use crate::{
 /// different failures of the same command count as different failures. A call
 /// with no error-looking line falls back to its first line, so the signature is
 /// never empty.
-pub(crate) fn Fn(Content:&str, command:Option<&str>, Returncode:Option<i64>) -> Struct {
+pub(crate) fn Fn(Content:&str, Command:Option<&str>, Returncode:Option<i64>) -> Struct {
 	let Outcome = match Returncode {
 		Some(0) | None => Outcome::Okay,
 		Some(_) => Outcome::Failed,
 	};
-	let Args = command.map(|Command| serde_json::json!({ "command": Command }));
+	let Args = Command.map(|Command| serde_json::json!({ "command": Command }));
 	let ErrorSig = match Outcome {
 		Outcome::Okay => None,
 		Outcome::Failed => {
@@ -35,14 +35,14 @@ pub(crate) fn Fn(Content:&str, command:Option<&str>, Returncode:Option<i64>) -> 
 				})
 				.or_else(|| Content.lines().next());
 
-			Some(Flow::Signature::Error::Fn::ErrorSig(command, FirstError))
+			Some(Flow::Signature::Error::Fn::Fn(Command, FirstError))
 		},
 	};
 
 	Struct {
 		Tool:"terminal".to_string(),
 		Outcome,
-		ArgsSig:Flow::Signature::Normalize::Fn::NormalizeArgsSig("terminal", Args.as_ref()),
+		ArgsSig:Flow::Signature::Normalize::Fn::Fn("terminal", Args.as_ref()),
 		ErrorSig,
 		Bytes:Content.len(),
 		WrotePath:None,

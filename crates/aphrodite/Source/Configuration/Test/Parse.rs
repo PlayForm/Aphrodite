@@ -1,13 +1,13 @@
 //! Parsing the document itself - what an absent table means.
 
-use super::MultiConfigurationFromToml;
+use super::Toml;
 
 // ── Point 5 (feedback): a hook-only configuration that omits the
 // `[proxies]` table entirely must parse, defaulting `Proxies` to an
 // empty Vec - not fail with `missing field 'proxies'`. ──
 #[test]
 fn TestMultiConfigurationWithoutProxiesTableDefaultsToEmpty() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[compression]
 		engine_threshold_pct = 45
@@ -23,7 +23,7 @@ fn TestMultiConfigurationWithoutProxiesTableDefaultsToEmpty() {
 // ── Point 5 (feedback): an explicit empty `proxies = []` also parses. ──
 #[test]
 fn TestMultiConfigurationExplicitEmptyProxies() {
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		proxies = []
 		"#,

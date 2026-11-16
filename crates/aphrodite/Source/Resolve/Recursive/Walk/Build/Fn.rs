@@ -25,9 +25,9 @@ fn Replace(Traversal:&mut Traversal, Occurrence:&Occurrence::Struct::Struct<'_>,
 		Some(Cached) => Nested::Enum::Enum::Replaced(Cached),
 		None => {
 			match Recursive::Fn(Traversal, Occurrence.Hash, Depth + 1) {
-				Ok(Expanded) => Nested::Enum::Enum::Replaced(Expanded.IntoText()),
+				Ok(Expanded) => Nested::Enum::Enum::Replaced(Expanded.Owned()),
 				Err(Halt::Enum::Enum::Absent) => Nested::Enum::Enum::Unresolved,
-				Err(Halt::Enum::Enum::OverBudget) => Nested::Enum::Enum::Abandoned,
+				Err(Halt::Enum::Enum::Budget) => Nested::Enum::Enum::Abandoned,
 			}
 		},
 	}
@@ -53,18 +53,14 @@ fn Replace(Traversal:&mut Traversal, Occurrence:&Occurrence::Struct::Struct<'_>,
 /// The budget check runs before each append, so a bounded expansion stops as soon as its
 /// output cannot fit instead of building the document and measuring it afterwards. A document
 /// with no markers costs one load, one scan and one charge.
-pub(crate) fn Fn(
-	Traversal:&mut Traversal,
-	HashValue:&str,
-	Depth:usize,
-) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
-	let Some(Content) = Traversal.Load(HashValue) else {
+pub(crate) fn Fn(Traversal:&mut Traversal, Hash:&str, Depth:usize) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
+	let Some(Content) = Traversal.Load(Hash) else {
 		return Err(Halt::Enum::Enum::Absent);
 	};
 
 	// Cache what the store holds BEFORE expanding it: a reference to this hash from inside
 	// its own content is a cycle, and the loaded text is the only answer that terminates.
-	Traversal.Cache(HashValue, Expansion::Enum::Enum::Loaded(Content.clone()));
+	Traversal.Cache(Hash, Expansion::Enum::Enum::Loaded(Content.clone()));
 
 	let Occurrences = Find::Fn(&Content);
 
@@ -87,7 +83,7 @@ pub(crate) fn Fn(
 
 	let Tail = &Content[Cursor..];
 
-	Traversal.Charge(Out.len() + Tail.len()).ok_or(Halt::Enum::Enum::OverBudget)?;
+	Traversal.Charge(Out.len() + Tail.len()).ok_or(Halt::Enum::Enum::Budget)?;
 
 	Out.push_str(Tail);
 

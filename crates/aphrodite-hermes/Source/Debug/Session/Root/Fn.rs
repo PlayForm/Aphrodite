@@ -7,23 +7,23 @@
 
 use std::sync::Mutex;
 
-use crate::Debug::{Chain, Session::State::LAST_SESSION};
+use crate::Debug::{Chain, Session::State::Current};
 
 /// Resolve the most recently seen session's ROOT id.
 ///
 /// Returns an empty string when no session has been recorded yet, which the
 /// toggle reports as "no session context" rather than inventing a root.
 ///
-/// The `LAST_SESSION` guard is scoped to the clone, not held across the walk:
-/// the walk takes `SESSION_PARENTS`, and holding one process-global guard while
-/// acquiring another is how a lock-order inversion is born.
+/// The `State::Current` guard is scoped to the clone, not held across the walk:
+/// the walk takes `Chain::State::Parent`, and holding one process-global guard
+/// while acquiring another is how a lock-order inversion is born.
 ///
 /// Dev-only: the only caller is the `aphrodite_debug` tool, gated behind
 /// `debug_assertions` so release dylibs register exactly the 13 production
 /// tools.
 pub(crate) fn Fn() -> String {
-	let Last = {
-		let Guard = LAST_SESSION
+	let Recent = {
+		let Guard = Current
 			.get_or_init(|| Mutex::new(String::new()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -31,7 +31,8 @@ pub(crate) fn Fn() -> String {
 		Guard.clone()
 	};
 
-	Last.is_empty()
+	Recent
+		.is_empty()
 		.then(String::new)
-		.unwrap_or_else(|| Chain::Fn::Fn(&Last).last().cloned().unwrap_or_else(|| Last.clone()))
+		.unwrap_or_else(|| Chain::Fn::Fn(&Recent).last().cloned().unwrap_or_else(|| Recent.clone()))
 }

@@ -1,8 +1,8 @@
 //! Apply a prepared context-engine archive.
 
 use crate::{
-	Session::{Archive::Fn::ArchiveTurn, Engine::Plan::Struct::Struct as Plan},
-	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+	Session::{Archive::Fn::Fn as Archive, Engine::Plan::Struct::Struct as Plan},
+	State::{Marker::Struct::Struct as Entry, Struct::AphroditeState},
 };
 
 /// Store the packed payload and replace the middle of the index with its marker.
@@ -17,7 +17,7 @@ use crate::{
 /// recorded after the index is consistent, so the model never reads a marker for
 /// an archive that was not finished.
 pub(crate) fn Fn(State:&mut AphroditeState, Plan:&Plan) -> Option<String> {
-	State.InlineStorePut(Plan.Hash.clone(), Plan.Packed.clone());
+	State.Put(Plan.Hash.clone(), Plan.Packed.clone());
 
 	Plan.MiddleKeys.iter().for_each(|Turn| {
 		State.ConvIndex.remove(Turn);
@@ -27,8 +27,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Plan:&Plan) -> Option<String> {
 		"engine offload: {} middle turns archived (keep {}/{})",
 		Plan.MiddleN, Plan.HeadN, Plan.TailN
 	);
-	ArchiveTurn(State, &Plan.Hash, &Summary, Plan.Packed.len());
-	State.RecordMarker(MarkerEntry {
+	Archive(State, &Plan.Hash, &Summary, Plan.Packed.len());
+	State.RecordMarker(Entry {
 		hash:Plan.Hash.clone(),
 		CCRType:"context".into(),
 		Size:Plan.Packed.len(),

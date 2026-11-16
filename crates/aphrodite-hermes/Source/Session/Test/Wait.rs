@@ -8,7 +8,7 @@
 
 use std::sync::{atomic::AtomicBool, mpsc::channel};
 
-use crate::Session::Watcher::{Event, Wait::Fn::Fn as wait};
+use crate::Session::Watcher::{Event, Wait};
 
 // ── A closed channel ends the watch: `recv` fails and the loop stops instead of
 // blocking the watcher thread forever. ──
@@ -20,7 +20,7 @@ fn probe_wait_reports_a_closed_channel() {
 	let Stop = AtomicBool::new(false);
 
 	assert!(
-		matches!(wait(&Receiver, &Stop), Event::Enum::Enum::Closed),
+		matches!(Wait::Fn::Fn(&Receiver, &Stop), Event::Enum::Enum::Closed),
 		"a closed channel must end the watch, not block on it"
 	);
 }
@@ -35,7 +35,7 @@ fn probe_wait_reports_a_stop_request() {
 	Sender.send(()).unwrap();
 
 	assert!(
-		matches!(wait(&Receiver, &Stop), Event::Enum::Enum::Stop),
+		matches!(Wait::Fn::Fn(&Receiver, &Stop), Event::Enum::Enum::Stop),
 		"a stop request must end the watch, not be consumed as a config tick"
 	);
 }
@@ -49,7 +49,7 @@ fn probe_wait_reports_a_tick() {
 	Sender.send(()).unwrap();
 
 	assert!(
-		matches!(wait(&Receiver, &Stop), Event::Enum::Enum::Tick),
+		matches!(Wait::Fn::Fn(&Receiver, &Stop), Event::Enum::Enum::Tick),
 		"a pending event with no stop request is one tick"
 	);
 }

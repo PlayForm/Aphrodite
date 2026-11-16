@@ -29,10 +29,10 @@ pub(crate) fn Fn(
 	State:&mut AphroditeState,
 	Content:&str,
 	Classify:Option<(&str, &str)>,
-	command:Option<&str>,
+	Command:Option<&str>,
 	Returncode:Option<i64>,
 ) -> serde_json::Value {
-	let Observation = (!Content.is_empty()).then(|| Observe(Content, command, Returncode));
+	let Observation = (!Content.is_empty()).then(|| Observe(Content, Command, Returncode));
 	let _ = Observation.as_ref().map(|Observation| ApplyObservation(State, Observation));
 
 	let Input = Input { Content, Classify };

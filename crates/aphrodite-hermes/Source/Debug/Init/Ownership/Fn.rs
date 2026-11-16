@@ -1,6 +1,6 @@
 //! Reading the recorded ownership decision without making it.
 
-use crate::Debug::Init::{Ownership, State::INSTALL};
+use crate::Debug::Init::{Ownership, State::Install};
 
 /// The ownership decision this process recorded, or `None` if no install has
 /// been attempted yet.
@@ -12,4 +12,4 @@ use crate::Debug::Init::{Ownership, State::INSTALL};
 /// them still gets the honest answer - "nobody has decided yet" - and takes the
 /// safe branch instead of quietly installing a subscriber as a side effect of
 /// warning about something.
-pub(crate) fn Fn() -> Option<&'static Ownership::Enum::Enum> { INSTALL.get() }
+pub(crate) fn Fn() -> Option<&'static Ownership::Enum::Enum> { Install.get() }

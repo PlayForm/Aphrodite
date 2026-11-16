@@ -31,10 +31,10 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 			match Named.then_some(Name).filter(|Name| {
 				!Name.is_empty() && Name.chars().all(|Character| Character.is_alphanumeric() || Character == '_')
 			}) {
-				Some(Name) => Declaration::Declaration { Kind:"=>", Name, Parameters:None, Return:None },
-				None => Declaration::NotDeclaration,
+				Some(Name) => Declaration::Present { Kind:"=>", Name, Parameters:None, Return:None },
+				None => Declaration::Absent,
 			}
 		},
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

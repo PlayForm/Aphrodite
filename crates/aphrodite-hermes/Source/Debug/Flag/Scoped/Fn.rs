@@ -14,6 +14,4 @@ use crate::Debug::{Flag, Runtime};
 /// resolution walks the chain first. It does not check existence and does not
 /// validate the id, so an empty id yields `debug.` (a harmless file nobody
 /// reads).
-pub(crate) fn Fn(session:&str) -> PathBuf {
-	Runtime::Fn::Fn().join(format!("{}.{}", Flag::Const::FLAG_PREFIX, session))
-}
+pub(crate) fn Fn(session:&str) -> PathBuf { Runtime::Fn::Fn().join(format!("{}.{}", Flag::Const::Prefix, session)) }

@@ -15,4 +15,4 @@
 /// The per-export checks that remain (`Compress`, `Transform`, `Terminal`,
 /// `Classify`) are the same rule stated by the export that stores, kept because
 /// the store is what the cap exists to protect.
-pub(crate) const MaximumContent:usize = 16 * 1024 * 1024; // 16MB cap
+pub(crate) const Maximum:usize = 16 * 1024 * 1024; // 16MB cap

@@ -25,14 +25,14 @@ use crate::{
 /// and `EngineProtectLast` at the end, with the pre-Rust middle-size floor of 3 -
 /// are packed as one JSON payload, stored under a BLAKE3 key
 /// (`headroom_core::ccr::compute_key`), and the middle is REPLACED in `ConvIndex`
-/// by a single marker entry recorded via `ArchiveTurn`, so the model sees a
+/// by a single marker entry recorded via `Archive`, so the model sees a
 /// compact history (head + marker + tail). The returned string is the CCR marker
 /// plus the rendered `EngineOffload` prompt (hash + tail) for the caller to
 /// inject into the live conversation.
 ///
 /// `None` = nothing archived, with zero mutation - byte-identical behaviour when
 /// disabled, because the refusal is decided before the plan is applied.
-pub fn EngineMaybeArchive(State:&mut AphroditeState) -> Option<String> {
+pub fn Fn(State:&mut AphroditeState) -> Option<String> {
 	match Assess(State) {
 		Assessment::Skip(Reason) => {
 			// DEV-ONLY debug instrumentation (crate::debug): engine decision.

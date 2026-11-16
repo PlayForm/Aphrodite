@@ -36,13 +36,13 @@ impl AppState {
 			// Encoded-body savings, reported separately: `tokens_saved` is content
 			// bytes a marker replaced, this is the serialised body a cache hit never
 			// fetched. Summing them would be summing two units.
-			"body_bytes_saved": self.BodyBytesSaved.load(Ordering::Relaxed),
+			"body_bytes_saved": self.BytesSaved.load(Ordering::Relaxed),
 			"ccr": {
 				"hits": self.CCRHits.load(Ordering::Relaxed),
 				"misses": self.CCRMisses.load(Ordering::Relaxed),
 				"created": self.CCRCreated.load(Ordering::Relaxed),
 			},
-			"tool_relay_calls": self.ToolRelayCalls.load(Ordering::Relaxed),
+			"tool_relay_calls": self.RelayCalls.load(Ordering::Relaxed),
 			"cache": {
 				"hits": self.CacheHits.load(Ordering::Relaxed),
 				"misses": self.CacheMisses.load(Ordering::Relaxed),
@@ -54,19 +54,19 @@ impl AppState {
 				self.LatencyBuckets[3].load(Ordering::Relaxed),
 				self.LatencyBuckets[4].load(Ordering::Relaxed),
 			],
-			"total_latency_micros": self.TotalLatencyMicros.load(Ordering::Relaxed),
-			"compressions_by_type": self.CompressionsByType.lock().map(|m| m.clone()).unwrap_or_default(),
-			"compression_ratio_ema": self.CompressionRatioEma.load(Ordering::Relaxed) as f64 / 100.0,
+			"total_latency_micros": self.TotalLatency.load(Ordering::Relaxed),
+			"compressions_by_type": self.Compressions.lock().map(|m| m.clone()).unwrap_or_default(),
+			"compression_ratio_ema": self.RatioEma.load(Ordering::Relaxed) as f64 / 100.0,
 			"last_errors": self.LastErrors.lock().map(|v| v.iter().rev().take(5).cloned().collect::<Vec<_>>()).unwrap_or_default(),
 			"request_history": self.RequestHistory.lock().map(|v| v.clone()).unwrap_or_default(),
 			"inline_ccr": {
-				"hits": self.InlineCCRHits.load(Ordering::Relaxed),
-				"misses": self.InlineCCRMisses.load(Ordering::Relaxed),
+				"hits": self.InlineHits.load(Ordering::Relaxed),
+				"misses": self.InlineMisses.load(Ordering::Relaxed),
 			},
 			"tool_relay": {
-				"total": self.ToolRelayCalls.load(Ordering::Relaxed),
-				"success": self.ToolRelaySuccess.load(Ordering::Relaxed),
-				"failure": self.ToolRelayFailure.load(Ordering::Relaxed),
+				"total": self.RelayCalls.load(Ordering::Relaxed),
+				"success": self.RelaySuccess.load(Ordering::Relaxed),
+				"failure": self.RelayFailure.load(Ordering::Relaxed),
 			},
 			"notify": {
 				"success": self.NotifySuccess.load(Ordering::Relaxed),
@@ -78,13 +78,13 @@ impl AppState {
 				"timeouts": self.UpstreamTimeouts.load(Ordering::Relaxed),
 				// F17: non-timeout transport failures (connect refused, DNS,
 				// TLS) - previously folded into "timeouts" above.
-				"connect_errors": self.UpstreamConnectErrors.load(Ordering::Relaxed),
+				"connect_errors": self.ConnectErrors.load(Ordering::Relaxed),
 				// 02-F9: mid-stream chunk errors on the SSE relay path.
-				"sse_stream_errors": self.SSEStreamErrors.load(Ordering::Relaxed),
+				"sse_stream_errors": self.StreamErrors.load(Ordering::Relaxed),
 				// Transport failures that are neither a timeout nor a connect
 				// error - split out of `connect_errors`, which used to absorb
 				// them.
-				"other": self.UpstreamOtherErrors.load(Ordering::Relaxed),
+				"other": self.OtherErrors.load(Ordering::Relaxed),
 			},
 			"ccr_store": {
 				// Live store values, not counters: these two fields used to
@@ -103,10 +103,10 @@ impl AppState {
 					.unwrap_or(0),
 			},
 			"body_bytes": {
-				"request": self.RequestBodyBytes.load(Ordering::Relaxed),
-				"response": self.ResponseBodyBytes.load(Ordering::Relaxed),
+				"request": self.RequestBytes.load(Ordering::Relaxed),
+				"response": self.ResponseBytes.load(Ordering::Relaxed),
 			},
-			"upstream_latency_micros": self.UpstreamLatencyMicros.load(Ordering::Relaxed),
+			"upstream_latency_micros": self.UpstreamLatency.load(Ordering::Relaxed),
 		})
 	}
 }

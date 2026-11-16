@@ -1,4 +1,4 @@
-//! The axum wrapper around [`CheckLoopbackRequest`].
+//! The axum wrapper around [`Fn`](crate::Guard::Loopback::Fn::Fn).
 //!
 //! It reads the peer address and the `Host` header, asks the decision function,
 //! and turns a rejection into 403. It must stay this thin - any rule added here
@@ -13,22 +13,25 @@ use axum::{
 	response::{IntoResponse, Json},
 };
 
-use crate::Guard::Loopback::Fn::CheckLoopbackRequest;
+use crate::Guard::Loopback::Fn::Fn as Loopback;
 
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
-pub async fn LoopbackOnly(
-	ConnectInfo(Addr):ConnectInfo<SocketAddr>,
+///
+/// External contract: applied by `Boot::Route::Build` to every router except the
+/// `/health` one; a rejection is a 403 carrying `{"error": ...}`.
+pub async fn Fn(
+	ConnectInfo(Address):ConnectInfo<SocketAddr>,
 	Request:Request,
-	next:Next,
+	Next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-	let Host = Request
+	let Header = Request
 		.headers()
 		.get(axum::http::header::HOST)
-		.and_then(|v| v.to_str().ok())
+		.and_then(|Value| Value.to_str().ok())
 		.unwrap_or("");
-	match CheckLoopbackRequest(Addr, Host) {
-		Ok(()) => Ok(next.run(Request).await),
+	match Loopback(Address, Header) {
+		Ok(()) => Ok(Next.run(Request).await),
 		Err(Message) => {
 			Err((
 				StatusCode::FORBIDDEN,

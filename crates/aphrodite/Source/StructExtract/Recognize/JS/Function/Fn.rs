@@ -21,11 +21,11 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 		let Name = AfterKeyword.split('(').next().unwrap_or("").trim();
 
 		match (!Name.is_empty()).then_some(Name) {
-			Some(Name) => Declaration::Declaration { Kind:"function", Name, Parameters:None, Return:None },
+			Some(Name) => Declaration::Present { Kind:"function", Name, Parameters:None, Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {
 		Some(Declaration) => Declaration,
-		None => Declaration::NotDeclaration,
+		None => Declaration::Absent,
 	}
 }

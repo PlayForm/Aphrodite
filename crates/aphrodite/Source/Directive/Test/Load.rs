@@ -1,14 +1,10 @@
 //! The disk loader's Issue #6 semantics and the baked-in directive set.
 //!
-//! `LoadDirectives` is not cwd-relative (the caller passes an explicit path),
+//! `Load` is not cwd-relative (the caller passes an explicit path),
 //! so these are hermetic tempdir tests - no cwd mutation risk, unlike
-//! `ApplyCompression`'s own directory search (04-T7).
+//! `Apply::Startup::Fn`'s own directory search (04-T7).
 
-use crate::Directive::{
-	Builtin::Fn as LoadedBuiltins,
-	Cap::MaximumDirectiveChars::Const::Const as MaximumDirectiveChars,
-	Load::Fn as LoadDirectives,
-};
+use crate::Directive::{Builtin::Fn as Builtin, Cap::Single::Const::Const as Single, Load::Fn as Load};
 
 /// A unique scratch directory per test, auto-removed on drop.
 struct TempDirectory(std::path::PathBuf);
@@ -32,25 +28,25 @@ impl Drop for TempDirectory {
 }
 
 #[test]
-fn TestLoadDirectivesReadsMdFilesFromDirectory() {
+fn TestLoadReadsMdFilesFromDirectory() {
 	let Directory = TempDirectory::new("basic");
 	std::fs::write(Directory.path().join("focus.md"), "# focus\nstay concise").unwrap();
 	std::fs::write(Directory.path().join("explore.md"), "# explore\nlook around").unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert_eq!(Loaded.len(), 2);
 	assert_eq!(Loaded["focus"].Content, "# focus\nstay concise");
 	assert_eq!(Loaded["explore"].Content, "# explore\nlook around");
 }
 
 #[test]
-fn TestLoadDirectivesSkipsNonMdFiles() {
+fn TestLoadSkipsNonMdFiles() {
 	let Directory = TempDirectory::new("skip-non-md");
 	std::fs::write(Directory.path().join("focus.md"), "keep me").unwrap();
 	std::fs::write(Directory.path().join("README.txt"), "not a directive").unwrap();
 	std::fs::write(Directory.path().join("notes"), "no extension at all").unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert_eq!(Loaded.len(), 1);
 	assert!(Loaded.contains_key("focus"));
 }
@@ -60,12 +56,12 @@ fn TestLoadDirectivesSkipsNonMdFiles() {
 // directory still falls back to builtins, see
 // test_load_directives_missing_dir_returns_builtins). ──
 #[test]
-fn TestLoadDirectivesExistingEmptyDirectoryReturnsEmptyMap() {
+fn TestLoadExistingEmptyDirectoryReturnsEmptyMap() {
 	let Directory = TempDirectory::new("empty-dir");
 	// Non-.md files must not count as a usable directive either.
 	std::fs::write(Directory.path().join("README.txt"), "not a directive").unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert!(
 		Loaded.is_empty(),
 		"an existing empty directives dir must yield an empty map, not builtins"
@@ -75,11 +71,11 @@ fn TestLoadDirectivesExistingEmptyDirectoryReturnsEmptyMap() {
 // ── Issue #6: an empty .md file is a *readable* .md file, so it wins
 // over builtins and loads as a directive with empty content. ──
 #[test]
-fn TestLoadDirectivesEmptyMdFileLoadsEmptyContent() {
+fn TestLoadEmptyMdFileLoadsEmptyContent() {
 	let Directory = TempDirectory::new("empty-md");
 	std::fs::write(Directory.path().join("empty.md"), "").unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert_eq!(Loaded.len(), 1, "the empty .md file must load, not builtins");
 	assert!(Loaded.contains_key("empty"));
 	assert_eq!(Loaded["empty"].Content, "");
@@ -88,20 +84,20 @@ fn TestLoadDirectivesEmptyMdFileLoadsEmptyContent() {
 // ── Issue #6: whitespace-only .md content loads verbatim (no trimming
 // beyond the size cap). ──
 #[test]
-fn TestLoadDirectivesWhitespaceOnlyLoadsVerbatim() {
+fn TestLoadWhitespaceOnlyLoadsVerbatim() {
 	let Directory = TempDirectory::new("whitespace-md");
 	let Ws = "   \n\t\n  \n";
 	std::fs::write(Directory.path().join("ws.md"), Ws).unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert_eq!(Loaded.len(), 1);
 	assert_eq!(Loaded["ws"].Content, Ws, "whitespace-only content must load verbatim");
 }
 
 #[test]
-fn TestLoadDirectivesMissingDirectoryReturnsBuiltins() {
+fn TestLoadMissingDirectoryReturnsBuiltins() {
 	let Missing = std::env::temp_dir().join("aphrodite-directives-test-does-not-exist");
-	let Loaded = LoadDirectives(&Missing);
+	let Loaded = Load(&Missing);
 	// Built-in directives are now returned as fallback when no
 	// `directives/` directory exists on disk.
 	assert!(
@@ -114,7 +110,7 @@ fn TestLoadDirectivesMissingDirectoryReturnsBuiltins() {
 // ── Built-in directives: baked into the binary via include_str! ──
 #[test]
 fn TestLoadedBuiltinsContainsAllSeven() {
-	let Builtins = LoadedBuiltins();
+	let Builtins = Builtin();
 	assert_eq!(Builtins.len(), 7, "should have 7 baked-in directives");
 	assert!(Builtins.contains_key("focus"));
 	assert!(Builtins.contains_key("foresight"));
@@ -126,25 +122,25 @@ fn TestLoadedBuiltinsContainsAllSeven() {
 }
 
 #[test]
-fn TestLoadDirectivesTruncatesAtMaximumCharsWithEllipsis() {
+fn TestLoadTruncatesAtMaximumCharsWithEllipsis() {
 	let Directory = TempDirectory::new("truncate");
-	let Oversized = "x".repeat(MaximumDirectiveChars + 500);
+	let Oversized = "x".repeat(Single + 500);
 	std::fs::write(Directory.path().join("huge.md"), &Oversized).unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	let Content = &Loaded["huge"].Content;
 	// MAX_DIRECTIVE_CHARS worth of 'x' plus the ellipsis marker.
-	assert_eq!(Content.chars().count(), MaximumDirectiveChars + 3);
+	assert_eq!(Content.chars().count(), Single + 3);
 	assert!(Content.ends_with("..."));
 }
 
 #[test]
-fn TestLoadDirectivesUnderCapIsNotTruncated() {
+fn TestLoadUnderCapIsNotTruncated() {
 	let Directory = TempDirectory::new("under-cap");
 	let Small = "short directive body";
 	std::fs::write(Directory.path().join("small.md"), Small).unwrap();
 
-	let Loaded = LoadDirectives(&Directory.path());
+	let Loaded = Load(&Directory.path());
 	assert_eq!(Loaded["small"].Content, Small);
 	assert!(!Loaded["small"].Content.ends_with("..."));
 }

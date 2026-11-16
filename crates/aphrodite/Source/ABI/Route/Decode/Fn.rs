@@ -19,7 +19,7 @@ use super::super::Command::Enum::Enum as Command;
 pub(crate) fn Fn<'a>(Name:&'a str, Args:&'a serde_json::Value) -> anyhow::Result<Command<'a>> {
 	let Content = Args.get("content").and_then(|Value| Value.as_str()).unwrap_or("");
 
-	crate::ABI::Guard::Reject::Fn::Fn(Content.len() > crate::ABI::Guard::Content::Const::MaximumContent, || {
+	crate::ABI::Guard::Reject::Fn::Fn(Content.len() > crate::ABI::Guard::Content::Const::Maximum, || {
 		anyhow::anyhow!("content exceeds 16MB limit")
 	})?;
 
@@ -42,7 +42,7 @@ pub(crate) fn Fn<'a>(Name:&'a str, Args:&'a serde_json::Value) -> anyhow::Result
 		"search" => {
 			Command::Search {
 				Query:Args.get("query").and_then(|Value| Value.as_str()).unwrap_or(""),
-				TypeFilter:Args.get("type").and_then(|Value| Value.as_str()),
+				Filter:Args.get("type").and_then(|Value| Value.as_str()),
 			}
 		},
 		"diff" => Command::Diff,

@@ -15,7 +15,7 @@ use crate::Health::Proxy::Fn::proxy_health;
 
 /// Emitted once per process: the session-init/config-summary line (first
 /// `on_session_start` or `pre_llm_call` that has a session id wins).
-static INIT_EMITTED:AtomicBool = AtomicBool::new(false);
+static EMITTED:AtomicBool = AtomicBool::new(false);
 
 /// DEV-ONLY: emit the session-init/config-summary line exactly once per
 /// process. Includes dylib version, root session id, the config summary
@@ -25,7 +25,7 @@ static INIT_EMITTED:AtomicBool = AtomicBool::new(false);
 pub(crate) fn Fn(State:&AphroditeState, Session:&str) {
 	// `swap` still runs only for a real session (the `||` short-circuits), and
 	// the line is emitted at most once per process.
-	let Some(()) = (!(Session.is_empty() || INIT_EMITTED.swap(true, Ordering::Relaxed))).then_some(()) else {
+	let Some(()) = (!(Session.is_empty() || EMITTED.swap(true, Ordering::Relaxed))).then_some(()) else {
 		return;
 	};
 

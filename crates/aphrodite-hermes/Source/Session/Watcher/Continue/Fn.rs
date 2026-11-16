@@ -19,6 +19,6 @@ use crate::Session::Watcher::Outcome;
 pub(crate) fn Fn(Pass:&Outcome::Enum::Enum) -> bool {
 	match Pass {
 		Outcome::Enum::Enum::Failed(_) => true,
-		Outcome::Enum::Enum::Applied(Report) => Report.WantsReload > 0 || Report.Applied == 0,
+		Outcome::Enum::Enum::Applied(Report) => Report.Reload > 0 || Report.Applied == 0,
 	}
 }

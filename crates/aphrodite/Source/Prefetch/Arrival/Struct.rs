@@ -1,6 +1,6 @@
 //! Live-container arrival records for prefetched files.
 //!
-//! `LiveArrival` is a description of how much of a container has landed and
+//! `Struct` is a description of how much of a container has landed and
 //! when - not a scheduler and not a progress bar. It exists because the
 //! pre-Rust `_prefetch_registry` tracked chunked arrival per path, and the
 //! status surface has to answer "is this ready yet" with a number rather than
@@ -14,7 +14,7 @@
 /// means fully arrived; a partial record models chunked arrival (the
 /// async-loading case the pre-Rust `_prefetch_registry` tracked per path).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct LiveArrival {
+pub struct Struct {
 	/// Unix-seconds timestamp of first arrival.
 	pub ArrivedAtUnix:u64,
 	/// Bytes of container content arrived so far.
@@ -25,18 +25,18 @@ pub struct LiveArrival {
 	pub EtaS:f32,
 }
 
-impl LiveArrival {
+impl Struct {
 	/// Fully-arrived record for content that landed synchronously (the
 	/// Rust port's prefetch read is synchronous, so every loaded entry
 	/// arrives in one chunk at insert time).
 	///
 	/// The timestamp is an argument, not a clock read: one batch stamps every entry
-	/// it loads from one `UnixNow()`, so a reader comparing two entries of the same
+	/// it loads from one `Clock()`, so a reader comparing two entries of the same
 	/// prefetch cannot see them arrive in different seconds because the loop took
 	/// that long. It also makes the record a function of its inputs, which is what a
 	/// test can pin.
-	pub fn Arrived(Size:u64, ArrivedAtUnix:u64) -> LiveArrival {
-		LiveArrival { ArrivedAtUnix, BytesArrived:Size, Size, EtaS:0.0 }
+	pub fn Arrived(Size:u64, ArrivedAtUnix:u64) -> Struct {
+		Struct { ArrivedAtUnix, BytesArrived:Size, Size, EtaS:0.0 }
 	}
 
 	/// Chunked-arrival ETA estimate for a partial record: scale the elapsed time

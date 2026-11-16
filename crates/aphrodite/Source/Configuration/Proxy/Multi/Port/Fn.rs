@@ -19,21 +19,21 @@ impl Struct {
 	/// This is per-mode, never process-wide: `APHRODITE_CACHE_PORT` and
 	/// `APHRODITE_TOKEN_PORT` exist precisely so a blanket
 	/// `APHRODITE_LISTEN` cannot collapse the two-proxy split.
-	pub(crate) fn ApplyPortOverride(Listen:SocketAddr, EnvironmentVar:&str) -> SocketAddr {
-		match std::env::var(EnvironmentVar) {
-			Ok(p) => {
-				match p.parse::<u16>() {
+	pub(crate) fn Override(Listen:SocketAddr, Variable:&str) -> SocketAddr {
+		match std::env::var(Variable) {
+			Ok(Value) => {
+				match Value.parse::<u16>() {
 					Ok(Port) => {
 						let mut Addr = Listen;
 						Addr.set_port(Port);
-						tracing::info!("{}={} overriding listen to {}", EnvironmentVar, Port, Addr);
+						tracing::info!("{}={} overriding listen to {}", Variable, Port, Addr);
 						Addr
 					},
 					Err(_) => {
 						tracing::warn!(
 							"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
-							EnvironmentVar,
-							p,
+							Variable,
+							Value,
 							Listen,
 						);
 						Listen

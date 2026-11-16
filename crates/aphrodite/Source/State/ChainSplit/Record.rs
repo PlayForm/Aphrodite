@@ -11,7 +11,7 @@
 //! for the life of the process - the one unbounded structure in the state, growing
 //! by every segment of every chain ever split.
 
-use crate::State::{ChainSplit::Struct::SplitEvent, Const::SplitEventCap, Struct::AphroditeState};
+use crate::State::{ChainSplit::Struct::Struct as Split, Const::SplitEventCap, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a chain-split event (Tier 1 teaching loop): a chain's output
@@ -29,7 +29,7 @@ impl AphroditeState {
 	/// happens in one call at the front where the oldest events sit. Every
 	/// evicted event takes its hashes out of `SplitSegmentMap`, so the map holds
 	/// exactly the segment identities the ring can still explain.
-	pub fn RecordChainSplit(&mut self, Hashes:Vec<String>) {
+	pub fn RecordSplit(&mut self, Hashes:Vec<String>) {
 		// A batch with no segments records nothing, and the count is the whole
 		// decision: `NonZeroUsize` exists only when the split produced something,
 		// so the id, the map and the ring move together for exactly those batches.
@@ -46,7 +46,7 @@ impl AphroditeState {
 		});
 
 		self.SplitEvents
-			.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced:Produced.get(), Retrieved:0 });
+			.push_back(Split { ID, Turn:self.TurnCounter, Produced:Produced.get(), Retrieved:0 });
 
 		let Excess = self.SplitEvents.len().saturating_sub(SplitEventCap);
 		let Evicted:Vec<usize> = self.SplitEvents.drain(..Excess).map(|Event| Event.ID).collect();
@@ -55,6 +55,6 @@ impl AphroditeState {
 		// with it - the ring entry that explained them is gone.
 		self.SplitSegmentMap.retain(|_, EventID| !Evicted.contains(EventID));
 
-		self.AdaptChainSplitThreshold();
+		self.Adapt();
 	}
 }

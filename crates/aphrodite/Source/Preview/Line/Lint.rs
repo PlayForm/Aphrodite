@@ -26,14 +26,14 @@ pub(crate) fn Fn(Line:&str) -> bool {
 fn LintPrefix(Trimmed:&str) -> bool {
 	let mut Fields = Trimmed.splitn(4, ':');
 	let Path = Fields.next().filter(|Path| !Path.is_empty() && !Path.contains(' '));
-	let LineNumber = Fields
+	let Number = Fields
 		.next()
 		.filter(|Field| !Field.is_empty() && Field.chars().all(|c| c.is_ascii_digit()));
 	let Column = Fields
 		.next()
 		.filter(|Field| !Field.is_empty() && Field.chars().all(|c| c.is_ascii_digit()));
 
-	Path.is_some() && LineNumber.is_some() && Column.is_some() && Fields.next().is_some()
+	Path.is_some() && Number.is_some() && Column.is_some() && Fields.next().is_some()
 }
 
 /// `E###`/`W###`/`F###` issue code as a whitespace-delimited token.

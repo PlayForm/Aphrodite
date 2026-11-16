@@ -6,24 +6,24 @@
 //! the report before it goes.
 
 use crate::PollWorker::{
-	Expire::{Decision::Enum::RetentionDecision, Report::Struct::ExpirationReport},
+	Expire::{Decision::Enum::Enum as Decision, Report::Struct::Struct as Expiry},
 	Registry::Struct::Registry,
-	Task::{Status::Enum::BgStatus, Struct::BgTask},
+	Task::{Status::Enum::Enum as Status, Struct::Struct as Record},
 };
 
 /// Walk the set once, applying `Decide` to each task.
-pub(crate) fn Fn(This:&mut Registry, mut Decide:impl FnMut(&mut BgTask) -> RetentionDecision) -> ExpirationReport {
-	let mut Report = ExpirationReport::default();
+pub(crate) fn Fn(This:&mut Registry, mut Decide:impl FnMut(&mut Record) -> Decision) -> Expiry {
+	let mut Report = Expiry::default();
 
 	This.Tasks.retain_mut(|Task| {
 		match Decide(Task) {
-			RetentionDecision::Keep => true,
-			RetentionDecision::MarkStale => {
+			Decision::Keep => true,
+			Decision::MarkStale => {
 				Report.MarkedStale.push(Task.ID.clone());
-				Task.Status = BgStatus::Stale;
+				Task.Status = Status::Stale;
 				true
 			},
-			RetentionDecision::Remove => {
+			Decision::Remove => {
 				Report.Removed.push(Task.ID.clone());
 				false
 			},

@@ -1,4 +1,4 @@
-//! `HermesHomeOpt`: the Hermes home, or `None` when nothing resolves.
+//! `Opt`: the Hermes home, or `None` when nothing resolves.
 
 use std::path::PathBuf;
 

@@ -13,7 +13,7 @@ pub(crate) fn HeaderValue(s:&str) -> axum::http::HeaderValue { axum::http::Heade
 /// request, and writes back a canned HTTP/1.1 response before closing -
 /// this crate has no HTTP mocking dependency, and a hand-rolled listener
 /// is simpler than standing up a second axum server for one test.
-pub(crate) async fn SpawnMockUpstream(response:&'static str) -> std::net::SocketAddr {
+pub(crate) async fn Spawn(response:&'static str) -> std::net::SocketAddr {
 	let Listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
 	let Addr = Listener.local_addr().unwrap();
 	tokio::spawn(async move {

@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::PollWorker::{Registry::Capacity::Struct::Capacity, Task::Struct::BgTask};
+use crate::PollWorker::{Registry::Capacity::Struct::Capacity, Task::Struct::Struct as Record};
 
 /// The task set, with its capacity.
 ///
@@ -13,7 +13,7 @@ use crate::PollWorker::{Registry::Capacity::Struct::Capacity, Task::Struct::BgTa
 pub(crate) struct Registry<'a> {
 	/// The storage. Visible inside `Registry` only: outside, the operations are
 	/// the surface.
-	pub(super) Tasks:&'a mut VecDeque<BgTask>,
+	pub(super) Tasks:&'a mut VecDeque<Record>,
 	/// The bound this registry keeps, non-zero by construction.
 	pub(super) Bound:Capacity,
 }

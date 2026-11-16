@@ -1,6 +1,6 @@
 //! Listen ports, and the per-mode overrides that move them.
 
-use super::super::{Guard::EnvironmentGuard, MultiConfigurationFromToml};
+use super::super::{Guard::EnvironmentGuard, Toml};
 
 #[test]
 fn TestResolveDefaultPortsPerMode() {
@@ -8,7 +8,7 @@ fn TestResolveDefaultPortsPerMode() {
 	unsafe { std::env::remove_var("APHRODITE_CACHE_PORT") };
 	unsafe { std::env::remove_var("APHRODITE_TOKEN_PORT") };
 
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "cache"
@@ -19,7 +19,7 @@ fn TestResolveDefaultPortsPerMode() {
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
 	assert_eq!(CLI.Listen.port(), 9797); // default listen, no override present
 
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "token"
@@ -35,7 +35,7 @@ fn TestResolveDefaultPortsPerMode() {
 fn TestResolveExplicitPortOverrideViaEnvironment() {
 	let _G = EnvironmentGuard();
 	unsafe { std::env::set_var("APHRODITE_CACHE_PORT", "19797") };
-	let Mc = MultiConfigurationFromToml(
+	let Mc = Toml(
 		r#"
 		[[proxies]]
 		name = "cache"

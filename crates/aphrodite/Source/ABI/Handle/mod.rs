@@ -4,7 +4,7 @@
 //! names one `AphroditeState` living behind its own mutex inside
 //! `Registry::Const::Handles`. Nothing here is exported to C - the exports that
 //! take a handle are one file each beside this directory, and they all reach
-//! state through `Lookup::WithState` or `Lookup::Locked`, so the table lock is
+//! state through `Lookup::Guarded` or `Lookup::Locked`, so the table lock is
 //! never held across a hook body.
 //!
 //! Two layers, deliberately separate: `Registry` owns the table (initialisation,

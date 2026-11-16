@@ -17,8 +17,8 @@ use std::borrow::Cow;
 pub(crate) enum Enum<'a> {
 	/// The caller passed a null pointer.
 	Absent,
-	/// The caller's string, at most `MaximumContent` bytes.
+	/// The caller's string, at most `Maximum` bytes.
 	Text(Cow<'a, str>),
-	/// The caller's string is longer than `MaximumContent`; nothing was copied.
+	/// The caller's string is longer than `Maximum`; nothing was copied.
 	Oversize,
 }

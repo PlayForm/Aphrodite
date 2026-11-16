@@ -6,22 +6,22 @@ use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 #[test]
 fn TestDefaults() {
 	let cfg = Configuration::default();
-	assert_eq!(cfg.GetU64("NONEXISTENT", "compression", "threshold", 42), 42);
-	assert!(cfg.GetBool("NONEXISTENT", "compression", "enabled", true));
-	assert_eq!(cfg.GetString("NONEXISTENT", "defaults", "model", "gpt-4o"), "gpt-4o");
+	assert_eq!(cfg.Number("NONEXISTENT", "compression", "threshold", 42), 42);
+	assert!(cfg.Bool("NONEXISTENT", "compression", "enabled", true));
+	assert_eq!(cfg.Text("NONEXISTENT", "defaults", "model", "gpt-4o"), "gpt-4o");
 }
 
 #[test]
 fn TestOverride() {
 	let mut cfg = Configuration::default();
-	cfg.SetOverride("APHRODITE_ENGINE_THRESHOLD_PCT", "90");
+	cfg.Set("APHRODITE_ENGINE_THRESHOLD_PCT", "90");
 	assert_eq!(
-		cfg.GetU64("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45),
+		cfg.Number("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45),
 		90
 	);
 }
 
-// ── Fix 21 (inspection): `GetBool` must accept uppercase/mixed-case
+// ── Fix 21 (inspection): `Resolve::Bool` must accept uppercase/mixed-case
 // `TRUE`/`True`/`tRuE` and `1` through BOTH the overrides map and the
 // environment path - the old exact lowercase comparison silently
 // resolved them to false. Only `true`/`1` (after ASCII-lowercasing)
@@ -41,9 +41,9 @@ fn TestGetBoolOverrideCaseInsensitive() {
 	]
 	.into_iter()
 	.for_each(|(Value, Expected)| {
-		cfg.SetOverride("APHRODITE_TEST_BOOL_CASE", Value);
+		cfg.Set("APHRODITE_TEST_BOOL_CASE", Value);
 		assert_eq!(
-			cfg.GetBool("APHRODITE_TEST_BOOL_CASE", "compression", "enabled", true),
+			cfg.Bool("APHRODITE_TEST_BOOL_CASE", "compression", "enabled", true),
 			Expected,
 			"override value {Value:?} must resolve to {Expected}"
 		);
@@ -77,7 +77,7 @@ fn TestGetBoolEnvironmentCaseInsensitive() {
 	.for_each(|(Value, Expected)| {
 		unsafe { std::env::set_var(Key, Value) };
 		assert_eq!(
-			cfg.GetBool(Key, "compression", "enabled", true),
+			cfg.Bool(Key, "compression", "enabled", true),
 			Expected,
 			"env value {Value:?} must resolve to {Expected}"
 		);

@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, sync::Mutex};
 
-use crate::Debug::Chain::{self, State::SESSION_PARENTS};
+use crate::Debug::Chain;
 
 /// Resolve the ROOT of `Session`'s tree, recording the `Session -> Parent` edge
 /// first when there is one.
@@ -16,7 +16,7 @@ use crate::Debug::Chain::{self, State::SESSION_PARENTS};
 /// nothing.
 ///
 /// This must never become `Chain::Fn::Fn` (the locking wrapper) while the guard
-/// is alive: that re-locks `SESSION_PARENTS`, `std::sync::Mutex` is not
+/// is alive: that re-locks `Chain::State::Parent`, `std::sync::Mutex` is not
 /// reentrant, and the nested acquisition blocked the thread FOREVER while holding
 /// the process-global lock - every later hook in the gateway process queued
 /// behind it, the host abandoned the worker on its hook timeout, and the plugin
@@ -27,7 +27,7 @@ pub(crate) fn Fn(Session:&str, Parent:&str) -> String {
 		.or_else(|| {
 			// The guard is a closure-local: it drops when this block yields, so
 			// the caller's log line is emitted with no lock held.
-			let mut Map = SESSION_PARENTS
+			let mut Map = Chain::State::Parent
 				.get_or_init(|| Mutex::new(HashMap::new()))
 				.lock()
 				.unwrap_or_else(std::sync::PoisonError::into_inner);
