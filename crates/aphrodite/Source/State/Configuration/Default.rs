@@ -10,7 +10,7 @@ use super::Struct::Struct;
 impl Default for Struct {
 	fn default() -> Self {
 		Self {
-			APIURL:String::new(),
+			URL:String::new(),
 			Model:"gpt-4o".into(),
 			EngineThresholdPct:45,
 			EngineMinimumMsgs:8,
@@ -19,7 +19,7 @@ impl Default for Struct {
 			ContextEngineEnabled:true,
 			ToolThreshold:512,
 			TerminalThreshold:256,
-			ConfigurationError:None,
+			Error:None,
 			AutoReload:false,
 			DebugLevel:0,
 			CatalogMode:"tool".into(),

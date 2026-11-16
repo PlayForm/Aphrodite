@@ -22,7 +22,8 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 	let Mode = Mode::Parse::Fn::Fn(Mode);
 
 	let Items:Vec<serde_json::Value> = State
-		.RecentMarkers
+		.Marker
+		.Recent
 		.iter()
 		.map(|Marker| {
 			match Mode {
@@ -56,7 +57,7 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 	// states produce different JSON across calls.
 	let mut ByType:BTreeMap<String, Vec<String>> = BTreeMap::new();
 
-	State.RecentMarkers.iter().for_each(|Marker| {
+	State.Marker.Recent.iter().for_each(|Marker| {
 		ByType.entry(Marker.CCRType.clone()).or_default().push(Marker.hash.clone());
 	});
 
@@ -81,7 +82,8 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 	// reporting the full original size as "saved", which is what a 100%-compression
 	// ratio would claim.
 	let TotalSaved:usize = State
-		.RecentMarkers
+		.Marker
+		.Recent
 		.iter()
 		.map(|Marker| Marker.Size.saturating_sub(Marker.Preview.len()))
 		.sum();
@@ -93,9 +95,9 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 		"total_saved_human": FmtSize(TotalSaved),
 		"by_type": ByTypeJSON,
 		"items": Items,
-		"turn": State.TurnCounter,      // backward compat with inline callers
-		"conv_turns": State.ConvIndex.len(),
-		"referenced_files": State.ReferencedFiles.len(),
+		"turn": State.Turn.Counter,      // backward compat with inline callers
+		"conv_turns": State.Turn.Index.len(),
+		"referenced_files": State.File.Recent.len(),
 	});
 
 	Enrich::Fn::Fn(State, &Mode, &mut Result);

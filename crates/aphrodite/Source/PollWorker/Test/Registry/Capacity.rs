@@ -24,5 +24,5 @@ fn Admission() {
 		);
 	});
 
-	assert_eq!(State.BgTasks.len(), Maximum);
+	assert_eq!(State.PollWorker.Tasks.len(), Maximum);
 }

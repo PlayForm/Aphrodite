@@ -8,13 +8,15 @@ use crate::State::Struct::AphroditeState;
 /// Each knob is resolved independently, so a file that sets only
 /// `EngineMinimumMsgs` still gets every other default.
 pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
-	State.ContextEngineEnabled = Configuration.Bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
-	State.EngineThresholdPct =
+	State.Configuration.ContextEngineEnabled =
+		Configuration.Bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
+	State.Configuration.EngineThresholdPct =
 		Configuration.Number("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45);
-	State.EngineMinimumMsgs = Configuration.Size("APHRODITE_ENGINE_MIN_MSGS", "compression", "engine_min_msgs", 8);
-	State.EngineProtectFirst =
+	State.Configuration.EngineMinimumMsgs =
+		Configuration.Size("APHRODITE_ENGINE_MIN_MSGS", "compression", "engine_min_msgs", 8);
+	State.Configuration.EngineProtectFirst =
 		Configuration.Size("APHRODITE_ENGINE_PROTECT_FIRST", "compression", "engine_protect_first", 2);
-	State.EngineProtectLast =
+	State.Configuration.EngineProtectLast =
 		Configuration.Size("APHRODITE_ENGINE_PROTECT_LAST", "compression", "engine_protect_last", 5);
 	// F3: was keyed "tool_threshold" and env var APHRODITE_TOOL_THRESHOLD -
 	// neither exists in any shipped TOML/doc (they use
@@ -23,10 +25,10 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// is the tool-injecting, aggressive-compression environment (no
 	// cache-vs-token split like the proxy's dual listeners), so it maps
 	// to `ToolThresholdToken`.
-	State.ToolThreshold =
+	State.Configuration.ToolThreshold =
 		Configuration.Size("APHRODITE_TOOL_THRESHOLD_TOKEN", "compression", "tool_threshold_token", 4096);
-	State.TerminalThreshold =
+	State.Configuration.TerminalThreshold =
 		Configuration.Size("APHRODITE_TERMINAL_THRESHOLD", "compression", "terminal_threshold", 1024);
-	State.Model = Configuration.Text("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
-	State.APIURL = Configuration.Text("APHRODITE_API_URL", "defaults", "api_url", "");
+	State.Configuration.Model = Configuration.Text("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
+	State.Configuration.URL = Configuration.Text("APHRODITE_API_URL", "defaults", "api_url", "");
 }

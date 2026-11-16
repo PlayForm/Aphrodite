@@ -18,16 +18,16 @@ use crate::State::Struct::AphroditeState;
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	let Span = tracing::info_span!(
 		"hook.pre_llm",
-		turn = State.TurnCounter,
+		turn = State.Turn.Counter,
 		markers = tracing::field::Empty,
 		context_bytes = tracing::field::Empty,
 	);
 	let _Entered = Span.enter();
 	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
 	// (only when the master flag is enabled).
-	let _ = State.PollWorkerEnabled.then(|| crate::PollWorker::Check::Fn::Fn(State));
+	let _ = State.PollWorker.Enable.then(|| crate::PollWorker::Check::Fn::Fn(State));
 
-	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
+	let Directives = crate::Directive::Build::Fn(&State.Directive.Loaded, &State.Directive.Active);
 	// catalog_summary is called inside build_turn_context - not separately
 	// (04-F3: a double call skipped delta tracking every other turn).
 	let Context = crate::Flow::TurnContext::Fn::Fn(State, None);
@@ -35,14 +35,14 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	let ContextField = (!Context.is_empty()).then_some(Context);
 	let Payload = serde_json::json!({
 		"status": "ok",
-		"compressed_count": State.RecentMarkers.len(),
+		"compressed_count": State.Marker.Recent.len(),
 		"directives": DirectivesField,
 		"context": ContextField,
 	});
 	// Outcome: what this turn's context actually carried. Byte counts, never the
 	// context itself - it is prompt text and may quote anything the tools
 	// returned.
-	Span.record("markers", State.RecentMarkers.len());
+	Span.record("markers", State.Marker.Recent.len());
 	Span.record(
 		"context_bytes",
 		Payload

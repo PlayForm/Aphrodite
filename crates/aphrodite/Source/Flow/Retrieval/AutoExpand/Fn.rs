@@ -18,6 +18,7 @@ pub(crate) fn Fn(State:&AphroditeState) -> String {
 	// Rendering is the work the flag buys: `then` keeps it out of the disabled
 	// path, and an empty render is an absent section rather than a gate.
 	State
+		.Configuration
 		.AutoExpand
 		.then(|| Render(State, "auto_expand_guidance", &[]))
 		.filter(|Text| !Text.is_empty())

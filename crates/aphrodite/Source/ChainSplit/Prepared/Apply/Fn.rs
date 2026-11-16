@@ -2,7 +2,7 @@
 
 use crate::{
 	ChainSplit::Prepared::{Claims::Fn::Fn as BatchClaims, Struct::Struct as Prepared},
-	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// Store every prepared segment, record its marker, and render the payload.
@@ -42,13 +42,13 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared) -> serde_json::Va
 			// `Size` is read before the text moves into the store; the marker
 			// entry and the payload both describe those same bytes.
 			let Size = Segment.Text.len();
-			State.Put(Segment.Hash.clone(), Segment.Text);
-			State.RecordMarker(MarkerEntry {
+			State.Store.Put(Segment.Hash.clone(), Segment.Text);
+			State.Marker.Record(MarkerEntry {
 				hash:Segment.Hash.clone(),
 				CCRType:Segment.Type.clone(),
 				Size,
 				Preview:Segment.Preview.clone(),
-				Turn:State.TurnCounter,
+				Turn:State.Turn.Counter,
 				Center:None,
 				meta:None,
 			});
@@ -66,7 +66,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared) -> serde_json::Va
 
 	// Tier 1 teaching loop: record the split event so segment retrievals can be
 	// attributed and the split threshold adapted.
-	State.RecordSplit(Claims);
+	State.ChainSplit.Record(State.Turn.Counter, Claims);
 
 	let Summary = format!(
 		"[chain:{} segs | {} orig → {} markers]",
@@ -76,7 +76,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared) -> serde_json::Va
 	);
 
 	// DEV-ONLY debug metrics: the per-segment markers are counted individually
-	// by `RecordMarker`; this counts the split decision itself.
+	// by `Marker::Record`; this counts the split decision itself.
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Compressions);
 
 	serde_json::json!({

@@ -19,6 +19,7 @@ use crate::{Flow::Prompt::Const::Fallback, Marker::Format::Vars::Fn as Substitut
 /// available for the engine-offload / auto-expand / context-count sites.
 pub fn Fn(State:&AphroditeState, name:&str, Vars:&[(&str, &str)]) -> String {
 	let Tmpl = State
+		.Configuration
 		.Templates
 		.as_ref()
 		.and_then(|t| t.Prompts.get(name))

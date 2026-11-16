@@ -39,7 +39,7 @@ pub(crate) fn Fn(State:&mut AphroditeState) -> Vec<Section> {
 	let SessionInject = FirstTurn(State);
 
 	// ── Always-survive sections (top priority) ──
-	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
+	let Directives = crate::Directive::Build::Fn(&State.Directive.Loaded, &State.Directive.Active);
 	let Nudges = Nudge(State);
 
 	// ── Context-engine trigger + offload prompt (fires only when the engine

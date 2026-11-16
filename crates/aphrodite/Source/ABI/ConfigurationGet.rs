@@ -36,11 +36,11 @@ pub unsafe extern "C" fn AphroditeConfigurationGet(Handle:*const c_char, Key:*co
 		let Key = Optional(Key)?;
 
 		let Value = match &*Key {
-			"model" => s.Model.clone(),
-			"api_url" => s.APIURL.clone(),
-			"engine_threshold_pct" => s.EngineThresholdPct.to_string(),
-			"tool_threshold" => s.ToolThreshold.to_string(),
-			"context_engine_enabled" => s.ContextEngineEnabled.to_string(),
+			"model" => s.Configuration.Model.clone(),
+			"api_url" => s.Configuration.URL.clone(),
+			"engine_threshold_pct" => s.Configuration.EngineThresholdPct.to_string(),
+			"tool_threshold" => s.Configuration.ToolThreshold.to_string(),
+			"context_engine_enabled" => s.Configuration.ContextEngineEnabled.to_string(),
 			_ => anyhow::bail!("unknown key: {}", Key),
 		};
 

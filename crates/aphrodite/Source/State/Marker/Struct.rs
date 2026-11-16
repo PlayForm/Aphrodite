@@ -13,16 +13,18 @@ use super::Entry::Struct::Struct as Entry;
 
 /// The marker catalog: the bounded ring of recorded markers and the counter the
 /// catalog renderer uses to emit a delta line only when something is new.
-#[derive(Clone)]
+///
+/// `Default` is the seed: an empty ring, a zero counter.
+#[derive(Clone, Default)]
 pub struct Struct {
 	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}].
 	/// `VecDeque` (fix 6): `Record` pushes back and pops the front
 	/// while over `Marker::Const::Cap`, so the oldest marker always sits at
 	/// index 0.
-	pub RecentMarkers:VecDeque<Entry>,
+	pub Recent:VecDeque<Entry>,
 	/// Number of markers the last time catalog_summary rendered, so we emit a
 	/// delta line only when new markers arrived this turn. Zero-initialized;
 	/// reset on session start. Stops the prompt-cache-poisoning repetition of
 	/// the same 5 previews every turn.
-	pub LastEmittedMarkerCount:usize,
+	pub Emitted:usize,
 }

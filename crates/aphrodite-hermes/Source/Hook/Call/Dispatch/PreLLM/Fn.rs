@@ -51,10 +51,10 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 			Session,
 			"pre_turn",
 			&[
-				("turn", State.TurnCounter.to_string()),
+				("turn", State.Turn.Counter.to_string()),
 				("session", Session.to_string()),
 				("est_request_bytes", Length.to_string()),
-				("pending_markers", State.RecentMarkers.len().to_string()),
+				("pending_markers", State.Marker.Recent.len().to_string()),
 			],
 		);
 		Log::Fn::Fn(State, Session);

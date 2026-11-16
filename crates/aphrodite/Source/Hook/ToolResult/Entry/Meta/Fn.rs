@@ -2,7 +2,7 @@
 //!
 //! This is the entry point the Hermes bridge routes to, so the error/args/
 //! duration signals Hermes ships on every call stop being dropped: they are
-//! recorded into the `ToolEvents` telemetry ring.
+//! recorded into the `Event::Recent` telemetry ring.
 
 use crate::{
 	Hook::{

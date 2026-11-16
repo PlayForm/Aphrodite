@@ -10,7 +10,7 @@ use crate::{
 #[test]
 fn ExitCode() {
 	let mut s = AphroditeState::default();
-	s.TerminalThreshold = 0;
+	s.Configuration.TerminalThreshold = 0;
 	let r = Transform(&mut s, "error: broke\nexit code: 1\n");
 	assert_eq!(r["type"], "terminal");
 }
@@ -18,9 +18,9 @@ fn ExitCode() {
 #[test]
 fn Expand() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 102400;
-	s.TerminalThreshold = 0;
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 102400;
+	s.Configuration.TerminalThreshold = 0;
 	let Nested = "terminal nested content";
 	let NestedHash = StoreNested(&mut s, Nested);
 	let Content = format!("line 1\n<<<CCR:{NestedHash}|text|{}>>>\nline 3", Nested.len());
@@ -37,9 +37,9 @@ fn Expand() {
 #[test]
 fn OverLimit() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 4;
-	s.TerminalThreshold = 0;
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 4;
+	s.Configuration.TerminalThreshold = 0;
 	let Content = "way over the four byte limit";
 	let r = Transform(&mut s, Content);
 	assert_eq!(r["compressed"], true);
@@ -52,7 +52,7 @@ fn OverLimit() {
 #[test]
 fn Identical() {
 	let mut s = AphroditeState::default();
-	s.TerminalThreshold = 0;
+	s.Configuration.TerminalThreshold = 0;
 	let Content = "cargo build\n   Compiling aphrodite v0.1.0\nexit code: 0\n";
 	let r = Transform(&mut s, Content);
 	assert_eq!(r["compressed"], true);
@@ -76,10 +76,10 @@ fn Identical() {
 #[test]
 fn Bypass() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 102400;
-	s.ChainSplitEnabled = true;
-	s.TerminalThreshold = 100000; // content below the threshold
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 102400;
+	s.ChainSplit.Enable = true;
+	s.Configuration.TerminalThreshold = 100000; // content below the threshold
 	let Content = format!("seg a output\n{}\nseg b output\n{}\nseg c output\n", Marker, Marker);
 	let r = Transform(&mut s, &Content);
 	assert_eq!(
@@ -96,8 +96,8 @@ fn Bypass() {
 #[test]
 fn Unaffected() {
 	let mut s = AphroditeState::default(); // auto_expand = false
-	s.ChainSplitEnabled = true;
-	s.TerminalThreshold = 0;
+	s.ChainSplit.Enable = true;
+	s.Configuration.TerminalThreshold = 0;
 	let Content = format!("seg a output\n{}\nseg b output\n{}\nseg c output\n", Marker, Marker);
 	let r = Transform(&mut s, &Content);
 	assert_eq!(r["chain_split"], true, "chain-split must keep working when auto-expand is off");

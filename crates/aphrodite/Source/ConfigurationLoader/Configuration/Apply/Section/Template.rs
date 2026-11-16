@@ -21,7 +21,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// ── [templates] section (pre-Rust port): preview families, marker
 	// block, prompt templates, reverse key map ──
 	let Templates = Configuration.Template();
-	State.Templates = Templates.clone();
+	State.Configuration.Templates = Templates.clone();
 
 	// ── First-turn session injection (templates.prompts.session_inject) ──
 	// Priority (pre-Rust port): override/env → `[templates.prompts]
@@ -29,7 +29,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// (legacy location) → compiled-in SHIPPED_SESSION_INJECT (so a
 	// bare/minimal config still gets a first-turn orientation). Empty string
 	// disables it entirely.
-	State.SessionInject = match Configuration.Overrides.get("APHRODITE_SESSION_INJECT") {
+	State.Configuration.SessionInject = match Configuration.Overrides.get("APHRODITE_SESSION_INJECT") {
 		Some(v) => v.clone(),
 		None => {
 			match std::env::var("APHRODITE_SESSION_INJECT") {

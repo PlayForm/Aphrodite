@@ -30,7 +30,7 @@ fn Event<'a>(Command:Option<&str>, ExitCode:Option<i32>, Output:&'a str, Observe
 
 fn OneRunning() -> AphroditeState {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 4;
+	State.Turn.Counter = 4;
 	Insert(&mut State, "cargo build".into(), "terminal".into(), "cargo build".into(), 1);
 
 	State
@@ -41,7 +41,8 @@ fn Progress() {
 	let mut State = OneRunning();
 	let Poll = Event(Some("cargo build"), None, "compiling", 100);
 
-	let Outcome = Apply(&mut Registry(&mut State.BgTasks), &Poll, State.TurnCounter).expect("the poll names our task");
+	let Outcome =
+		Apply(&mut Registry(&mut State.PollWorker.Tasks), &Poll, State.Turn.Counter).expect("the poll names our task");
 
 	match Outcome {
 		Outcome::Progressed(Subject) => {
@@ -54,10 +55,10 @@ fn Progress() {
 
 	// The accumulator grew and the task is still running: a progress poll's whole
 	// effect is inside the task.
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
-	assert_eq!(State.BgTasks[0].AccumulatedOutput.AsStr(), "compiling");
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].AccumulatedOutput.AsStr(), "compiling");
 	assert!(
-		Stored(&State.BgTasks[0].Status).is_none(),
+		Stored(&State.PollWorker.Tasks[0].Status).is_none(),
 		"nothing is stored for a progress poll"
 	);
 }
@@ -66,10 +67,11 @@ fn Progress() {
 fn Owns() {
 	let mut State = OneRunning();
 	let First = Event(Some("cargo build"), None, "compiling", 100);
-	let _ = Apply(&mut Registry(&mut State.BgTasks), &First, State.TurnCounter);
+	let _ = Apply(&mut Registry(&mut State.PollWorker.Tasks), &First, State.Turn.Counter);
 
 	let Last = Event(Some("cargo build"), Some(0), "finished", 120);
-	let Outcome = Apply(&mut Registry(&mut State.BgTasks), &Last, State.TurnCounter).expect("the poll names our task");
+	let Outcome =
+		Apply(&mut Registry(&mut State.PollWorker.Tasks), &Last, State.Turn.Counter).expect("the poll names our task");
 
 	let Finished = match Outcome {
 		Outcome::Completed(Finished) => Finished,
@@ -81,8 +83,16 @@ fn Owns() {
 	assert_eq!(Finished.Output, "compiling\nfinished");
 	assert_eq!(Finished.ExitCode, 0);
 	assert_eq!(Finished.Subject.Index, 0);
-	assert_eq!(State.BgTasks[0].AccumulatedOutput.Len(), 0, "the buffer was moved, not copied");
-	assert_eq!(State.BgTasks[0].Status, Status::Running, "the status is `Complete`'s to set");
+	assert_eq!(
+		State.PollWorker.Tasks[0].AccumulatedOutput.Len(),
+		0,
+		"the buffer was moved, not copied"
+	);
+	assert_eq!(
+		State.PollWorker.Tasks[0].Status,
+		Status::Running,
+		"the status is `Complete`'s to set"
+	);
 }
 
 #[test]
@@ -91,11 +101,14 @@ fn Untracked() {
 	let Poll = Event(Some("make release"), Some(0), "done", 100);
 
 	assert!(
-		Apply(&mut Registry(&mut State.BgTasks), &Poll, State.TurnCounter).is_none(),
+		Apply(&mut Registry(&mut State.PollWorker.Tasks), &Poll, State.Turn.Counter).is_none(),
 		"a poll for a process we do not track is not ours"
 	);
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
-	assert_eq!(State.BgTasks[0].PollCount, 0, "an unattributed poll does not touch the task");
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
+	assert_eq!(
+		State.PollWorker.Tasks[0].PollCount, 0,
+		"an unattributed poll does not touch the task"
+	);
 }
 
 #[test]
@@ -103,7 +116,8 @@ fn After() {
 	let mut State = OneRunning();
 	let Poll = Event(Some("cargo build"), Some(0), "finished", 100);
 
-	let Outcome = Apply(&mut Registry(&mut State.BgTasks), &Poll, State.TurnCounter).expect("first poll completes");
+	let Outcome =
+		Apply(&mut Registry(&mut State.PollWorker.Tasks), &Poll, State.Turn.Counter).expect("first poll completes");
 	let Finished = match Outcome {
 		Outcome::Completed(Finished) => Finished,
 		Outcome::Progressed(_) => panic!("a poll carrying an exit code completes the task"),
@@ -119,12 +133,12 @@ fn After() {
 		Preview:String::new(),
 		Size:Finished.Output.len(),
 	};
-	assert!(Complete(&mut Registry(&mut State.BgTasks), 0, Output, Finished.ExitCode).is_some());
+	assert!(Complete(&mut Registry(&mut State.PollWorker.Tasks), 0, Output, Finished.ExitCode).is_some());
 
 	// The task is not running any more, so `Select::Target` cannot hand it out again -
 	// a second exit code cannot re-complete a finished task.
 	assert!(
-		Apply(&mut Registry(&mut State.BgTasks), &Poll, State.TurnCounter).is_none(),
+		Apply(&mut Registry(&mut State.PollWorker.Tasks), &Poll, State.Turn.Counter).is_none(),
 		"a finished task is no longer a target"
 	);
 }
@@ -134,7 +148,7 @@ fn Single() {
 	// Audit D6, restated at the level of the value: the exit code belongs to the task
 	// the poll named, and the other task neither completes nor accumulates.
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 4;
+	State.Turn.Counter = 4;
 	Insert(&mut State, "cargo build".into(), "terminal".into(), "cargo build".into(), 1);
 	Insert(&mut State, "npm install".into(), "terminal".into(), "npm install".into(), 2);
 
@@ -142,10 +156,14 @@ fn Single() {
 	assert!(Update(&mut State, "process", &Poll));
 
 	assert!(
-		matches!(State.BgTasks[0].Status, Status::Done { .. }),
+		matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }),
 		"the polled task completes with its own exit code"
 	);
-	assert_eq!(State.BgTasks[1].Status, Status::Running, "the other task keeps running");
-	assert_eq!(State.BgTasks[1].PollCount, 0);
-	assert!(Stored(&State.BgTasks[1].Status).is_none());
+	assert_eq!(
+		State.PollWorker.Tasks[1].Status,
+		Status::Running,
+		"the other task keeps running"
+	);
+	assert_eq!(State.PollWorker.Tasks[1].PollCount, 0);
+	assert!(Stored(&State.PollWorker.Tasks[1].Status).is_none());
 }

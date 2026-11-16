@@ -17,18 +17,18 @@ use crate::{
 /// The metric (documented per the pre-Rust-port brief): the dylib never receives
 /// the raw conversation message list (Hermes holds it) and has no token counts or
 /// context length, so the closest available message-count proxy is the
-/// conversation index itself - `ConvIndex.len()` is the number of archived turns,
+/// conversation index itself - `Turn::Index.len()` is the number of archived turns,
 /// and the "fill ratio" is `len * 100 / Cap`. The index's own eviction
 /// cap is the only "full" reference available.
 ///
 /// Read-only: the gates and the packing both borrow the session, so a refusal and
 /// a plan cost the same nothing, and the caller decides whether to apply.
 pub(crate) fn Fn(State:&AphroditeState) -> Assessment {
-	let Total = State.ConvIndex.len();
+	let Total = State.Turn.Index.len();
 	// Fill ratio: archived-turn count against the index's own cap.
 	let FillPct = ((Total as u64 * 100) / Cap as u64).min(100);
-	let HeadN = State.EngineProtectFirst;
-	let TailN = State.EngineProtectLast;
+	let HeadN = State.Configuration.EngineProtectFirst;
+	let TailN = State.Configuration.EngineProtectLast;
 	let MiddleN = Total.saturating_sub(HeadN).saturating_sub(TailN);
 
 	match ResolveGate(State, Total, FillPct, MiddleN) {

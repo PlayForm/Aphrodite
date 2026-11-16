@@ -21,9 +21,9 @@ fn Disabled() {
 	// `Session::Engine::Fn::EngineMaybeArchive` (its only call site), so the
 	// engine is never consulted and no section can appear.
 	let mut s = AphroditeState::default();
-	s.ContextEngineEnabled = false;
-	s.TurnCounter = 5;
-	s.FlowBudgetChars = 4000;
+	s.Configuration.ContextEngineEnabled = false;
+	s.Turn.Counter = 5;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[engine-offload"),
@@ -57,8 +57,8 @@ fn Default() {
 	// `EngineMaybeArchive` stub returns None => no archive, no injection -
 	// byte-identical current behavior (and the context stays empty).
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 5;
-	s.FlowBudgetChars = 4000;
+	s.Turn.Counter = 5;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[engine-offload"),

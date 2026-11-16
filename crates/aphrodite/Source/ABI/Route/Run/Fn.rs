@@ -33,17 +33,18 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json
 				Command::Stats => {
 					serde_json::json!({
 						"version": env!("CARGO_PKG_VERSION"),
-						"inline_entries": State.InlineStore.len(),
-						"markers": State.RecentMarkers.len(),
-						"turn": State.TurnCounter,
-						"engine_enabled": State.ContextEngineEnabled,
+						"inline_entries": State.Store.Map.len(),
+						"markers": State.Marker.Recent.len(),
+						"turn": State.Turn.Counter,
+						"engine_enabled": State.Configuration.ContextEngineEnabled,
 					})
 				},
 				Command::Directive { Action, Name } => crate::Directive::Action::Fn(State, Action, Name),
 				Command::Search { Query, Filter } => {
 					let Query = Query.to_lowercase();
 					let Results:Vec<serde_json::Value> = State
-						.RecentMarkers
+						.Marker
+						.Recent
 						.iter()
 						.filter(|Marker| {
 							let Contains = Query.is_empty()
@@ -68,7 +69,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json
 				},
 				Command::Diff => {
 					let Turns:Vec<serde_json::Value> = State
-						.ConvIndex
+						.Turn
+						.Index
 						.iter()
 						.map(
 							|(Turn, (hash, Summary, Size))| serde_json::json!({"turn":Turn,"hash":hash,"summary":Summary,"size":Size}),
@@ -79,7 +81,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared<'_>) -> serde_json
 				},
 				Command::Files => {
 					let Files:Vec<serde_json::Value> = State
-						.ReferencedFiles
+						.File
+						.Recent
 						.iter()
 						.map(|(path, Tool)| serde_json::json!({"path":path,"tool":Tool}))
 						.collect();

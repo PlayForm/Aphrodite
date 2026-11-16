@@ -5,7 +5,7 @@ use crate::{Session::Turn::Fn::Fn as Turn, State::Struct::AphroditeState};
 #[test]
 fn Advance() {
 	let mut s = AphroditeState::default();
-	assert_eq!(Turn(&mut s), 1);
-	assert_eq!(Turn(&mut s), 2);
-	assert_eq!(s.ScannedMessageIndex, 0);
+	assert_eq!(Turn(&mut s.Turn), 1);
+	assert_eq!(Turn(&mut s.Turn), 2);
+	assert_eq!(s.Turn.Scanned, 0);
 }

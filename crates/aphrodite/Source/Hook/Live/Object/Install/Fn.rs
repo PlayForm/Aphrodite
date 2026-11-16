@@ -29,14 +29,14 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> Objec
 	let Policy = ChunkPolicy::new(Size);
 
 	// Round-trip view: the plain hash resolves to the exact original.
-	State.Put(Hash.clone(), Content.to_string());
+	State.Store.Put(Hash.clone(), Content.to_string());
 
 	// Chunk views: produced lazily, stored and counted in the same pass.
 	let Chunks = Policy.as_ref().map_or(0, |Policy| {
 		Policy
 			.Chunks(Content)
 			.enumerate()
-			.map(|(Index, Chunk)| State.Put(ChunkKey(&Hash, Index), Chunk.to_string()))
+			.map(|(Index, Chunk)| State.Store.Put(ChunkKey(&Hash, Index), Chunk.to_string()))
 			.count()
 	});
 	// The envelope reports the target the chunks were actually cut with, and zero
@@ -45,7 +45,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> Objec
 	let ChunkSize = Policy.as_ref().map_or(0, |Policy| Policy.Target());
 
 	let Object = Object { Hash, Type:TypeStr.to_string(), Total, Chunks, ChunkSize };
-	State.Put(MetaKey(&Object.Hash), Object.Meta());
+	State.Store.Put(MetaKey(&Object.Hash), Object.Meta());
 
 	Object
 }

@@ -11,7 +11,7 @@
 
 use crate::{
 	Flow::Nudge::Push::Const::Maximum,
-	State::{Directive::Struct::Struct as ActiveDirective, Struct::AphroditeState},
+	State::{Directive::Entry::Struct::Struct as ActiveDirective, Struct::AphroditeState},
 };
 
 /// Push an inline nudge that renders on the next `PreLLMCall` and self-purges after
@@ -19,14 +19,14 @@ use crate::{
 /// purged at the following `PostLLMCall`. At most four ephemeral entries are
 /// stored; pushing a 5th drops the oldest.
 pub fn Fn(State:&mut AphroditeState, Text:&str, TtlTurns:usize) {
-	let Expires = Some(State.TurnCounter + TtlTurns);
-	State.EphemeralDirectives.push(ActiveDirective {
+	let Expires = Some(State.Turn.Counter + TtlTurns);
+	State.Directive.Ephemeral.push(ActiveDirective {
 		name:String::new(),
 		inline:Some(Text.to_string()),
 		ExpiresAfterTurn:Expires,
 	});
 
-	let Overflow = State.EphemeralDirectives.len().saturating_sub(Maximum);
+	let Overflow = State.Directive.Ephemeral.len().saturating_sub(Maximum);
 
-	State.EphemeralDirectives.drain(..Overflow);
+	State.Directive.Ephemeral.drain(..Overflow);
 }

@@ -20,6 +20,6 @@ use crate::{Hook::Hash::Fn::Fn as ComputeHash, State::Struct::AphroditeState};
 /// instead of passing the wrapper through.
 pub(super) fn StoreNested(State:&mut AphroditeState, Text:&str) -> String {
 	let h = ComputeHash(Text);
-	State.Put(h.clone(), Text.to_string());
+	State.Store.Put(h.clone(), Text.to_string());
 	h
 }

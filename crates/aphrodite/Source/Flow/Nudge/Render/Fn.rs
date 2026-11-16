@@ -12,11 +12,12 @@ use crate::State::Struct::AphroditeState;
 /// (`expires_after_turn >= turn_counter`, or `None` = permanent).
 pub fn Fn(State:&AphroditeState) -> String {
 	let mut Lines:Vec<String> = State
-		.EphemeralDirectives
+		.Directive
+		.Ephemeral
 		.iter()
 		.rev() // newest first
 		.filter(|e| e.inline.is_some())
-		.filter(|e| e.ExpiresAfterTurn.is_none_or(|Exp| Exp >= State.TurnCounter))
+		.filter(|e| e.ExpiresAfterTurn.is_none_or(|Exp| Exp >= State.Turn.Counter))
 		.take(2)
 		.filter_map(|e| e.inline.as_ref().map(|t| format!("[nudge: {t}]")))
 		.collect();

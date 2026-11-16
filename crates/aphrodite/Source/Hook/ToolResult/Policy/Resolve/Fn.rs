@@ -15,7 +15,7 @@ use crate::{
 pub(crate) fn Fn(State:&AphroditeState, Content:&str) -> Struct {
 	Struct {
 		AutoExpand:Applies(State, Content),
-		Threshold:State.ToolThreshold,
-		Live:State.LiveContainer,
+		Threshold:State.Configuration.ToolThreshold,
+		Live:State.Configuration.LiveContainer,
 	}
 }

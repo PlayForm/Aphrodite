@@ -23,14 +23,14 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.Startup(&mut State);
-	assert_eq!(State.RetrieveGuidance, "verbose");
-	assert!(State.CatalogIntentHints);
+	assert_eq!(State.Configuration.RetrieveGuidance, "verbose");
+	assert!(State.Configuration.CatalogIntentHints);
 
 	// Absent everywhere => defaults (minimal / off).
 	let mut State2 = crate::State::Struct::AphroditeState::default();
 	Configuration::default().Startup(&mut State2);
-	assert_eq!(State2.RetrieveGuidance, "minimal");
-	assert!(!State2.CatalogIntentHints);
+	assert_eq!(State2.Configuration.RetrieveGuidance, "minimal");
+	assert!(!State2.Configuration.CatalogIntentHints);
 }
 
 #[test]
@@ -40,6 +40,6 @@ fn TestPromptKnobsResolveFromEnvironmentOverride() {
 	cfg.Set("APHRODITE_CATALOG_INTENT_HINTS", "1");
 	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.Startup(&mut State);
-	assert_eq!(State.RetrieveGuidance, "standard");
-	assert!(State.CatalogIntentHints);
+	assert_eq!(State.Configuration.RetrieveGuidance, "standard");
+	assert!(State.Configuration.CatalogIntentHints);
 }

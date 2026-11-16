@@ -23,31 +23,31 @@ pub struct Struct {
 	/// override (opt-in per session via `APHRODITE_CHAIN_SPLIT=1` or TOML
 	/// `[compression] chain_split`). Env: `APHRODITE_CHAIN_SPLIT`, TOML:
 	/// `[compression] chain_split`.
-	pub ChainSplitEnabled:bool,
+	pub Enable:bool,
 	/// Current minimum segment count for chain splitting. Only chains with
 	/// at least this many segments are rewritten. Starts at the configured
-	/// floor (default 2, `SplitChain` already requires ≥2) and adapts
-	/// within `[ChainSplitFloor, ChainSplitMaximumSegments]` based on
-	/// whether the agent actually retrieves the produced segment markers
-	/// (consequence-driven learning). The threshold is machinery - never
-	/// observable to the LLM (no directive text, no summary changes).
-	pub ChainSplitMinimumSegments:usize,
+	/// floor (default 2, `SplitChain` already requires ≥2) and adapts within
+	/// `[Floor, Maximum]` based on whether the agent actually retrieves the
+	/// produced segment markers (consequence-driven learning). The threshold is
+	/// machinery - never observable to the LLM (no directive text, no summary
+	/// changes).
+	pub Minimum:usize,
 	/// Lower bound of the adaptive threshold: the configured initial value.
-	pub ChainSplitFloor:usize,
+	pub Floor:usize,
 	/// Upper bound of the adaptive threshold. Env:
 	/// `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS`, TOML:
 	/// `[compression] chain_split_max_segments`. Default 6.
-	pub ChainSplitMaximumSegments:usize,
+	pub Maximum:usize,
 	/// Consequence ledger: one entry per chain-split event recording how
 	/// many segment markers were produced and how many distinct ones were
 	/// later retrieved. Bounded ring (cap `ChainSplit::Const::Cap`); oldest
-	/// evicted. `SplitSegmentMap` maps each produced segment hash to its
+	/// evicted. `ChainSplit::Segments` maps each produced segment hash to its
 	/// event id so a resolve can be attributed to the right event.
-	pub SplitEvents:VecDeque<Entry>,
+	pub Ledger:VecDeque<Entry>,
 	/// Segment hash → split-event id, for retrieval attribution. A hash
 	/// resolves at most once (removed after counting), so re-retrieving the
 	/// same marker never double-counts.
-	pub SplitSegmentMap:HashMap<String, usize>,
-	/// Monotonic event id counter for `SplitEvents`.
-	pub SplitNextEventID:usize,
+	pub Segments:HashMap<String, usize>,
+	/// Monotonic event id counter for `ChainSplit::Ledger`.
+	pub Next:usize,
 }

@@ -3,7 +3,7 @@
 /// Metadata Hermes already sends alongside a tool result (report 05, P2) - the
 /// signals the bridge historically dropped on the floor (`Status`,
 /// `ErrorType`, `ErrorMessage`, `Args`, `DurationMs`). Threaded through
-/// [`crate::Hook::transform_tool_result_with_meta`] into the `ToolEvents`
+/// [`crate::Hook::transform_tool_result_with_meta`] into the `Event::Recent`
 /// telemetry ring.
 ///
 /// Borrowed, not owned: every field points into the caller's JSON or string

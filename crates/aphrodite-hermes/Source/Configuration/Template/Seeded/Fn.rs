@@ -46,7 +46,7 @@ pub(crate) fn Fn() -> AphroditeState {
 	// config fields are mutated - session CCR state, directive selection, and
 	// telemetry survive a reload (the dropped dylib-binary hot-reload wiped
 	// them; fa85dfa).
-	let Started = State.AutoReload.then(Watcher::Fn::Fn);
+	let Started = State.Configuration.AutoReload.then(Watcher::Fn::Fn);
 
 	matches!(Started, Some(Start::Enum::Enum::Failed))
 		.then_some(Notice)

@@ -9,7 +9,7 @@ use crate::{
 #[test]
 fn All() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 20;
+	State.Turn.Counter = 20;
 	Insert(
 		&mut State,
 		"stale".into(),
@@ -18,11 +18,11 @@ fn All() {
 		10, // started at turn 10, gap=10 < 16 so retain won't drop it
 	);
 	// Never polled - gap from turn 20 to last_poll 10 = 10 > STALE_TURN_AGE(8).
-	State.BgTasks[0].LastPollTurn = 10;
+	State.PollWorker.Tasks[0].LastPollTurn = 10;
 
 	Expire(&mut State);
 	assert_eq!(
-		State.BgTasks[0].Status,
+		State.PollWorker.Tasks[0].Status,
 		Status::Stale,
 		"unpolled task at turn 20 should be stale (last poll: turn 10, gap=10 > 8)"
 	);
@@ -31,13 +31,13 @@ fn All() {
 #[test]
 fn Recent() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 20;
+	State.Turn.Counter = 20;
 	Insert(&mut State, "active".into(), "terminal".into(), "recent-cmd".into(), 15);
-	State.BgTasks[0].LastPollTurn = 19; // polled just one turn ago
+	State.PollWorker.Tasks[0].LastPollTurn = 19; // polled just one turn ago
 
 	Expire(&mut State);
 	assert_eq!(
-		State.BgTasks[0].Status,
+		State.PollWorker.Tasks[0].Status,
 		Status::Running,
 		"recently polled task must not be marked stale"
 	);

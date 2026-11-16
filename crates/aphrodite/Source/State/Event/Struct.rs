@@ -12,9 +12,11 @@ use std::collections::VecDeque;
 use super::Entry::Struct::Struct as Entry;
 
 /// The bounded ring of per-call events (cap `Event::Const::Cap`, evict front).
-#[derive(Clone)]
+///
+/// `Default` is the seed: an empty ring.
+#[derive(Clone, Default)]
 pub struct Struct {
 	/// Bounded ring of per-tool-call events (cap 200, evict front). Feeds phase
 	/// detection, error-loop breaking, delta previews, checkpoints (P6-P11).
-	pub ToolEvents:VecDeque<Entry>,
+	pub Recent:VecDeque<Entry>,
 }

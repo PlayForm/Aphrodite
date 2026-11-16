@@ -6,7 +6,7 @@ use crate::{
 		Classification::{Fn::Fn as Classification, Hint::Enum::Enum as Hint},
 	},
 	Marker::Format::Entry::Fn as CCRMarker,
-	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// Store the content, record the marker, and build the payload the bridge hands
@@ -36,17 +36,17 @@ pub(crate) fn Fn(
 	let Resolved = Classification(Content, Classify, Hint);
 
 	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
-	State.Put(hash.clone(), Content.to_string());
+	State.Store.Put(hash.clone(), Content.to_string());
 
 	let Preview = crate::Preview::Builder::Entry::Fn(&Resolved.Type, Resolved.Content);
 	let Marker = CCRMarker(&hash, &Resolved.Type, Content.len(), &Preview, None, None, None);
 
-	State.RecordMarker(MarkerEntry {
+	State.Marker.Record(MarkerEntry {
 		hash:hash.clone(),
 		CCRType:Resolved.Type.clone(),
 		Size:Content.len(),
 		Preview:Preview.clone(),
-		Turn:State.TurnCounter,
+		Turn:State.Turn.Counter,
 		Center:None,
 		meta:None,
 	});

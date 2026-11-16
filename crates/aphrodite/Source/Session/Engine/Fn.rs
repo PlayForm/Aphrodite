@@ -24,7 +24,7 @@ use crate::{
 /// middle turns of the index - keeping exactly `EngineProtectFirst` at the start
 /// and `EngineProtectLast` at the end, with the pre-Rust middle-size floor of 3 -
 /// are packed as one JSON payload, stored under a BLAKE3 key
-/// (`headroom_core::ccr::compute_key`), and the middle is REPLACED in `ConvIndex`
+/// (`headroom_core::ccr::compute_key`), and the middle is REPLACED in `Turn::Index`
 /// by a single marker entry recorded via `Archive`, so the model sees a
 /// compact history (head + marker + tail). The returned string is the CCR marker
 /// plus the rendered `EngineOffload` prompt (hash + tail) for the caller to

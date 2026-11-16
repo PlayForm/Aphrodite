@@ -6,7 +6,7 @@ use crate::{Session::Catalog::Fn::Fn as Catalog, State::Struct::AphroditeState};
 fn Markers() {
 	let mut s = AphroditeState::default();
 	assert!(Catalog(&mut s).is_empty());
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -27,8 +27,8 @@ fn Files() {
 	// Add files the production way: record_file pushes to the FRONT of
 	// the deque, so the delta must read from the front and reverse into
 	// insertion order (Fix 16).
-	s.RecordFile("src/a.rs".into(), "read_file".into());
-	s.RecordFile("src/b.rs".into(), "write_file".into());
+	s.File.Record("src/a.rs".into(), "read_file".into());
+	s.File.Record("src/b.rs".into(), "write_file".into());
 	let R1 = Catalog(&mut s);
 	assert!(R1.contains("+2 new files"));
 	assert!(R1.contains("src/a.rs (read_file), src/b.rs (write_file)"));
@@ -41,7 +41,7 @@ fn Files() {
 #[test]
 fn HintsOff() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"aaaaaaaaaaaa111111111111".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -57,7 +57,7 @@ fn HintsOff() {
 #[test]
 fn HintsOn() {
 	let mut s = AphroditeState::default();
-	s.CatalogIntentHints = true;
+	s.Configuration.CatalogIntentHints = true;
 	[
 		"aaaaaaaaaaaa111111111111",
 		"bbbbbbbbbbbb222222222222",
@@ -66,7 +66,7 @@ fn HintsOn() {
 	]
 	.into_iter()
 	.for_each(|h| {
-		s.RecordMarker(crate::State::Marker::Struct::Struct {
+		s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 			hash:h.into(),
 			CCRType:"text".into(),
 			Size:100,

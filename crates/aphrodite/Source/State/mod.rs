@@ -5,8 +5,8 @@
 //! The tree is grouped by the concern that owns the data, not by the order the
 //! fields appear in the struct:
 //!
-//! - `Struct.rs` - `AphroditeState` itself: the composition, nothing else.
-//! - `Default.rs` - the seed every session clones from.
+//! - `Struct.rs` - `AphroditeState` itself: the composition and its seed,
+//!   nothing else.
 //! - `Identity/` - the three identity types the state's records are keyed by.
 //! - `Template/` - the `[templates]` section of the configuration.
 //! - `Configuration/` - the resolved config the session mirrors.
@@ -42,7 +42,6 @@
 
 pub mod ChainSplit;
 pub mod Configuration;
-pub mod Default;
 pub mod Directive;
 pub mod Event;
 pub mod File;

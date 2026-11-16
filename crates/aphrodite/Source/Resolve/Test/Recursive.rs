@@ -18,12 +18,12 @@ fn TestExpandDeepNestingRespectsLimit() {
 	// than an unresolved placeholder - the content genuinely exists; the depth limit only
 	// stops *further* recursive expansion, it must not misreport presence.
 	let mut s = AphroditeState::default();
-	s.Put("h0".into(), "<<<CCR:h1|t|1>>>".into());
-	s.Put("h1".into(), "<<<CCR:h2|t|1>>>".into());
-	s.Put("h2".into(), "<<<CCR:h3|t|1>>>".into());
-	s.Put("h3".into(), "<<<CCR:h4|t|1>>>".into());
-	s.Put("h4".into(), "<<<CCR:h5|t|1>>>".into());
-	s.Put("h5".into(), "DEEP".into());
+	s.Store.Put("h0".into(), "<<<CCR:h1|t|1>>>".into());
+	s.Store.Put("h1".into(), "<<<CCR:h2|t|1>>>".into());
+	s.Store.Put("h2".into(), "<<<CCR:h3|t|1>>>".into());
+	s.Store.Put("h3".into(), "<<<CCR:h4|t|1>>>".into());
+	s.Store.Put("h4".into(), "<<<CCR:h5|t|1>>>".into());
+	s.Store.Put("h5".into(), "DEEP".into());
 
 	assert_eq!(Expand(&mut s, "h0"), Some("DEEP".to_string()));
 }
@@ -35,8 +35,8 @@ fn TestExpandCycleSafe() {
 	// second visit to hA (while still expanding hB) substitutes hA's cached pre-expansion
 	// content instead of being skipped outright.
 	let mut s = AphroditeState::default();
-	s.Put("hA".into(), "<<<CCR:hB|t|1>>>".into());
-	s.Put("hB".into(), "<<<CCR:hA|t|1>>>".into());
+	s.Store.Put("hA".into(), "<<<CCR:hB|t|1>>>".into());
+	s.Store.Put("hB".into(), "<<<CCR:hA|t|1>>>".into());
 
 	let Result = Expand(&mut s, "hA").unwrap();
 
@@ -53,9 +53,9 @@ fn TestExpandCycleSafe() {
 fn TestExpandDiamondNestingFullyExpands() {
 	let mut s = AphroditeState::default();
 	// `outer` references both `a` and `b`; `b` also references `a`.
-	s.Put("outer".into(), "<<<CCR:a|t|1>>> and <<<CCR:b|t|1>>>".into());
-	s.Put("a".into(), "A".into());
-	s.Put("b".into(), "wraps <<<CCR:a|t|1>>>".into());
+	s.Store.Put("outer".into(), "<<<CCR:a|t|1>>> and <<<CCR:b|t|1>>>".into());
+	s.Store.Put("a".into(), "A".into());
+	s.Store.Put("b".into(), "wraps <<<CCR:a|t|1>>>".into());
 
 	let Result = Expand(&mut s, "outer").unwrap();
 
@@ -70,11 +70,11 @@ fn TestExpandDiamondNestingFullyExpands() {
 #[test]
 fn TestExpandRevisitsACappedHashWithDepthRemaining() {
 	let mut s = AphroditeState::default();
-	s.RecursiveDepth = 2;
+	s.Configuration.RecursiveDepth = 2;
 	// `a` reaches `z` at depth 2 (the cap); `top` also reaches `z` at depth 1.
-	s.Put("top".into(), "<<<CCR:a|t|1>>> and <<<CCR:z|t|1>>>".into());
-	s.Put("a".into(), "<<<CCR:z|t|1>>>".into());
-	s.Put("z".into(), "Z".into());
+	s.Store.Put("top".into(), "<<<CCR:a|t|1>>> and <<<CCR:z|t|1>>>".into());
+	s.Store.Put("a".into(), "<<<CCR:z|t|1>>>".into());
+	s.Store.Put("z".into(), "Z".into());
 
 	assert_eq!(Expand(&mut s, "top"), Some("Z and Z".to_string()));
 }
@@ -85,12 +85,12 @@ fn TestExpandRevisitsACappedHashWithDepthRemaining() {
 #[test]
 fn TestExpandCappedReferenceKeepsItsMarkerText() {
 	let mut s = AphroditeState::default();
-	s.RecursiveDepth = 1;
+	s.Configuration.RecursiveDepth = 1;
 	// At depth 1 both `a` and `b` are at the cap, so `a` is answered as stored - and its
 	// stored text is itself the marker for `b`.
-	s.Put("outer".into(), "<<<CCR:a|t|1>>> <<<CCR:b|t|1>>>".into());
-	s.Put("a".into(), "<<<CCR:b|t|1>>>".into());
-	s.Put("b".into(), "B".into());
+	s.Store.Put("outer".into(), "<<<CCR:a|t|1>>> <<<CCR:b|t|1>>>".into());
+	s.Store.Put("a".into(), "<<<CCR:b|t|1>>>".into());
+	s.Store.Put("b".into(), "B".into());
 
 	assert_eq!(Expand(&mut s, "outer"), Some("<<<CCR:b|t|1>>> B".to_string()));
 }
@@ -101,8 +101,8 @@ fn TestExpandCappedReferenceKeepsItsMarkerText() {
 #[test]
 fn TestInlineReturnsContentWithinLimit() {
 	let mut s = AphroditeState::default();
-	s.Put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
-	s.Put("inner123".into(), "RESOLVED".into());
+	s.Store.Put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.Store.Put("inner123".into(), "RESOLVED".into());
 
 	let Result = Inline(&mut s, "outer", 1000);
 
@@ -116,8 +116,8 @@ fn TestInlineReturnsContentWithinLimit() {
 #[test]
 fn TestInlineOverLimitReturnsNone() {
 	let mut s = AphroditeState::default();
-	s.Put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
-	s.Put("inner123".into(), "RESOLVED".into());
+	s.Store.Put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.Store.Put("inner123".into(), "RESOLVED".into());
 
 	// The resolved content is 21 bytes ("before RESOLVED after") - a 10-byte limit must refuse
 	// it, leaving the caller's marker in place.
@@ -134,8 +134,8 @@ fn TestInlineCycleIsSafe() {
 	// Cycle-safe: a self-referential pair must terminate and must not surface a raw marker as
 	// if it were resolved content.
 	let mut s = AphroditeState::default();
-	s.Put("hA".into(), "<<<CCR:hB|t|1>>>".into());
-	s.Put("hB".into(), "<<<CCR:hA|t|1>>>".into());
+	s.Store.Put("hA".into(), "<<<CCR:hB|t|1>>>".into());
+	s.Store.Put("hB".into(), "<<<CCR:hA|t|1>>>".into());
 
 	assert_eq!(Inline(&mut s, "hA", 1000), Some("<<<CCR:hB|t|1>>>".to_string()));
 }
@@ -148,14 +148,14 @@ fn TestInlineAbandonsAnOverBudgetNestedExpansion() {
 	let mut s = AphroditeState::default();
 	// `outer` itself is 30 bytes, but its only marker expands to a 4 KiB body: no budget of
 	// 100 bytes can hold the result, so the answer must be `None` rather than a partial inline.
-	s.Put("outer".into(), "<<<CCR:big|t|4096>>>".into());
-	s.Put("big".into(), "x".repeat(4096));
+	s.Store.Put("outer".into(), "<<<CCR:big|t|4096>>>".into());
+	s.Store.Put("big".into(), "x".repeat(4096));
 
 	assert_eq!(Inline(&mut s, "outer", 100), None);
 }
 
 // ── Pre-Rust port: `APHRODITE_RECURSIVE_DEPTH` - the depth limit is config-driven via
-// `state.RecursiveDepth` (default 5, byte-identical to the pre-port hardcoded constant), not a
+// `state.Configuration.RecursiveDepth` (default 5, byte-identical to the pre-port hardcoded constant), not a
 // fixed constant. ──
 #[test]
 fn TestExpandHonorsConfiguredRecursiveDepth() {
@@ -163,11 +163,11 @@ fn TestExpandHonorsConfiguredRecursiveDepth() {
 	// readable raw content of the deepest-visited leaf hash (F9) - never absent and never an
 	// unresolved placeholder.
 	let mut s = AphroditeState::default();
-	s.RecursiveDepth = 2;
-	s.Put("h0".into(), "<<<CCR:h1|t|1>>>".into());
-	s.Put("h1".into(), "<<<CCR:h2|t|1>>>".into());
-	s.Put("h2".into(), "<<<CCR:h3|t|1>>>".into());
-	s.Put("h3".into(), "DEEP".into());
+	s.Configuration.RecursiveDepth = 2;
+	s.Store.Put("h0".into(), "<<<CCR:h1|t|1>>>".into());
+	s.Store.Put("h1".into(), "<<<CCR:h2|t|1>>>".into());
+	s.Store.Put("h2".into(), "<<<CCR:h3|t|1>>>".into());
+	s.Store.Put("h3".into(), "DEEP".into());
 
 	assert_eq!(Expand(&mut s, "h0"), Some("<<<CCR:h3|t|1>>>".to_string()));
 }
@@ -177,11 +177,11 @@ fn TestExpandRecursiveDepthHigherThanDefaultExpandsFurther() {
 	// A 6-deep chain exceeds the old hardcoded 5 but must fully expand when RecursiveDepth is
 	// raised to 8 - proves the limit is the configured value, not a min() with the old constant.
 	let mut s = AphroditeState::default();
-	s.RecursiveDepth = 8;
+	s.Configuration.RecursiveDepth = 8;
 	// h7 -> DEEP; h6 -> marker(h7); ...; h0 -> marker(h1): an 8-deep chain.
-	s.Put("h7".into(), "DEEP".into());
+	s.Store.Put("h7".into(), "DEEP".into());
 	(0..7).rev().for_each(|i| {
-		s.Put(format!("h{i}"), format!("<<<CCR:h{}|t|1>>>", i + 1));
+		s.Store.Put(format!("h{i}"), format!("<<<CCR:h{}|t|1>>>", i + 1));
 	});
 
 	assert_eq!(Expand(&mut s, "h0"), Some("DEEP".to_string()));
@@ -192,11 +192,11 @@ fn TestExpandRecursiveDepthFiveIsByteIdenticalToDefault() {
 	// The state default is 5 (the pre-port hardcoded constant): a default state and an
 	// explicitly-configured 5 must produce identical output on the same chain, and the default
 	// must be exactly 5.
-	assert_eq!(AphroditeState::default().RecursiveDepth, 5);
+	assert_eq!(AphroditeState::default().Configuration.RecursiveDepth, 5);
 
 	let mut SDefault = AphroditeState::default();
 	let mut SFive = AphroditeState::default();
-	SFive.RecursiveDepth = 5;
+	SFive.Configuration.RecursiveDepth = 5;
 
 	[
 		("h0", "<<<CCR:h1|t|1>>>"),
@@ -208,8 +208,8 @@ fn TestExpandRecursiveDepthFiveIsByteIdenticalToDefault() {
 	]
 	.into_iter()
 	.for_each(|(k, v)| {
-		SDefault.Put(k.into(), v.into());
-		SFive.Put(k.into(), v.into());
+		SDefault.Store.Put(k.into(), v.into());
+		SFive.Store.Put(k.into(), v.into());
 	});
 
 	assert_eq!(Expand(&mut SDefault, "h0"), Expand(&mut SFive, "h0"));

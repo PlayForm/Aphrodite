@@ -34,27 +34,27 @@ use crate::{
 /// string, so "absent" and "empty" are the same fact and the join cannot leave a
 /// stray separator.
 pub fn Fn(State:&mut AphroditeState) -> String {
-	let CurrentMarkers = State.RecentMarkers.len();
-	let PreviousMarkers = State.LastEmittedMarkerCount;
-	let CurrentFiles = State.ReferencedFiles.len();
-	let PreviousFiles = State.LastEmittedFileCount;
+	let CurrentMarkers = State.Marker.Recent.len();
+	let PreviousMarkers = State.Marker.Emitted;
+	let CurrentFiles = State.File.Recent.len();
+	let PreviousFiles = State.File.Emitted;
 	let NewMarkers = CurrentMarkers.saturating_sub(PreviousMarkers);
 	let NewFiles = CurrentFiles.saturating_sub(PreviousFiles);
 
 	let Sections = [
-		MarkerDelta(&State.RecentMarkers, NewMarkers, CurrentMarkers),
-		Archived(State.ConvIndex.len()),
-		FileDelta(&State.ReferencedFiles, NewFiles, CurrentFiles),
-		Workers(State.PollWorkerEnabled, &State.BgTasks),
-		Intent(State.CatalogIntentHints, &State.RecentMarkers, CurrentMarkers),
+		MarkerDelta(&State.Marker.Recent, NewMarkers, CurrentMarkers),
+		Archived(State.Turn.Index.len()),
+		FileDelta(&State.File.Recent, NewFiles, CurrentFiles),
+		Workers(State.PollWorker.Enable, &State.PollWorker.Tasks),
+		Intent(State.Configuration.CatalogIntentHints, &State.Marker.Recent, CurrentMarkers),
 	];
 	let Summary = Sections.into_iter().flatten().collect::<Vec<String>>().join(" ");
 
 	// Commit both watermarks only now, after the string is fully assembled: the
 	// two counters advance together, and a mid-build failure cannot leave one
 	// side of the delta bookkeeping ahead of the other.
-	State.LastEmittedMarkerCount = CurrentMarkers;
-	State.LastEmittedFileCount = CurrentFiles;
+	State.Marker.Emitted = CurrentMarkers;
+	State.File.Emitted = CurrentFiles;
 
 	Summary
 }

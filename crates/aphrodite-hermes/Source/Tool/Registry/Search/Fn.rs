@@ -14,7 +14,8 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 
 		crate::Session::With::Fn::with_shared(|State| {
 			let Results:Vec<serde_json::Value> = State
-				.RecentMarkers
+				.Marker
+				.Recent
 				.iter()
 				.rev()
 				.filter(|Marker| {

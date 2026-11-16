@@ -12,7 +12,7 @@ use crate::{
 ///
 /// A live session owns its directive set: `aphrodite_directive` swaps, adds and removes
 /// entries at runtime, so a reload has no authority to re-discover the directory and
-/// reseed `ActiveDirectives` from `[directives] active`. The absence of `Directive` here
+/// reseed `Directive::Active` from `[directives] active`. The absence of `Directive` here
 /// IS that fix - there is nothing to snapshot and restore afterwards, because the reload
 /// path cannot reach the field at all.
 pub(crate) const Sequence:&[fn(&Configuration, &mut AphroditeState)] = &[

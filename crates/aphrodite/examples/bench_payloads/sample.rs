@@ -77,7 +77,7 @@ impl BatchProcessor {
 				let Sl = Slice.to_vec();
 				s.spawn(move || {
 					for (k, v) in &Sl {
-						St.Put(k, v);
+						St.Store.Put(k, v);
 						*Dn.lock().unwrap() += 1;
 					}
 				});
@@ -93,15 +93,15 @@ mod tests {
 	#[test]
 	fn PutGet() {
 		let s = Store::new(4);
-		s.Put("a", "1");
+		s.Store.Put("a", "1");
 		assert_eq!(s.get("a"), Some("1".into()));
 	}
 	#[test]
 	fn Eviction() {
 		let s = Store::new(2);
-		s.Put("a", "1");
-		s.Put("b", "2");
-		s.Put("c", "3");
+		s.Store.Put("a", "1");
+		s.Store.Put("b", "2");
+		s.Store.Put("c", "3");
 		assert_eq!(s.get("a"), None);
 		assert_eq!(s.get("b"), Some("2".into()));
 	}

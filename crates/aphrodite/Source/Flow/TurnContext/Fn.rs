@@ -59,7 +59,7 @@ pub fn Fn(State:&mut AphroditeState, Estimate:Option<usize>) -> String {
 	// (captured only when the logger is on - one atomic load when off).
 	let T0 = crate::Debug::Level::Enabled::Fn::Fn().then(std::time::Instant::now);
 
-	let Budget = State.FlowBudgetChars;
+	let Budget = State.Configuration.FlowBudgetChars;
 
 	// Gather every candidate section in fixed order, then drop the optional ones
 	// from the bottom until the joined string fits the budget.

@@ -23,8 +23,9 @@ fn Configured() {
 #[test]
 fn Override() {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::Template::Struct::Struct::default());
-	s.Templates
+	s.Configuration.Templates = Some(crate::State::Template::Struct::Struct::default());
+	s.Configuration
+		.Templates
 		.as_mut()
 		.unwrap()
 		.Prompts

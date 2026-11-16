@@ -2,14 +2,14 @@
 
 use crate::{
 	Flow::Window::Turn::Fn::Fn as Window,
-	State::{Event::Struct::Struct as ToolEvent, Struct::AphroditeState},
+	State::{Event::Entry::Struct::Struct as ToolEvent, Struct::AphroditeState},
 };
 
 #[test]
 fn Aggregate() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 10;
-	s.RecordEvent(ToolEvent {
+	s.Turn.Counter = 10;
+	s.Event.Record(ToolEvent {
 		Turn:10,
 		Tool:"read_file".into(),
 		Sig:1,
@@ -18,7 +18,7 @@ fn Aggregate() {
 		bytes:100,
 		WrotePath:None,
 	});
-	s.RecordEvent(ToolEvent {
+	s.Event.Record(ToolEvent {
 		Turn:10,
 		Tool:"write_file".into(),
 		Sig:2,
@@ -27,7 +27,7 @@ fn Aggregate() {
 		bytes:50,
 		WrotePath:Some("src/a.rs".into()),
 	});
-	s.RecordEvent(ToolEvent {
+	s.Event.Record(ToolEvent {
 		Turn:9,
 		Tool:"terminal".into(),
 		Sig:3,
@@ -37,7 +37,7 @@ fn Aggregate() {
 		WrotePath:None,
 	});
 	// old event outside the window
-	s.RecordEvent(ToolEvent {
+	s.Event.Record(ToolEvent {
 		Turn:2,
 		Tool:"read_file".into(),
 		Sig:4,

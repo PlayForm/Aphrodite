@@ -1,8 +1,12 @@
 //! Record one archived compression against the current turn.
 
-use crate::{Session::Turn::Const::Cap, State::Struct::AphroditeState};
+use crate::{Session::Turn::Const::Cap, State::Turn::Struct::Struct as Turn};
 
 /// Archive a compression at end of turn into the conversation index.
+///
+/// Takes the turn bookkeeping rather than the session state: this step writes
+/// one map and reads one counter, so it has no business reaching the store, the
+/// rings or the configuration.
 ///
 /// The index is a map keyed by turn, bounded by `Cap`: exceeding the cap
 /// evicts the OLDEST turn, because the model's useful history is the recent end -
@@ -16,16 +20,16 @@ use crate::{Session::Turn::Const::Cap, State::Struct::AphroditeState};
 /// makes the new entry the OLDEST key, and evicting that would delete the
 /// archive this call exists to record while keeping the entries it should have
 /// displaced.
-pub fn Fn(State:&mut AphroditeState, hash:&str, Summary:&str, Size:usize) {
-	let Turn = State.TurnCounter;
-	State.ConvIndex.insert(Turn, (hash.to_string(), Summary.to_string(), Size));
+pub fn Fn(Turn:&mut Turn, hash:&str, Summary:&str, Size:usize) {
+	let Now = Turn.Counter;
+	Turn.Index.insert(Now, (hash.to_string(), Summary.to_string(), Size));
 
-	let OverCap = State.ConvIndex.len() > Cap;
+	let OverCap = Turn.Index.len() > Cap;
 	let Oldest = OverCap
-		.then(|| State.ConvIndex.keys().copied().filter(|Key| *Key != Turn).min())
+		.then(|| Turn.Index.keys().copied().filter(|Key| *Key != Now).min())
 		.flatten();
 
 	Oldest.into_iter().for_each(|Key| {
-		State.ConvIndex.remove(&Key);
+		Turn.Index.remove(&Key);
 	});
 }

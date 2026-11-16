@@ -37,10 +37,10 @@ use crate::{
 /// caller takes the normal compression path.
 pub fn Fn(State:&mut AphroditeState, ToolName:&str, Content:&str) -> bool {
 	let ObservedAtUnix = crate::Prefetch::Clock::Fn::Fn();
-	let Turn = State.TurnCounter;
+	let Turn = State.Turn.Counter;
 
 	let Outcome:Option<Outcome> = Decode(ToolName, Content, ObservedAtUnix).and_then(|Event| {
-		let mut Tasks = Registry(&mut State.BgTasks);
+		let mut Tasks = Registry(&mut State.PollWorker.Tasks);
 
 		Apply(&mut Tasks, &Event, Turn)
 	});

@@ -76,7 +76,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 			Probed.join(", ")
 		);
 
-		State.Directives = crate::Directive::Builtin::Fn();
+		State.Directive.Loaded = crate::Directive::Builtin::Fn();
 	});
 	// Seed active directives: from TOML [directives] active list, filtered
 	// to those that actually loaded. If the TOML list resolves empty while
@@ -85,17 +85,21 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// keeps the session from over-eagerly stacking directives until a later
 	// turn proves it needs focus/explore/foresight/cleanup).
 	let Active = Configuration.List("directives", "active");
-	State.ActiveDirectives = Active.into_iter().filter(|name| State.Directives.contains_key(name)).collect();
+	State.Directive.Active = Active
+		.into_iter()
+		.filter(|name| State.Directive.Loaded.contains_key(name))
+		.collect();
 
 	let Defaults:Vec<String> = State
-		.ActiveDirectives
+		.Directive
+		.Active
 		.is_empty()
 		.then_some(["focus", "foresight", "lazy"])
 		.into_iter()
 		.flatten()
-		.filter(|Name| State.Directives.contains_key(*Name))
+		.filter(|Name| State.Directive.Loaded.contains_key(*Name))
 		.map(str::to_string)
 		.collect();
 
-	State.ActiveDirectives.extend(Defaults);
+	State.Directive.Active.extend(Defaults);
 }

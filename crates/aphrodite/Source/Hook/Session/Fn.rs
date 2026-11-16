@@ -10,7 +10,7 @@ use crate::State::Struct::AphroditeState;
 /// name), and two reset implementations would drift the moment one gained a
 /// field the other did not.
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
-	let Span = tracing::info_span!("hook.session_start", turn = State.TurnCounter);
+	let Span = tracing::info_span!("hook.session_start", turn = State.Turn.Counter);
 	let _Entered = Span.enter();
 	crate::Session::Start::Fn::Fn(State)
 }

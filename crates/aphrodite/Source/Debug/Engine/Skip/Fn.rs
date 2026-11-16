@@ -14,7 +14,7 @@ use crate::{Debug::Log::At::Fn::Fn as LogAt, State::Struct::AphroditeState};
 pub fn Fn(State:&AphroditeState, Reason:&str) {
 	// A level of 0 is "off", which is exactly what `NonZeroU8` refuses to hold: the
 	// level is the value that logs, and the reason is formatted only for it.
-	std::num::NonZeroU8::new(State.DebugLevel)
+	std::num::NonZeroU8::new(State.Configuration.DebugLevel)
 		.into_iter()
 		.for_each(|Level| LogAt(Level.get(), "engine_skip", &[("reason", Reason.to_string())]));
 }

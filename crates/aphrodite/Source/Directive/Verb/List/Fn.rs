@@ -11,7 +11,8 @@ use crate::State::Struct::AphroditeState;
 /// (P3/T10).
 pub(crate) fn Fn(State:&AphroditeState) -> serde_json::Value {
 	let Ephemeral:Vec<serde_json::Value> = State
-		.EphemeralDirectives
+		.Directive
+		.Ephemeral
 		.iter()
 		.map(|Ephemeral| {
 			serde_json::json!({
@@ -22,12 +23,12 @@ pub(crate) fn Fn(State:&AphroditeState) -> serde_json::Value {
 		})
 		.collect();
 
-	let mut Available:Vec<&String> = State.Directives.keys().collect();
+	let mut Available:Vec<&String> = State.Directive.Loaded.keys().collect();
 	Available.sort();
 
 	serde_json::json!({
 		"available": Available,
-		"active": &State.ActiveDirectives,
+		"active": &State.Directive.Active,
 		"ephemeral": Ephemeral,
 	})
 }

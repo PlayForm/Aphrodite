@@ -52,17 +52,17 @@ stateful!(
 		);
 		let Hash = headroom_core::ccr::compute_key(Content.as_bytes());
 
-		s.Put(Hash.clone(), Content.to_string());
+		s.Store.Put(Hash.clone(), Content.to_string());
 
 		let Preview = crate::Preview::Builder::Entry::Fn(&Type, &Content);
 		let Marker = crate::Marker::Format::Entry::Fn(&Hash, &Type, Content.len(), &Preview, None, None, None);
 
-		s.RecordMarker(crate::State::Marker::Struct::Struct {
+		s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 			hash:Hash.clone(),
 			CCRType:Type.clone(),
 			Size:Content.len(),
 			Preview:Preview.clone(),
-			Turn:s.TurnCounter,
+			Turn:s.Turn.Counter,
 			Center:None,
 			meta:None,
 		});

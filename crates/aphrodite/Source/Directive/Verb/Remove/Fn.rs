@@ -9,8 +9,8 @@ use crate::State::Struct::AphroditeState;
 /// it. `retain` is the whole implementation - it removes every occurrence, which is what
 /// makes it idempotent even if a duplicate ever reached the list.
 pub(crate) fn Fn(State:&mut AphroditeState, name:&str) -> serde_json::Value {
-	State.ActiveDirectives.retain(|Active| Active != name);
-	State.ManualDirectiveTurn = Some(State.TurnCounter);
+	State.Directive.Active.retain(|Active| Active != name);
+	State.Directive.Manual = Some(State.Turn.Counter);
 
-	serde_json::json!({"active": &State.ActiveDirectives})
+	serde_json::json!({"active": &State.Directive.Active})
 }

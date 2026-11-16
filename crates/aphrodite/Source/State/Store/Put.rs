@@ -14,14 +14,14 @@ impl Struct {
 		// scan is gone (fix 1).
 		// The prior entry decides the subtraction: `None` contributes zero bytes
 		// rather than a branch, so the running total is corrected in one place.
-		let Previous = self.InlineStore.remove(&hash).map_or(0, |Old| Old.len());
+		let Previous = self.Map.remove(&hash).map_or(0, |Old| Old.len());
 
-		self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(Previous);
-		self.InlineStoreBytes += Content.len();
-		self.InlineStore.insert(hash.clone(), Content);
+		self.Bytes = self.Bytes.saturating_sub(Previous);
+		self.Bytes += Content.len();
+		self.Map.insert(hash.clone(), Content);
 		// Capacity `Entry::Const::Cap + 1` guarantees this never self-evicts
 		// before the explicit evict loop below.
-		self.InlineOrder.put(hash, ());
+		self.Order.put(hash, ());
 		self.Evict();
 	}
 }

@@ -4,7 +4,7 @@ use crate::Hook::Path::{Resolved::Struct::Struct as Resolved, Source::Enum::Enum
 
 /// Extract a file path from tool output - heuristic.
 ///
-/// Feeds the `ReferencedFiles` catalog stat. It is a heuristic on the FIRST
+/// Feeds the `File::Recent` catalog stat. It is a heuristic on the FIRST
 /// line only: a path that does not start at the beginning of the first line is
 /// missed rather than guessed, because a wrong path in the catalog is worse
 /// than a missing one. The answer carries `Source::Output` so a consumer never

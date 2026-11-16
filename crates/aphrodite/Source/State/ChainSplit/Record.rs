@@ -1,6 +1,6 @@
 //! Recording a chain-split event.
 //!
-//! The segment hashes must be registered in `SplitSegmentMap` before the
+//! The segment hashes must be registered in `ChainSplit::Segments` before the
 //! event is pushed, because attribution (`Retrieve.rs`) looks the hash up in
 //! that map. Registering first and pushing second means an interruption can
 //! only lose an event, never attribute a resolve to the wrong one.
@@ -27,7 +27,7 @@ impl Struct {
 	/// The ring bound is `drain` over the excess rather than a pop loop: the
 	/// length is known, so the number to drop is arithmetic, and the eviction
 	/// happens in one call at the front where the oldest events sit. Every
-	/// evicted event takes its hashes out of `SplitSegmentMap`, so the map holds
+	/// evicted event takes its hashes out of `ChainSplit::Segments`, so the map holds
 	/// exactly the segment identities the ring can still explain.
 	pub fn Record(&mut self, Turn:usize, Hashes:Vec<String>) {
 		// A batch with no segments records nothing, and the count is the whole
@@ -37,23 +37,22 @@ impl Struct {
 			return;
 		};
 
-		self.SplitNextEventID += 1;
+		self.Next += 1;
 
-		let ID = self.SplitNextEventID;
+		let ID = self.Next;
 
 		Hashes.iter().for_each(|h| {
-			self.SplitSegmentMap.insert(h.clone(), ID);
+			self.Segments.insert(h.clone(), ID);
 		});
 
-		self.SplitEvents
-			.push_back(Entry { ID, Turn, Produced:Produced.get(), Retrieved:0 });
+		self.Ledger.push_back(Entry { ID, Turn, Produced:Produced.get(), Retrieved:0 });
 
-		let Excess = self.SplitEvents.len().saturating_sub(Cap);
-		let Evicted:Vec<usize> = self.SplitEvents.drain(..Excess).map(|Event| Event.ID).collect();
+		let Excess = self.Ledger.len().saturating_sub(Cap);
+		let Evicted:Vec<usize> = self.Ledger.drain(..Excess).map(|Event| Event.ID).collect();
 
 		// An evicted event can no longer be attributed, so its hashes leave
 		// with it - the ring entry that explained them is gone.
-		self.SplitSegmentMap.retain(|_, EventID| !Evicted.contains(EventID));
+		self.Segments.retain(|_, EventID| !Evicted.contains(EventID));
 
 		self.Adapt();
 	}

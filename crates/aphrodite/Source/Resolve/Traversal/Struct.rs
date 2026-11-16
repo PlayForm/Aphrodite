@@ -52,7 +52,7 @@ impl<'a> Struct<'a> {
 	}
 
 	/// The configured recursion depth cap.
-	pub(crate) fn Cap(&self) -> usize { self.State.RecursiveDepth }
+	pub(crate) fn Cap(&self) -> usize { self.State.Configuration.RecursiveDepth }
 
 	/// Load one hash from the store, through the same primitive every caller uses.
 	pub(crate) fn Load(&mut self, Hash:&str) -> Option<String> { One::Fn(self.State, Hash) }

@@ -21,7 +21,10 @@ use crate::{
 /// Check all background tasks and push ephemeral nudges for any that need the
 /// agent's attention.
 pub fn Fn(State:&mut AphroditeState) {
-	let Plans:Vec<Nudge> = Select(&ReadFrom(&State.BgTasks)).into_iter().filter_map(Render).collect();
+	let Plans:Vec<Nudge> = Select(&ReadFrom(&State.PollWorker.Tasks))
+		.into_iter()
+		.filter_map(Render)
+		.collect();
 
 	Plans.into_iter().for_each(|Plan| PushNudge(State, &Plan.Text, Plan.TtlTurns));
 }

@@ -2,7 +2,7 @@
 
 use crate::{
 	Hook::LLM::{Post::Fn::Fn as PostLLMCall, Pre::Fn::Fn as PreLLMCall},
-	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 // ── T13 (F11): post_llm_call must archive the turn's last marker into
@@ -10,9 +10,9 @@ use crate::{
 #[test]
 fn Archive() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 2;
+	s.Turn.Counter = 2;
 	// Record a marker on the current turn.
-	s.RecordMarker(MarkerEntry {
+	s.Marker.Record(MarkerEntry {
 		hash:"hash42".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -22,9 +22,9 @@ fn Archive() {
 		meta:None,
 	});
 	let _ = PostLLMCall(&mut s);
-	assert_eq!(s.TurnCounter, 3);
-	assert_eq!(s.ConvIndex.len(), 1, "post_llm_call must archive the turn");
-	assert_eq!(s.ConvIndex[&2].0, "hash42");
+	assert_eq!(s.Turn.Counter, 3);
+	assert_eq!(s.Turn.Index.len(), 1, "post_llm_call must archive the turn");
+	assert_eq!(s.Turn.Index[&2].0, "hash42");
 }
 
 // ── T13 (F13): when a turn records several markers, post_llm_call must
@@ -34,9 +34,9 @@ fn Archive() {
 #[test]
 fn Largest() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 7;
+	s.Turn.Counter = 7;
 	let Record = |s:&mut AphroditeState, hash:&str, Size:usize| {
-		s.RecordMarker(MarkerEntry {
+		s.Marker.Record(MarkerEntry {
 			hash:hash.into(),
 			CCRType:"text".into(),
 			Size,
@@ -52,9 +52,9 @@ fn Largest() {
 	Record(&mut s, "small-1", 40);
 	Record(&mut s, "small-2", 41);
 	let _ = PostLLMCall(&mut s);
-	assert_eq!(s.TurnCounter, 8);
-	assert_eq!(s.ConvIndex.len(), 1, "post_llm_call must archive the turn");
-	assert_eq!(s.ConvIndex[&7].0, "large", "largest same-turn marker must win");
+	assert_eq!(s.Turn.Counter, 8);
+	assert_eq!(s.Turn.Index.len(), 1, "post_llm_call must archive the turn");
+	assert_eq!(s.Turn.Index[&7].0, "large", "largest same-turn marker must win");
 }
 
 // ── Poll-worker integration tests ──────────────────────────
@@ -66,12 +66,12 @@ fn Largest() {
 #[test]
 fn Nudge() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 3;
+	s.Turn.Counter = 3;
 	crate::PollWorker::Insert::Fn::Fn(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 	let _ = PreLLMCall(&mut s);
 	// The nudge should have been pushed into ephemeral_directives.
-	assert!(!s.EphemeralDirectives.is_empty(), "pre_llm_call should push poll-worker nudge");
-	let Nudge = s.EphemeralDirectives.last().unwrap();
+	assert!(!s.Directive.Ephemeral.is_empty(), "pre_llm_call should push poll-worker nudge");
+	let Nudge = s.Directive.Ephemeral.last().unwrap();
 	assert!(
 		Nudge.inline.as_deref().unwrap().contains("cargo build"),
 		"nudge should mention the command"
@@ -81,7 +81,7 @@ fn Nudge() {
 #[test]
 fn Expire() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 20;
+	s.Turn.Counter = 20;
 	crate::PollWorker::Insert::Fn::Fn(
 		&mut s,
 		"old-task".into(),
@@ -89,11 +89,11 @@ fn Expire() {
 		"old-build".into(),
 		10, // started at turn 10, gap=10 < 16 so retain won't drop it
 	);
-	s.BgTasks[0].LastPollTurn = 10; // never polled after start, gap=10 > 8
+	s.PollWorker.Tasks[0].LastPollTurn = 10; // never polled after start, gap=10 > 8
 	let _ = PostLLMCall(&mut s);
 	// Should be marked stale.
 	assert_eq!(
-		s.BgTasks[0].Status,
+		s.PollWorker.Tasks[0].Status,
 		crate::PollWorker::Task::Status::Enum::Enum::Stale,
 		"unpolled task should be expired as stale after {} turns",
 		crate::PollWorker::Task::Const::Age
@@ -103,13 +103,13 @@ fn Expire() {
 #[test]
 fn Disabled() {
 	let mut s = AphroditeState::default();
-	s.PollWorkerEnabled = false;
-	s.TurnCounter = 3;
+	s.PollWorker.Enable = false;
+	s.Turn.Counter = 3;
 	crate::PollWorker::Insert::Fn::Fn(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
-	let Before = s.EphemeralDirectives.len();
+	let Before = s.Directive.Ephemeral.len();
 	let _ = PreLLMCall(&mut s);
 	assert_eq!(
-		s.EphemeralDirectives.len(),
+		s.Directive.Ephemeral.len(),
 		Before,
 		"disabled flag must prevent poll-worker nudges in pre_llm_call"
 	);
@@ -118,14 +118,14 @@ fn Disabled() {
 #[test]
 fn Cleanup() {
 	let mut s = AphroditeState::default();
-	s.PollWorkerEnabled = false;
-	s.TurnCounter = 20;
+	s.PollWorker.Enable = false;
+	s.Turn.Counter = 20;
 	crate::PollWorker::Insert::Fn::Fn(&mut s, "old-task".into(), "terminal".into(), "old-build".into(), 10);
-	s.BgTasks[0].LastPollTurn = 10;
+	s.PollWorker.Tasks[0].LastPollTurn = 10;
 	let _ = PostLLMCall(&mut s);
 	// Expiry is a cleanup concern - should still run even when disabled.
 	assert_eq!(
-		s.BgTasks[0].Status,
+		s.PollWorker.Tasks[0].Status,
 		crate::PollWorker::Task::Status::Enum::Enum::Stale,
 		"expire_stale_tasks must still run when disabled (cleanup)"
 	);

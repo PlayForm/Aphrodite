@@ -10,11 +10,11 @@ use crate::{Flow::Window::Stats::Struct::Struct as Window, State::Struct::Aphrod
 
 /// Compute `Window::Stats::Struct` over the last `n` turns (P2/T7).
 pub fn Fn(State:&AphroditeState, n:usize) -> Window {
-	let Floor = State.TurnCounter.saturating_sub(n);
+	let Floor = State.Turn.Counter.saturating_sub(n);
 	let mut Stats = Window::default();
 	let mut ErrorSigs = std::collections::HashSet::new();
 	let mut SeenPaths = std::collections::HashSet::new();
-	State.ToolEvents.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
+	State.Event.Recent.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
 		Stats.Total += 1;
 		// A failed call is one count and (maybe) one signature; a successful one
 		// contributes neither, so the boolean is the quantity rather than a gate.

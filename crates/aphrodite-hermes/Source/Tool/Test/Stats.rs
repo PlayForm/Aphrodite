@@ -13,7 +13,7 @@ fn test_stats_surfaces_config_error() {
 
 	// Simulate a found-but-broken aphrodite.toml (what
 	// `Config::load().apply_compression()` records on the state).
-	crate::Session::With::Fn::with_shared(|s| s.ConfigurationError = Some(format!("{broken_path}: TOML parse error")));
+	crate::Session::With::Fn::with_shared(|s| s.Configuration.Error = Some(format!("{broken_path}: TOML parse error")));
 
 	let r = dispatch("aphrodite_stats", "{}");
 	assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
@@ -24,7 +24,7 @@ fn test_stats_surfaces_config_error() {
 	);
 
 	// Restore the shared state so later tests are hermetic.
-	crate::Session::With::Fn::with_shared(|s| s.ConfigurationError = None);
+	crate::Session::With::Fn::with_shared(|s| s.Configuration.Error = None);
 	let r2 = dispatch("aphrodite_stats", "{}");
 	assert!(
 		r2["config_error"].is_null(),

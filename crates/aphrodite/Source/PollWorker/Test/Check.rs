@@ -16,12 +16,12 @@ use crate::{
 #[test]
 fn Running() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 
 	Check(&mut State);
-	assert!(!State.EphemeralDirectives.is_empty(), "should push at least one nudge");
-	let Nudge = State.EphemeralDirectives.last().unwrap();
+	assert!(!State.Directive.Ephemeral.is_empty(), "should push at least one nudge");
+	let Nudge = State.Directive.Ephemeral.last().unwrap();
 	assert!(
 		Nudge.inline.as_deref().unwrap().contains("cargo build"),
 		"nudge should mention the command"
@@ -31,14 +31,14 @@ fn Running() {
 #[test]
 fn Completion() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 6;
+	State.Turn.Counter = 6;
 	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
-	State.BgTasks[0].Status = Status::Done {
+	State.PollWorker.Tasks[0].Status = Status::Done {
 		Output:Payload { Hash:Digest::from("hash123"), Preview:"[build:0E 2W 450L]".into(), Size:450 },
 	};
 
 	Check(&mut State);
-	let Nudge = State.EphemeralDirectives.last().unwrap();
+	let Nudge = State.Directive.Ephemeral.last().unwrap();
 	assert!(
 		Nudge.inline.as_deref().unwrap().contains("completed"),
 		"completion nudge should say 'completed'"
@@ -52,7 +52,7 @@ fn Completion() {
 #[test]
 fn Cap() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	// Insert 4 running tasks - only 2 should get nudges.
 	(0..4).for_each(|i| {
 		Insert(
@@ -65,11 +65,11 @@ fn Cap() {
 	});
 
 	// Count nudges pushed BEFORE check_bg_tasks.
-	let Before = State.EphemeralDirectives.len();
+	let Before = State.Directive.Ephemeral.len();
 
 	Check(&mut State);
 
 	// At most 2 new nudges should be pushed.
-	let NewNudges = State.EphemeralDirectives.len() - Before;
+	let NewNudges = State.Directive.Ephemeral.len() - Before;
 	assert!(NewNudges <= 2, "must push at most 2 nudges, pushed {}", NewNudges);
 }

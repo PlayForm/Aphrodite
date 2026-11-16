@@ -8,13 +8,11 @@
 //! error-loop detection, both of which compare digests, so raw args would be
 //! PII in state for no analytic gain.
 //!
-//! - `Struct.rs` - the ring's field.
-//! - `Default.rs` - the seed: empty.
+//! - `Struct.rs` - the ring's field and its seed.
 //! - `Entry/` - one recorded call (the item).
 //! - `Const.rs` - the ring's cap.
 
 pub mod Const;
-pub mod Default;
 pub mod Entry;
 pub mod Record;
 pub mod Struct;

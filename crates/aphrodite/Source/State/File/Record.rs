@@ -10,8 +10,8 @@ impl Struct {
 	/// is one call over a known length instead of a pop loop, and it preserves
 	/// the ordering the ring is for: front is most recent.
 	pub fn Record(&mut self, path:String, Tool:String) {
-		self.ReferencedFiles.retain(|(p, _)| p != &path);
-		self.ReferencedFiles.push_front((path, Tool));
-		self.ReferencedFiles.truncate(Cap);
+		self.Recent.retain(|(p, _)| p != &path);
+		self.Recent.push_front((path, Tool));
+		self.Recent.truncate(Cap);
 	}
 }

@@ -12,8 +12,9 @@ use crate::State::Struct::AphroditeState;
 /// AFTER `NextTurn` advances the counter, so a nudge pushed during turn N
 /// (expiring at N + ttl) renders in turn N+1's context exactly once for ttl=1.
 pub fn Fn(State:&mut AphroditeState) {
-	let Counter = State.TurnCounter;
+	let Counter = State.Turn.Counter;
 	State
-		.EphemeralDirectives
+		.Directive
+		.Ephemeral
 		.retain(|e| e.ExpiresAfterTurn.is_none_or(|Exp| Exp >= Counter));
 }

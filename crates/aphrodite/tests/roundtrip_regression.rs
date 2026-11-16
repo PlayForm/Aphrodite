@@ -58,7 +58,7 @@ fn LargeDocumentRoundTripsThroughStoreAndExpand() {
 	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 
 	let mut State = aphrodite::State::Struct::AphroditeState::default();
-	State.Put(hash.clone(), Content.clone());
+	State.Store.Put(hash.clone(), Content.clone());
 
 	let Expanded = aphrodite::Resolve::Expand::Fn(&mut State, &hash).expect("entry found");
 	assert_eq!(Expanded, Content, "expand must return the exact original bytes");

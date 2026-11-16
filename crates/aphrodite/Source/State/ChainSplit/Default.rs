@@ -7,13 +7,13 @@ use super::Struct::Struct;
 impl Default for Struct {
 	fn default() -> Self {
 		Self {
-			ChainSplitEnabled:false,
-			ChainSplitMinimumSegments:2,
-			ChainSplitFloor:2,
-			ChainSplitMaximumSegments:6,
-			SplitEvents:VecDeque::new(),
-			SplitSegmentMap:HashMap::new(),
-			SplitNextEventID:0,
+			Enable:false,
+			Minimum:2,
+			Floor:2,
+			Maximum:6,
+			Ledger:VecDeque::new(),
+			Segments:HashMap::new(),
+			Next:0,
 		}
 	}
 }

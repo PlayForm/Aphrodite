@@ -28,8 +28,8 @@ pub(crate) fn Fn(State:&AphroditeState, Tool:&str, Parsed:&serde_json::Value) ->
 		.contains(&Tool)
 		.then_some(Route::Enum::Essential)
 		.or_else(|| (Tool.starts_with("aphrodite_") || Tool.starts_with("headroom")).then_some(Route::Enum::SelfTool))
-		.or_else(|| State.AutoExpand.then_some(Route::Enum::AutoExpand))
+		.or_else(|| State.Configuration.AutoExpand.then_some(Route::Enum::AutoExpand))
 		.or_else(|| Chained::Fn::Fn(State, Tool, Parsed).then_some(Route::Enum::ChainSplit))
-		.or_else(|| State.LiveContainer.then_some(Route::Enum::LiveContainer))
+		.or_else(|| State.Configuration.LiveContainer.then_some(Route::Enum::LiveContainer))
 		.unwrap_or(Route::Enum::Threshold)
 }

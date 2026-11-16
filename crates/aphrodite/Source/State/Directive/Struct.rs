@@ -12,18 +12,20 @@ use super::Entry::Struct::Struct as Entry;
 
 /// The directive set: everything loaded, the subset active, the ephemeral
 /// nudges, and the turn a manual mutation last happened on.
-#[derive(Clone)]
+///
+/// `Default` is the seed: nothing loaded, nothing active, no latch.
+#[derive(Clone, Default)]
 pub struct Struct {
 	/// All loaded directives (name → content).
-	pub Directives:HashMap<String, crate::Directive::Model::Struct>,
+	pub Loaded:HashMap<String, crate::Directive::Model::Struct>,
 	/// Currently active directive names (the ones injected into context).
-	pub ActiveDirectives:Vec<String>,
+	pub Active:Vec<String>,
 	/// Ephemeral (one-shot / TTL) directives - inline nudges that render once
 	/// (or for a bounded number of turns) then self-purge (P3/T9). Distinct
-	/// from `ActiveDirectives` (permanent-until-removed named entries).
-	pub EphemeralDirectives:Vec<Entry>,
+	/// from `Directive::Active` (permanent-until-removed named entries).
+	pub Ephemeral:Vec<Entry>,
 	/// Turn number of the most recent MANUAL `AphroditeDirective` mutation
 	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
 	/// `Directive::Action::Fn` on any successful mutation.
-	pub ManualDirectiveTurn:Option<usize>,
+	pub Manual:Option<usize>,
 }

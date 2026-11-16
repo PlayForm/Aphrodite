@@ -40,7 +40,7 @@ fn Adopt(Directory:&PathBuf, State:&mut AphroditeState) -> PathBuf {
 		Loaded.len()
 	);
 
-	State.Directives = Loaded;
+	State.Directive.Loaded = Loaded;
 
 	Directory.clone()
 }

@@ -32,7 +32,7 @@ fn test_call_hook_tool_result_records_error_event() {
 	aphrodite_hermes_free_string(hook_ptr);
 
 	with_shared(|state| {
-		let ev = state.ToolEvents.back().expect("bridge must record a tool event");
+		let ev = state.Event.Recent.back().expect("bridge must record a tool event");
 		assert!(!ev.Okay, "status=error must record a failing event");
 		assert!(ev.ErrorSig.is_some(), "a failing event must carry an error_sig");
 	});
@@ -67,7 +67,7 @@ fn test_call_hook_transform_tool_result_unwraps_hermes_wrapper() {
 	);
 
 	let (hash, preview) = with_shared(|state| {
-		let last = state.RecentMarkers.back().expect("hook must record a marker");
+		let last = state.Marker.Recent.back().expect("hook must record a marker");
 		(last.hash.clone(), last.Preview.clone())
 	});
 	assert!(

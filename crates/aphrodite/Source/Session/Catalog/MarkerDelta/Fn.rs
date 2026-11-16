@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use crate::State::Marker::Struct::Struct as Entry;
+use crate::State::Marker::Entry::Struct::Struct as Entry;
 
 /// The marker half of the catalog summary: what this turn added, or a stable
 /// "no change" line.

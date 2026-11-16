@@ -32,22 +32,26 @@ fn Four() -> AphroditeState {
 #[test]
 fn Oldest() {
 	let mut State = Four();
-	State.BgTasks[1].Status = Status::Stale;
-	State.BgTasks[3].Status = Status::Stale;
+	State.PollWorker.Tasks[1].Status = Status::Stale;
+	State.PollWorker.Tasks[3].Status = Status::Stale;
 
-	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(1), "the older of two stale tasks goes");
+	assert_eq!(
+		Evict(&ReadFrom(&State.PollWorker.Tasks)),
+		Some(1),
+		"the older of two stale tasks goes"
+	);
 }
 
 #[test]
 fn Order() {
 	let mut State = Four();
-	State.BgTasks[2].Status = Status::Done { Output:Finished() };
-	State.BgTasks[3].Status = Status::Stale;
+	State.PollWorker.Tasks[2].Status = Status::Done { Output:Finished() };
+	State.PollWorker.Tasks[3].Status = Status::Stale;
 
-	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(3), "stale outranks finished");
+	assert_eq!(Evict(&ReadFrom(&State.PollWorker.Tasks)), Some(3), "stale outranks finished");
 
-	State.BgTasks[3].Status = Status::Running;
-	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(2), "finished outranks running");
+	State.PollWorker.Tasks[3].Status = Status::Running;
+	assert_eq!(Evict(&ReadFrom(&State.PollWorker.Tasks)), Some(2), "finished outranks running");
 }
 
 #[test]
@@ -55,7 +59,7 @@ fn Last() {
 	let State = Four();
 
 	assert_eq!(
-		Evict(&ReadFrom(&State.BgTasks)),
+		Evict(&ReadFrom(&State.PollWorker.Tasks)),
 		Some(0),
 		"with nothing expendable the front of the queue goes"
 	);
@@ -65,5 +69,5 @@ fn Last() {
 fn Empty() {
 	let State = AphroditeState::default();
 
-	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), None);
+	assert_eq!(Evict(&ReadFrom(&State.PollWorker.Tasks)), None);
 }

@@ -14,10 +14,10 @@ use crate::PollWorker::Task::Struct::Struct as Task;
 pub struct Struct {
 	/// Background tasks created by the poll-worker auto-backgrounding
 	/// heuristic (cap 4, evict oldest completed/stale on overflow).
-	pub BgTasks:VecDeque<Task>,
+	pub Tasks:VecDeque<Task>,
 	/// Master on/off for poll-worker auto-backgrounding. When false,
 	/// no tool output is auto-backgrounded (existing bg_tasks still
 	/// receive lifecycle nudges and expiry). Default true. Env:
 	/// `APHRODITE_POLL_WORKER`, TOML: `[compression] poll_worker`.
-	pub PollWorkerEnabled:bool,
+	pub Enable:bool,
 }

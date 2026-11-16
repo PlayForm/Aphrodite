@@ -17,8 +17,8 @@ use crate::{
 
 fn OneTask() -> AphroditeState {
 	let mut State = AphroditeState::default();
-	State.LiveContainer = true;
-	State.TurnCounter = 5;
+	State.Configuration.LiveContainer = true;
+	State.Turn.Counter = 5;
 	Insert(&mut State, "t1".into(), "terminal".into(), "very-verbose".into(), 1);
 	State
 }
@@ -32,15 +32,15 @@ fn Oversized() {
 	assert!(Update(&mut State, "process", &Poll));
 
 	assert_eq!(
-		State.BgTasks[0].AccumulatedOutput.Len(),
+		State.PollWorker.Tasks[0].AccumulatedOutput.Len(),
 		Maximum,
 		"the cap holds after one oversized poll"
 	);
 	assert_eq!(
-		State.BgTasks[0].LiveBytesArrived, Maximum,
+		State.PollWorker.Tasks[0].LiveBytesArrived, Maximum,
 		"bytes arrived never exceeds the cap"
 	);
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
 }
 
 #[test]
@@ -53,8 +53,8 @@ fn Bound() {
 		Update(&mut State, "process", &Poll);
 	});
 
-	assert_eq!(State.BgTasks[0].AccumulatedOutput.Len(), Maximum);
-	assert_eq!(State.BgTasks[0].LiveBytesArrived, Maximum);
+	assert_eq!(State.PollWorker.Tasks[0].AccumulatedOutput.Len(), Maximum);
+	assert_eq!(State.PollWorker.Tasks[0].LiveBytesArrived, Maximum);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn Truncate() {
 	let Poll = serde_json::json!({"output": Payload, "exit_code": serde_json::Value::Null}).to_string();
 	assert!(Update(&mut State, "process", &Poll));
 
-	let Kept = State.BgTasks[0].AccumulatedOutput.AsStr();
+	let Kept = State.PollWorker.Tasks[0].AccumulatedOutput.AsStr();
 	assert_eq!(Kept.len(), Maximum, "two bytes per char, so an even bound is met exactly");
 	assert!(
 		Kept.chars().all(|Char| Char == 'é'),
@@ -82,14 +82,14 @@ fn Prefix() {
 	let Poll = serde_json::json!({"output": "x".repeat(400 * 1024), "exit_code": 0}).to_string();
 	Update(&mut State, "process", &Poll);
 
-	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }));
 	assert_eq!(
-		State.BgTasks[0].LiveBytesArrived, Maximum,
+		State.PollWorker.Tasks[0].LiveBytesArrived, Maximum,
 		"the final byte count is the stored size"
 	);
-	assert_eq!(State.BgTasks[0].LiveEtaS, 0.0);
+	assert_eq!(State.PollWorker.Tasks[0].LiveEtaS, 0.0);
 	assert_eq!(
-		State.BgTasks[0].AccumulatedOutput.Len(),
+		State.PollWorker.Tasks[0].AccumulatedOutput.Len(),
 		0,
 		"the buffer was moved into the store"
 	);

@@ -21,19 +21,24 @@ use crate::{
 /// renders no section at all, so a quiet turn stays byte-identical to a turn from
 /// before the poll worker existed.
 pub fn Fn(State:&AphroditeState) -> String {
-	let Tasks = ReadFrom(&State.BgTasks);
+	let Tasks = ReadFrom(&State.PollWorker.Tasks);
 	// The feature flag is part of the renderer's contract, not a caller's: a disabled
 	// poll worker renders no section at all, so "the feature is off" and "nothing is
 	// running" produce the same empty string and cannot drift apart.
 	let Active:Vec<&Record> = Iterate(&Tasks)
-		.filter(|Task| State.PollWorkerEnabled && Task.Status == Status::Running)
+		.filter(|Task| State.PollWorker.Enable && Task.Status == Status::Running)
 		.collect();
 
 	Active
 		.first()
 		.map(|_| format!("[poll workers] {} active task(s):", Active.len()))
 		.into_iter()
-		.chain(Active.iter().take(3).flat_map(|Task| Detail(State.LiveContainer, Task)))
+		.chain(
+			Active
+				.iter()
+				.take(3)
+				.flat_map(|Task| Detail(State.Configuration.LiveContainer, Task)),
+		)
 		.collect::<Vec<String>>()
 		.join("\n")
 }

@@ -8,8 +8,8 @@
 //! `Section` holds one applier per configuration section, and `Startup`/`Reload` hold
 //! the ordered lists. The split exists so a section can be read, changed and tested
 //! without touching the other seven - it is not licence to reorder them, because a few
-//! sections seed values the next one reads (`ChainSplitFloor` from
-//! `ChainSplitMinimumSegments`, `ActiveDirectives` from the loaded set).
+//! sections seed values the next one reads (`ChainSplit::Floor` from
+//! `ChainSplit::Minimum`, `Directive::Active` from the loaded set).
 //!
 //! `Global` is separate because those appliers do not write state at all - they
 //! write process globals that paths without an `AphroditeState` (hooks, the dylib,

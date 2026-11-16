@@ -21,7 +21,7 @@ use crate::{
 /// never fabricated message content: the dylib never sees the message list.
 pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, MiddleN:usize) -> Result<Plan, Gate> {
 	// Sorted turns, oldest first (same ordering as `Index`).
-	let mut Turns:Vec<usize> = State.ConvIndex.keys().copied().collect();
+	let mut Turns:Vec<usize> = State.Turn.Index.keys().copied().collect();
 	Turns.sort_unstable();
 
 	let End = Total.saturating_sub(TailN);
@@ -30,7 +30,7 @@ pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, M
 	let PackedEntries:Vec<serde_json::Value> = MiddleKeys
 		.iter()
 		.filter_map(|Turn| {
-			State.ConvIndex.get(Turn).map(
+			State.Turn.Index.get(Turn).map(
 				|(Hash, Summary, Size)| serde_json::json!({ "turn": Turn, "hash": Hash, "summary": Summary, "size": Size }),
 			)
 		})

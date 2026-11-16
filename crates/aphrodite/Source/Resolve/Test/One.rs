@@ -10,7 +10,7 @@ use crate::{Resolve::One::Fn as One, State::Struct::AphroditeState};
 #[test]
 fn TestOneInline() {
 	let mut s = AphroditeState::default();
-	s.Put("abc123".into(), "hello world".into());
+	s.Store.Put("abc123".into(), "hello world".into());
 	assert_eq!(One(&mut s, "abc123"), Some("hello world".into()));
 }
 
@@ -29,8 +29,8 @@ fn TestOneMissing() {
 #[test]
 fn TestOneNeverShadowedByStage2Key() {
 	let mut s = AphroditeState::default();
-	s.Put("h".into(), "ORIGINAL".into());
-	s.Put("h#stage2".into(), "REDUCED".into());
+	s.Store.Put("h".into(), "ORIGINAL".into());
+	s.Store.Put("h#stage2".into(), "REDUCED".into());
 	assert_eq!(One(&mut s, "h"), Some("ORIGINAL".to_string()));
 }
 
@@ -44,7 +44,7 @@ fn TestOneNeverShadowedByStage2Key() {
 #[test]
 fn RegressionOneToleratesPipeSuffixedHash() {
 	let mut s = AphroditeState::default();
-	s.Put("abc123".into(), "<the real content>".into());
+	s.Store.Put("abc123".into(), "<the real content>".into());
 
 	assert_eq!(One(&mut s, "abc123"), Some("<the real content>".into()));
 	assert_eq!(
@@ -62,6 +62,6 @@ fn RegressionOneToleratesPipeSuffixedHash() {
 #[test]
 fn TestOneIPrefix() {
 	let mut s = AphroditeState::default();
-	s.Put("i:abc123def".into(), "inline content".into());
+	s.Store.Put("i:abc123def".into(), "inline content".into());
 	assert_eq!(One(&mut s, "i:abc123def"), Some("inline content".into()));
 }

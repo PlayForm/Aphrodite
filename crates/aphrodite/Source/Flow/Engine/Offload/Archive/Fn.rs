@@ -10,6 +10,7 @@ use crate::State::Struct::AphroditeState;
 /// engine itself answered `None`.
 pub(crate) fn Fn(State:&mut AphroditeState) -> Option<String> {
 	State
+		.Configuration
 		.ContextEngineEnabled
 		.then(|| crate::Session::Engine::Fn::Fn(State))
 		.flatten()

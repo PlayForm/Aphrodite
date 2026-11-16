@@ -20,7 +20,7 @@ fn Real() {
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
 	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1, "prefetch failed: {:?}", r);
-	assert_eq!(s.RecentMarkers.len(), 1);
+	assert_eq!(s.Marker.Recent.len(), 1);
 }
 
 // ── T11 (F11): prefetch surfaces the inline store's byte budget ──

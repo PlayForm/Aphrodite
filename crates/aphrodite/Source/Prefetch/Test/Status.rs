@@ -15,7 +15,7 @@ use crate::{
 #[test]
 fn LiveOff() {
 	let mut s = AphroditeState::default();
-	assert!(!s.LiveContainer, "default state must have live_container off");
+	assert!(!s.Configuration.LiveContainer, "default state must have live_container off");
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
 	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
@@ -26,7 +26,8 @@ fn LiveOff() {
 	// `{path, hash, type, size}` from marker meta, plus empty
 	// loading/errors arrays and total_ready.
 	let ExpectedReady:Vec<serde_json::Value> =
-		s.RecentMarkers
+		s.Marker
+			.Recent
 			.iter()
 			.filter_map(|Mk| {
 				Mk.meta.as_ref().and_then(|meta| meta.get("path")).map(
@@ -59,7 +60,7 @@ fn LiveOff() {
 #[test]
 fn LiveOn() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
+	s.Configuration.LiveContainer = true;
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
 	let r = Files(&mut s, std::slice::from_ref(&Src));
 	assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
@@ -87,7 +88,7 @@ fn LiveOn() {
 #[test]
 fn Instant() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
+	s.Configuration.LiveContainer = true;
 	let Src = env!("CARGO_MANIFEST_DIR").to_string() + "/Source/Prefetch/mod.rs";
 	let FileText = std::fs::read_to_string(&Src).unwrap();
 	let r = Files(&mut s, std::slice::from_ref(&Src));
@@ -101,7 +102,7 @@ fn Instant() {
 
 	// Full content arrives later: stored in the inline store and
 	// retrievable by the instant hash.
-	let Stored = s.Get(&hash);
+	let Stored = s.Store.Get(&hash);
 	assert_eq!(
 		Stored.as_deref(),
 		Some(FileText.as_str()),

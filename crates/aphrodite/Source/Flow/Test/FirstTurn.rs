@@ -10,8 +10,8 @@ use crate::{
 #[test]
 fn Zero() {
 	let mut s = AphroditeState::default();
-	s.SessionInject = Shipped.to_string();
-	s.TurnCounter = 0;
+	s.Configuration.SessionInject = Shipped.to_string();
+	s.Turn.Counter = 0;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[aphrodite: first-turn orientation]"),
@@ -26,8 +26,8 @@ fn Zero() {
 #[test]
 fn After() {
 	let mut s = AphroditeState::default();
-	s.SessionInject = Shipped.to_string();
-	s.TurnCounter = 1;
+	s.Configuration.SessionInject = Shipped.to_string();
+	s.Turn.Counter = 1;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[aphrodite: first-turn orientation]"),
@@ -38,8 +38,8 @@ fn After() {
 #[test]
 fn Disabled() {
 	let mut s = AphroditeState::default();
-	s.SessionInject = String::new();
-	s.TurnCounter = 0;
+	s.Configuration.SessionInject = String::new();
+	s.Turn.Counter = 0;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[aphrodite: first-turn orientation]"),
@@ -50,8 +50,8 @@ fn Disabled() {
 #[test]
 fn Version() {
 	let mut s = AphroditeState::default();
-	s.SessionInject = "aphrodite v{VERSION} ready".to_string();
-	s.TurnCounter = 0;
+	s.Configuration.SessionInject = "aphrodite v{VERSION} ready".to_string();
+	s.Turn.Counter = 0;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains(&format!("aphrodite v{}", env!("CARGO_PKG_VERSION"))),

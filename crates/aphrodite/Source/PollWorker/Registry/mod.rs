@@ -1,6 +1,6 @@
 //! The task set, and the operations that are allowed to change it.
 //!
-//! The registry is a borrowing view over the session's `BgTasks` deque: the
+//! The registry is a borrowing view over the session's `PollWorker::Tasks` deque: the
 //! field's type is fixed outside this package, so the registry owns the *rules*
 //! rather than the storage. Capacity, deduplication, eviction order and the
 //! poll/complete/expire transitions all live here; nothing outside pushes,

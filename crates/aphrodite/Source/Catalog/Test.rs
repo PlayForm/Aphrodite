@@ -16,7 +16,7 @@ fn TestEmptyCatalog() {
 #[test]
 fn TestCatalogWithItems() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"abc123def456".into(),
 		CCRType:"code_rust".into(),
 		Size:1024,
@@ -25,7 +25,7 @@ fn TestCatalogWithItems() {
 		Center:None,
 		meta:None,
 	});
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"def789abc012".into(),
 		CCRType:"diff".into(),
 		Size:2048,
@@ -49,7 +49,7 @@ fn TestCatalogWithItems() {
 #[test]
 fn TestTocMode() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -68,13 +68,14 @@ fn TestTocMode() {
 #[test]
 fn TestTocHintUsesConfiguredSearchHintTemplate() {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::Template::Struct::Struct::default());
-	s.Templates
+	s.Configuration.Templates = Some(crate::State::Template::Struct::Struct::default());
+	s.Configuration
+		.Templates
 		.as_mut()
 		.unwrap()
 		.Prompts
 		.insert("search_hint".into(), "custom search hint".into());
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -110,7 +111,7 @@ fn TestByTypeJSONDeterministic() {
 	.iter()
 	.enumerate()
 	.for_each(|(i, (hash, CCRType, Preview))| {
-		s.RecordMarker(crate::State::Marker::Struct::Struct {
+		s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 			hash:hash.to_string(),
 			CCRType:CCRType.to_string(),
 			Size:100 + i * 10,
@@ -136,7 +137,7 @@ fn TestTableSortsByTurnAndCapsTwenty() {
 	// insertion order would wrongly place it in the newest window.
 	let mut s = AphroditeState::default();
 	(0..25).for_each(|i| {
-		s.RecordMarker(crate::State::Marker::Struct::Struct {
+		s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 			hash:format!("h{:02}", i),
 			CCRType:"text".into(),
 			Size:100,

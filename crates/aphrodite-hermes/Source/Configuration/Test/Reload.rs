@@ -25,23 +25,23 @@ fn test_config_reload_preserves_directives_and_applies_thresholds() {
 	assert!(Configuration.ParseFailure.is_none());
 
 	let mut State = AphroditeState::default();
-	State.TerminalThreshold = 1024;
+	State.Configuration.TerminalThreshold = 1024;
 	// Simulate a live session that swapped in a runtime directive set.
-	State.Directives.insert(
+	State.Directive.Loaded.insert(
 		"focus".into(),
 		aphrodite::Directive::Model::Struct { name:"focus".into(), Content:"stay targeted".into() },
 	);
-	State.ActiveDirectives = vec!["focus".into()];
+	State.Directive.Active = vec!["focus".into()];
 
 	Reload::Fn::Fn(&Configuration, &mut State);
 
-	assert_eq!(State.TerminalThreshold, 2048, "reload must apply new thresholds");
+	assert_eq!(State.Configuration.TerminalThreshold, 2048, "reload must apply new thresholds");
 	assert!(
-		State.Directives.contains_key("focus"),
+		State.Directive.Loaded.contains_key("focus"),
 		"reload must preserve the runtime directive set"
 	);
 	assert_eq!(
-		State.ActiveDirectives,
+		State.Directive.Active,
 		vec!["focus".to_string()],
 		"reload must preserve active directives"
 	);

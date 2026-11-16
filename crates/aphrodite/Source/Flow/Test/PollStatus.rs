@@ -5,8 +5,8 @@ use crate::{Flow::TurnContext::Fn::Fn as Assemble, State::Struct::AphroditeState
 #[test]
 fn Disabled() {
 	let mut s = AphroditeState::default();
-	s.PollWorkerEnabled = false;
-	s.TurnCounter = 5;
+	s.PollWorker.Enable = false;
+	s.Turn.Counter = 5;
 	crate::PollWorker::Insert::Fn::Fn(&mut s, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 	let Context = Assemble(&mut s, None);
 	assert!(
@@ -18,8 +18,8 @@ fn Disabled() {
 #[test]
 fn Enabled() {
 	let mut s = AphroditeState::default();
-	s.PollWorkerEnabled = true;
-	s.TurnCounter = 5;
+	s.PollWorker.Enable = true;
+	s.Turn.Counter = 5;
 	crate::PollWorker::Insert::Fn::Fn(&mut s, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 	let Context = Assemble(&mut s, None);
 	assert!(

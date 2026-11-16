@@ -55,7 +55,8 @@ fn TestParseFailureRecordedOnConfigurationAndState() {
 	let mut State = crate::State::Struct::AphroditeState::default();
 	Guarded(&cfg, &mut State);
 	let Ce = State
-		.ConfigurationError
+		.Configuration
+		.Error
 		.as_deref()
 		.expect("config_error must be set on the state");
 	assert!(
@@ -89,6 +90,6 @@ fn TestReadMultibyteCommentParses() {
 	);
 	let mut State = crate::State::Struct::AphroditeState::default();
 	Guarded(&cfg, &mut State);
-	assert_eq!(State.TerminalThreshold, 16384);
-	assert!(State.ConfigurationError.is_none());
+	assert_eq!(State.Configuration.TerminalThreshold, 16384);
+	assert!(State.Configuration.Error.is_none());
 }

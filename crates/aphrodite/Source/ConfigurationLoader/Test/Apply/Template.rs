@@ -73,7 +73,7 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.Startup(&mut State);
-	assert_eq!(State.SessionInject, "templates text");
+	assert_eq!(State.Configuration.SessionInject, "templates text");
 
 	// No [templates.prompts] => the legacy [prompts] location still works.
 	let Cfg2 = Configuration {
@@ -83,12 +83,12 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 	};
 	let mut State2 = crate::State::Struct::AphroditeState::default();
 	Cfg2.Startup(&mut State2);
-	assert_eq!(State2.SessionInject, "legacy text");
+	assert_eq!(State2.Configuration.SessionInject, "legacy text");
 
 	// Neither => shipped constant.
 	let mut State3 = crate::State::Struct::AphroditeState::default();
 	Configuration::default().Startup(&mut State3);
-	assert_eq!(State3.SessionInject, crate::Flow::Prompt::Const::Shipped);
+	assert_eq!(State3.Configuration.SessionInject, crate::Flow::Prompt::Const::Shipped);
 }
 
 #[test]
@@ -98,5 +98,5 @@ fn TestSessionInjectEnvironmentOverrideBeatsTemplatesPrompts() {
 	cfg.Set("APHRODITE_SESSION_INJECT", "env wins");
 	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.Startup(&mut State);
-	assert_eq!(State.SessionInject, "env wins");
+	assert_eq!(State.Configuration.SessionInject, "env wins");
 }

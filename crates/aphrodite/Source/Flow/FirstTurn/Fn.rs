@@ -15,7 +15,8 @@ use crate::State::Struct::AphroditeState;
 pub fn Fn(State:&AphroditeState) -> String {
 	// The template is the value: it is present only on turn 0 with a configured
 	// injection, and the substitution runs only when it is.
-	let Template = (!State.SessionInject.is_empty() && State.TurnCounter == 0).then_some(State.SessionInject.as_str());
+	let Template = (!State.Configuration.SessionInject.is_empty() && State.Turn.Counter == 0)
+		.then_some(State.Configuration.SessionInject.as_str());
 
 	Template.map_or_else(String::new, |Template| Template.replace("{VERSION}", env!("CARGO_PKG_VERSION")))
 }

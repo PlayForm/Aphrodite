@@ -16,10 +16,12 @@ use crate::Directive::{Action::Fn as Action, Model::Struct as Directive};
 fn TestActionAllActionsAndUnknown() {
 	let mut State = crate::State::Struct::AphroditeState::default();
 	State
-		.Directives
+		.Directive
+		.Loaded
 		.insert("focus".into(), Directive { name:"focus".into(), Content:"stay focused".into() });
 	State
-		.Directives
+		.Directive
+		.Loaded
 		.insert("lazy".into(), Directive { name:"lazy".into(), Content:"defer work".into() });
 
 	let r = Action(&mut State, "list", "");
@@ -28,7 +30,7 @@ fn TestActionAllActionsAndUnknown() {
 
 	let r = Action(&mut State, "swap", "focus");
 	assert_eq!(r["swapped"], "focus");
-	assert_eq!(State.ActiveDirectives, vec!["focus".to_string()]);
+	assert_eq!(State.Directive.Active, vec!["focus".to_string()]);
 
 	let r = Action(&mut State, "swap", "nonexistent");
 	assert!(r["error"].as_str().unwrap().contains("unknown directive"));
@@ -53,7 +55,7 @@ fn TestActionAllActionsAndUnknown() {
 
 	let r = Action(&mut State, "reset", "");
 	assert_eq!(r["active"], serde_json::json!([]));
-	assert!(State.ActiveDirectives.is_empty());
+	assert!(State.Directive.Active.is_empty());
 
 	let r = Action(&mut State, "bogus", "");
 	assert!(r["error"].as_str().unwrap().contains("unknown action"));
@@ -65,19 +67,19 @@ fn TestActionAllActionsAndUnknown() {
 #[test]
 fn TestOneShotNudgeRendersOnceThenPurged() {
 	let mut s = crate::State::Struct::AphroditeState::default();
-	s.TurnCounter = 5;
+	s.Turn.Counter = 5;
 	crate::Flow::Nudge::Push::Fn::Fn(&mut s, "step back and restate the goal", 1);
 
 	// Simulate the turn advancing (post_llm_call runs next_turn then purge):
 	// during turn 5 the nudge is live; render at turn 6 must include it.
-	s.TurnCounter = 6;
+	s.Turn.Counter = 6;
 	let Ctx6 = crate::Flow::TurnContext::Fn::Fn(&mut s, None);
 	assert!(Ctx6.contains("[nudge:"), "one-shot nudge must render at turn 6: {Ctx6}");
 	assert!(Ctx6.contains("step back and restate the goal"));
 
 	// post_llm_call advances to turn 7 and purges expired nudges.
 	crate::Hook::LLM::Post::Fn::Fn(&mut s);
-	assert_eq!(s.TurnCounter, 7);
+	assert_eq!(s.Turn.Counter, 7);
 	let Ctx7 = crate::Flow::TurnContext::Fn::Fn(&mut s, None);
 	assert!(!Ctx7.contains("[nudge:"), "expired nudge must be gone at turn 7: {Ctx7}");
 }
@@ -91,15 +93,17 @@ fn TestNudgeCapDropsOldest() {
 	(0..5).for_each(|i| {
 		crate::Flow::Nudge::Push::Fn::Fn(&mut s, &format!("nudge number {i}"), 10);
 	});
-	assert_eq!(s.EphemeralDirectives.len(), 4, "cap must hold at 4 stored entries");
+	assert_eq!(s.Directive.Ephemeral.len(), 4, "cap must hold at 4 stored entries");
 	assert!(
-		!s.EphemeralDirectives
+		!s.Directive
+			.Ephemeral
 			.iter()
 			.any(|e| e.inline.as_deref() == Some("nudge number 0")),
 		"the oldest nudge must have been dropped"
 	);
 	assert!(
-		s.EphemeralDirectives
+		s.Directive
+			.Ephemeral
 			.iter()
 			.any(|e| e.inline.as_deref() == Some("nudge number 4")),
 		"the newest nudge must survive"
@@ -111,9 +115,9 @@ fn TestNudgeCapDropsOldest() {
 #[test]
 fn TestListShowsEphemeralAndResetClearsThem() {
 	let mut s = crate::State::Struct::AphroditeState::default();
-	s.TurnCounter = 3;
+	s.Turn.Counter = 3;
 	crate::Flow::Nudge::Push::Fn::Fn(&mut s, "watch out", 2);
-	s.ManualDirectiveTurn = Some(3);
+	s.Directive.Manual = Some(3);
 
 	let Listed = Action(&mut s, "list", "");
 	let Eph = Listed["ephemeral"].as_array().expect("ephemeral array");
@@ -122,23 +126,24 @@ fn TestListShowsEphemeralAndResetClearsThem() {
 	assert_eq!(Eph[0]["expires_after_turn"], 5);
 
 	Action(&mut s, "reset", "");
-	assert!(s.EphemeralDirectives.is_empty(), "reset must clear ephemeral nudges");
-	assert!(s.ManualDirectiveTurn.is_none(), "reset must clear the manual latch");
+	assert!(s.Directive.Ephemeral.is_empty(), "reset must clear ephemeral nudges");
+	assert!(s.Directive.Manual.is_none(), "reset must clear the manual latch");
 }
 
-// ── P1/T3: any manual mutation latches `ManualDirectiveTurn` to the
+// ── P1/T3: any manual mutation latches `Directive::Manual` to the
 // current turn (P6 override latch). ──
 #[test]
 fn TestManualMutationSetsManualDirectiveTurn() {
 	let mut s = crate::State::Struct::AphroditeState::default();
-	s.TurnCounter = 12;
-	s.Directives
+	s.Turn.Counter = 12;
+	s.Directive
+		.Loaded
 		.insert("focus".into(), Directive { name:"focus".into(), Content:"stay focused".into() });
 	Action(&mut s, "swap", "focus");
-	assert_eq!(s.ManualDirectiveTurn, Some(12), "a manual swap must latch the turn");
+	assert_eq!(s.Directive.Manual, Some(12), "a manual swap must latch the turn");
 
 	// A failed swap (unknown directive) must NOT latch.
-	s.ManualDirectiveTurn = None;
+	s.Directive.Manual = None;
 	Action(&mut s, "swap", "nope");
-	assert!(s.ManualDirectiveTurn.is_none(), "a failed swap must not latch");
+	assert!(s.Directive.Manual.is_none(), "a failed swap must not latch");
 }

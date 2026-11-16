@@ -40,17 +40,17 @@ fn TestDirectivesLoadedEvenWhenActiveEmpty() {
 	let _ = std::fs::remove_dir_all(&Temporary);
 
 	assert!(
-		State.Directives.contains_key("focus"),
+		State.Directive.Loaded.contains_key("focus"),
 		"directives must load even when [directives] active is empty"
 	);
 	// With empty TOML `Active` and directives loaded from disk, the
 	// fallback seeds whatever of [focus, foresight, lazy] exists in the
 	// loaded set - this temp dir only has focus.md, so focus is seeded.
 	assert!(
-		!State.ActiveDirectives.is_empty(),
+		!State.Directive.Active.is_empty(),
 		"empty active list should seed focus + foresight defaults"
 	);
-	assert!(State.ActiveDirectives.iter().any(|name| name == "focus"));
+	assert!(State.Directive.Active.iter().any(|name| name == "focus"));
 }
 
 // ── Issue #6: $APHRODITE_DIRECTIVES_DIR is the FIRST candidate and
@@ -84,11 +84,11 @@ fn TestDirectivesEnvironmentOverrideWinsOverCwd() {
 	let _ = std::fs::remove_dir_all(&CwdDirectory);
 
 	assert!(
-		State.Directives.contains_key("envwin"),
+		State.Directive.Loaded.contains_key("envwin"),
 		"$APHRODITE_DIRECTIVES_DIR must win as the first candidate"
 	);
 	assert!(
-		!State.Directives.contains_key("cwdwin"),
+		!State.Directive.Loaded.contains_key("cwdwin"),
 		"the cwd directives/ candidate must not beat the env override"
 	);
 }

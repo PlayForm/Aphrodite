@@ -14,12 +14,12 @@ impl Struct {
 		// DEV-ONLY debug metrics (crate::Debug): one atomic add when the
 		// logger is on; a no-op single load when off.
 		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::MarkersCreated);
-		self.RecentMarkers.push_back(Entry);
+		self.Recent.push_back(Entry);
 
 		// Keep the last `Marker::Const::Cap` markers; front eviction (fix 6)
 		// keeps index 0 as the oldest survivor.
-		let Excess = self.RecentMarkers.len().saturating_sub(Cap);
+		let Excess = self.Recent.len().saturating_sub(Cap);
 
-		let _ = self.RecentMarkers.drain(..Excess);
+		let _ = self.Recent.drain(..Excess);
 	}
 }

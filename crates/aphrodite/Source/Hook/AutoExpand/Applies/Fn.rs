@@ -14,5 +14,5 @@ use crate::State::Struct::AphroditeState;
 /// anything, only whether the stored result is returned inline - so the
 /// transform hooks evaluate it before every marker-emitting gate.
 pub(crate) fn Fn(State:&AphroditeState, Content:&str) -> bool {
-	State.AutoExpand && Content.len() <= State.AutoExpandLimit
+	State.Configuration.AutoExpand && Content.len() <= State.Configuration.AutoExpandLimit
 }

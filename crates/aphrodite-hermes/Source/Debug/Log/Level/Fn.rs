@@ -18,7 +18,7 @@ use crate::Debug::Flag;
 /// read (a stat plus a possible file read) stays off the operator's path: only
 /// the zero arm calls it.
 pub(crate) fn Fn(State:&aphrodite::State::Struct::AphroditeState, Session:&str) -> u8 {
-	match State.DebugLevel {
+	match State.Configuration.DebugLevel {
 		0 => u8::from(Flag::Resolve::Fn::Fn(Session)),
 		Level => Level,
 	}

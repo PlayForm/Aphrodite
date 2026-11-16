@@ -1,6 +1,6 @@
 //! The conversation-index cap.
 
-/// Cap on `ConvIndex` entries - the eviction bound `Archive` enforces.
+/// Cap on `Turn::Index` entries - the eviction bound `Archive` enforces.
 ///
 /// It doubles as the capacity reference for the context engine's fill ratio: the
 /// dylib has no token counts and no context length, so the conversation index's

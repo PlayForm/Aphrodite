@@ -23,7 +23,7 @@ fn Catalog() {
 	});
 	// Budget large enough for the directive block but too small for the
 	// recall block to also fit, so the catalog must be dropped first.
-	s.FlowBudgetChars = 90;
+	s.Configuration.FlowBudgetChars = 90;
 	let Context = Assemble(&mut s, None);
 	assert!(Context.contains("[directives:"), "directives must survive: {Context}");
 	assert!(
@@ -40,8 +40,8 @@ fn Catalog() {
 #[test]
 fn Required() {
 	let mut s = WithDirective("focus", "stay targeted, minimal tool usage");
-	s.SessionInject = Shipped.to_string();
-	s.TurnCounter = 0;
+	s.Configuration.SessionInject = Shipped.to_string();
+	s.Turn.Counter = 0;
 	Push(&mut s, "check marker sizes before retrieving", 1);
 	// 50 markers so the recall catalog is large and must drop.
 	(0..50).for_each(|i| {
@@ -49,7 +49,7 @@ fn Required() {
 	});
 	// Budget well below the three always-survive sections combined, so
 	// only the recall catalog may drop.
-	s.FlowBudgetChars = 600;
+	s.Configuration.FlowBudgetChars = 600;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[aphrodite: first-turn orientation]"),
@@ -69,7 +69,7 @@ fn Required() {
 fn Hint() {
 	let mut s = AphroditeState::default();
 	AddMarker(&mut s, &"a".repeat(40), 0);
-	s.FlowBudgetChars = 4000;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert_eq!(
 		Context.matches("retrieve: aphrodite_retrieve").count(),

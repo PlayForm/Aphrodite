@@ -11,7 +11,7 @@ use crate::{
 /// Every section, in the order the configuration has always been applied.
 ///
 /// `Directive` runs before `Template` and `Prompt`, and a few sections seed values the
-/// next one reads (`ChainSplitFloor` from `ChainSplitMinimumSegments`, `ActiveDirectives`
+/// next one reads (`ChainSplit::Floor` from `ChainSplit::Minimum`, `Directive::Active`
 /// from the loaded set), so the order is a contract rather than a preference.
 ///
 /// This list is the whole difference between a startup pass and a reload: `Reload/Const`

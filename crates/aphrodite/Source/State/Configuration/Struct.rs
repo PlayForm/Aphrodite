@@ -12,7 +12,7 @@
 //! subsystem each knob belongs to. Stripping the qualifier would collapse three
 //! different thresholds onto one word inside this struct - the collision rule
 //! in `.hermes/notes/RUST-NAMING-DOCTRINE.md` §4 keeps the distinction. The one
-//! qualifier the path does carry is `Configuration`, so `ConfigurationError`
+//! qualifier the path does carry is `Configuration`, so `Configuration::Error`
 //! drops to `Error`.
 
 use crate::State::Template::Struct::Struct as Templates;
@@ -21,7 +21,7 @@ use crate::State::Template::Struct::Struct as Templates;
 /// overrides that feed the same keys).
 #[derive(Clone)]
 pub struct Struct {
-	pub APIURL:String,
+	pub URL:String,
 	pub Model:String,
 	pub EngineThresholdPct:u64,
 	// RESERVED: write-only today (loaded from aphrodite.toml, never read back
@@ -38,7 +38,7 @@ pub struct Struct {
 	/// found but failed to parse (defaults in effect). Surfaced verbatim in
 	/// `AphroditeStats` so a broken config is never indistinguishable from
 	/// "config not set" - the tracing warn is a no-op in the Hermes dylib.
-	pub ConfigurationError:Option<String>,
+	pub Error:Option<String>,
 	/// Opt-in config auto-reload: watch aphrodite.toml and re-apply config
 	/// fields on change (default off). Only config fields are mutated -
 	/// session CCR state, directive selection, and telemetry are preserved.

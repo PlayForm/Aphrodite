@@ -24,5 +24,5 @@ pub fn Fn(State:&mut AphroditeState, TaskID:Command, Tool:String, command:String
 	let ObservedAtUnix = crate::Prefetch::Clock::Fn::Fn();
 	let Task = New(TaskID, Tool, command, Turn, ObservedAtUnix);
 
-	Admit(&mut Registry(&mut State.BgTasks), Task);
+	Admit(&mut Registry(&mut State.PollWorker.Tasks), Task);
 }

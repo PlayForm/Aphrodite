@@ -7,8 +7,8 @@ use crate::{Flow::TurnContext::Fn::Fn as Assemble, State::Struct::AphroditeState
 #[test]
 fn Minimal() {
 	let mut s = AphroditeState::default();
-	s.RetrieveGuidance = "minimal".into();
-	s.TurnCounter = 5;
+	s.Configuration.RetrieveGuidance = "minimal".into();
+	s.Turn.Counter = 5;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[retrieval:"),
@@ -19,7 +19,7 @@ fn Minimal() {
 #[test]
 fn Default() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 5;
+	s.Turn.Counter = 5;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[retrieval:"),
@@ -30,8 +30,8 @@ fn Default() {
 #[test]
 fn Standard() {
 	let mut s = AphroditeState::default();
-	s.RetrieveGuidance = "standard".into();
-	s.TurnCounter = 5;
+	s.Configuration.RetrieveGuidance = "standard".into();
+	s.Turn.Counter = 5;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval: CCR markers compress large tool output."),
@@ -43,8 +43,8 @@ fn Standard() {
 #[test]
 fn Verbose() {
 	let mut s = AphroditeState::default();
-	s.RetrieveGuidance = "verbose".into();
-	s.TurnCounter = 5;
+	s.Configuration.RetrieveGuidance = "verbose".into();
+	s.Turn.Counter = 5;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval:") && Context.contains("Never re-read a file"),
@@ -55,8 +55,8 @@ fn Verbose() {
 #[test]
 fn Unknown() {
 	let mut s = AphroditeState::default();
-	s.RetrieveGuidance = "bogus".into();
-	s.TurnCounter = 5;
+	s.Configuration.RetrieveGuidance = "bogus".into();
+	s.Turn.Counter = 5;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[retrieval: CCR markers compress large tool output."),

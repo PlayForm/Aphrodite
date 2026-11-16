@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 /// Takes the list it reads rather than the session, so this section cannot reach a
 /// field it does not report on.
 ///
-/// `RecordFile` pushes new entries to the FRONT of the deque, so the new ones sit
+/// `File::Record` pushes new entries to the FRONT of the deque, so the new ones sit
 /// at the front; the front is taken and then reversed so names render in insertion
 /// order (oldest-of-new first). Reading from the back would select the OLDEST
 /// entries and misreport old files as new.

@@ -5,7 +5,5 @@ use std::collections::VecDeque;
 use super::Struct::Struct;
 
 impl Default for Struct {
-	fn default() -> Self {
-		Self { BgTasks:VecDeque::new(), PollWorkerEnabled:true }
-	}
+	fn default() -> Self { Self { Tasks:VecDeque::new(), Enable:true } }
 }

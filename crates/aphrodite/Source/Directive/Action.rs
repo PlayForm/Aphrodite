@@ -20,7 +20,7 @@ use super::{
 /// them - from [`Refusal::Fn::Fn`], which is also where the unknown-NAME refusal lives, so the
 /// vocabulary's two refusals are one table rather than two spellings.
 ///
-/// Every successful mutation latches `ManualDirectiveTurn` (P6) - inside the leaf that performs
+/// Every successful mutation latches `Directive::Manual` (P6) - inside the leaf that performs
 /// it, because a manual choice must switch phase-aware auto-swaps off and a *failed* action must
 /// not.
 pub fn Fn(State:&mut AphroditeState, Verb:&str, name:&str) -> serde_json::Value {

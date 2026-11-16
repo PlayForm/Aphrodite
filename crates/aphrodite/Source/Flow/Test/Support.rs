@@ -7,21 +7,22 @@
 
 use crate::{
 	Directive::Model::Struct as Directive,
-	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 };
 
 /// A state carrying one directive, active and ready to render.
 pub(super) fn WithDirective(name:&str, body:&str) -> AphroditeState {
 	let mut s = AphroditeState::default();
-	s.Directives
+	s.Directive
+		.Loaded
 		.insert(name.into(), Directive { name:name.into(), Content:body.into() });
-	s.ActiveDirectives = vec![name.into()];
+	s.Directive.Active = vec![name.into()];
 	s
 }
 
 /// Record one marker of a fixed size, so catalog lengths are predictable.
 pub(super) fn AddMarker(s:&mut AphroditeState, hash:&str, Turn:usize) {
-	s.RecordMarker(MarkerEntry {
+	s.Marker.Record(MarkerEntry {
 		hash:hash.into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -35,7 +36,12 @@ pub(super) fn AddMarker(s:&mut AphroditeState, hash:&str, Turn:usize) {
 /// A state with a templates table holding exactly one prompt entry.
 pub(super) fn WithPrompt(name:&str, Tmpl:&str) -> AphroditeState {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::Template::Struct::Struct::default());
-	s.Templates.as_mut().unwrap().Prompts.insert(name.into(), Tmpl.into());
+	s.Configuration.Templates = Some(crate::State::Template::Struct::Struct::default());
+	s.Configuration
+		.Templates
+		.as_mut()
+		.unwrap()
+		.Prompts
+		.insert(name.into(), Tmpl.into());
 	s
 }

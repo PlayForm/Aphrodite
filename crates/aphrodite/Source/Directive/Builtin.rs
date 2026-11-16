@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use super::{Cap, Embedded, Model::Struct};
 
 /// Load the built-in directives from the binary, applying the same per-file cap the disk
-/// loader applies. Returns a map ready for `state.Directives`.
+/// loader applies. Returns a map ready for `state.Directive.Loaded`.
 ///
 /// These ship with every installation and are the fallback when no `directives/`
 /// directory exists on disk - a fresh install gets `focus`, `foresight`, `ccr-handling`,

@@ -18,7 +18,7 @@ fn Flag() {
 	// the renderer's contract, so the two ways of having nothing to say agree.
 	let mut State = AphroditeState::default();
 	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
-	State.PollWorkerEnabled = false;
+	State.PollWorker.Enable = false;
 
 	assert_eq!(Render(&State), "");
 }
@@ -47,7 +47,7 @@ fn Mixed() {
 	Insert(&mut State, "r1".into(), "terminal".into(), "running1".into(), 1);
 	Insert(&mut State, "r2".into(), "terminal".into(), "running2".into(), 2);
 	// Mark one as done.
-	State.BgTasks[1].Status = Status::Done { Output:Finished() };
+	State.PollWorker.Tasks[1].Status = Status::Done { Output:Finished() };
 	Insert(&mut State, "r3".into(), "terminal".into(), "running3".into(), 3);
 
 	let Rendered = Render(&State);
@@ -66,13 +66,13 @@ fn Mixed() {
 fn Live() {
 	// Off (default): byte-identical to the pre-port renderer.
 	let mut State = AphroditeState::default();
-	assert!(!State.LiveContainer, "default state must have live_container off");
+	assert!(!State.Configuration.LiveContainer, "default state must have live_container off");
 	Insert(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 	let Expected = "[poll workers] 1 active task(s):\n  · `cargo build` - running since turn 1 (not polled yet)";
 	assert_eq!(Render(&State), Expected, "off-path render must be byte-identical");
 
 	// On: a live-container line with byte progress appears.
-	State.LiveContainer = true;
+	State.Configuration.LiveContainer = true;
 	let Rendered = Render(&State);
 	assert!(
 		Rendered.contains("[live container]"),

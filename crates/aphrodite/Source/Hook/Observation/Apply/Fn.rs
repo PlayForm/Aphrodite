@@ -2,7 +2,7 @@
 
 use crate::{
 	Hook::Observation::{Outcome::Enum::Enum as Outcome, Struct::Struct},
-	State::{Event::Struct::Struct as ToolEvent, Struct::AphroditeState},
+	State::{Event::Entry::Struct::Struct as ToolEvent, Struct::AphroditeState},
 };
 
 /// Record an observation: the telemetry event and the file reference.
@@ -13,12 +13,12 @@ use crate::{
 /// compress - the phase detector and the error-loop breaker reason over call
 /// shape, not over what became a marker.
 ///
-/// The file reference is gated on `FileTools`, not on the essential-tool list:
+/// The file reference is gated on `File::Tools`, not on the essential-tool list:
 /// `read_file` is in both on purpose (it is never compressed, and it is the
 /// single most common file-reference source), so skipping compression and
 /// recording a reference have to be decided separately. That is why this leaf
 /// knows about `Hook::Tool::Const::Essential` only for the doc note above and reads
-/// `State.FileTools` for the decision.
+/// `State.File.Tools` for the decision.
 pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 	let Failed = matches!(Observation.Outcome, Outcome::Failed);
 
@@ -28,8 +28,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 		.into_iter()
 		.for_each(crate::Debug::Count::Bump::Fn::Fn);
 
-	State.RecordEvent(ToolEvent {
-		Turn:State.TurnCounter,
+	State.Event.Record(ToolEvent {
+		Turn:State.Turn.Counter,
 		Tool:Observation.Tool.clone(),
 		Sig:Observation.ArgsSig,
 		Okay:!Failed,
@@ -38,10 +38,10 @@ pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 		WrotePath:Observation.WrotePath.as_ref().map(|Resolved| Resolved.Path.clone()),
 	});
 
-	let Tracked = State.FileTools.iter().any(|Tool| Tool == &Observation.Tool);
+	let Tracked = State.File.Tools.iter().any(|Tool| Tool == &Observation.Tool);
 	let Referenced = Tracked.then_some(Observation.ReferencedPath.as_ref()).flatten();
 
 	Referenced
 		.into_iter()
-		.for_each(|Resolved| State.RecordFile(Resolved.Path.clone(), Observation.Tool.clone()));
+		.for_each(|Resolved| State.File.Record(Resolved.Path.clone(), Observation.Tool.clone()));
 }

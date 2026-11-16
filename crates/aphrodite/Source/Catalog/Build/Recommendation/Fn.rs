@@ -11,7 +11,8 @@ use crate::{State::Struct::AphroditeState, StructExtract::Format::Floor::Fn as F
 /// shape a caller already handles. The two are different answers and the type says so.
 pub(crate) fn Fn(State:&AphroditeState) -> Option<Vec<String>> {
 	let Recommendations:Vec<String> = State
-		.RecentMarkers
+		.Marker
+		.Recent
 		.iter()
 		.take(10)
 		.map(|Marker| format!("{} ({}B) - {}", Marker.CCRType, Marker.Size, FloorBoundary(&Marker.Preview, 60)))

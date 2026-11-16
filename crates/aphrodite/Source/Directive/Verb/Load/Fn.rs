@@ -10,12 +10,12 @@ use super::super::{Push, Unknown};
 /// (`loaded`) so a caller can tell it apart from a pre-seeded `add`. Idempotent when the
 /// directive is already active.
 pub(crate) fn Fn(State:&mut AphroditeState, name:&str) -> serde_json::Value {
-	let Some(name) = State.Directives.contains_key(name).then_some(name) else {
+	let Some(name) = State.Directive.Loaded.contains_key(name).then_some(name) else {
 		return Unknown::Fn::Fn(name);
 	};
 
-	Push::Fn::Fn(&mut State.ActiveDirectives, name);
-	State.ManualDirectiveTurn = Some(State.TurnCounter);
+	Push::Fn::Fn(&mut State.Directive.Active, name);
+	State.Directive.Manual = Some(State.Turn.Counter);
 
-	serde_json::json!({"loaded": name, "active": &State.ActiveDirectives})
+	serde_json::json!({"loaded": name, "active": &State.Directive.Active})
 }

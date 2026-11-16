@@ -23,7 +23,7 @@ impl Struct {
 	/// and re-running this against one would overwrite it. That is what
 	/// `Apply::Reload::Fn` exists for.
 	pub fn Startup(&self, State:&mut AphroditeState) {
-		State.ConfigurationError = self.ParseFailure.clone();
+		State.Configuration.Error = self.ParseFailure.clone();
 
 		Sequence.iter().for_each(|Apply| Apply(self, State));
 	}

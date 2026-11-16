@@ -51,8 +51,8 @@ fn TestHashlessMarkerDoesNotHideItsNeighbour() {
 #[test]
 fn TestReferenceIsResolved() {
 	let mut s = AphroditeState::default();
-	s.Put("doc".into(), "before <<<CCR:real|t|1>>> after".into());
-	s.Put("real".into(), "RESOLVED".into());
+	s.Store.Put("doc".into(), "before <<<CCR:real|t|1>>> after".into());
+	s.Store.Put("real".into(), "RESOLVED".into());
 
 	assert_eq!(Expand(&mut s, "doc"), Some("before RESOLVED after".to_string()));
 }
@@ -63,7 +63,7 @@ fn TestReferenceIsResolved() {
 fn TestUnresolvedReferenceKeepsItsOriginalText() {
 	let mut s = AphroditeState::default();
 	let Marker = "<<<CCR:missing|text|10>>>";
-	s.Put("doc".into(), format!("before {Marker} after"));
+	s.Store.Put("doc".into(), format!("before {Marker} after"));
 
 	assert_eq!(Expand(&mut s, "doc"), Some(format!("before {Marker} after")));
 }

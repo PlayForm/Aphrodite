@@ -23,9 +23,9 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	let Content = Input.Content();
 	let Parsed = &Input.Parsed;
 
-	// Poll-result tracking: update running BgTasks from
+	// Poll-result tracking: update running `PollWorker::Tasks` from
 	// process(action='poll') results. Only active when poll_worker is enabled.
-	(State.PollWorkerEnabled && Tool == "process")
+	(State.PollWorker.Enable && Tool == "process")
 		.then_some(())
 		.into_iter()
 		.for_each(|()| {

@@ -31,11 +31,11 @@ pub unsafe extern "C" fn AphroditeRetrieve(Handle:*const c_char, Hash:*const c_c
 	Bare(Handle, move |s| {
 		let Hash = Optional(Hash)?;
 
-		match s.Get(&Hash) {
+		match s.Store.Get(&Hash) {
 			Some(Content) => {
 				// Tier 1 teaching loop: the FFI retrieve path bypasses
 				// `Resolve::One::Fn`, so attribute the consequence here too.
-				s.NoteRetrieval(&Hash);
+				s.ChainSplit.Retrieve(&Hash);
 
 				Ok(Answer::Text(Content))
 			},

@@ -13,14 +13,14 @@ use super::super::Push;
 /// expressed a manual choice, and a manual choice must switch phase-aware auto-swaps off
 /// (P6).
 pub(crate) fn Fn(State:&mut AphroditeState, name:&str) -> serde_json::Value {
-	let Known = State.Directives.contains_key(name);
+	let Known = State.Directive.Loaded.contains_key(name);
 
 	Known
 		.then_some(name)
 		.into_iter()
-		.for_each(|Name| Push::Fn::Fn(&mut State.ActiveDirectives, Name));
+		.for_each(|Name| Push::Fn::Fn(&mut State.Directive.Active, Name));
 
-	State.ManualDirectiveTurn = Some(State.TurnCounter);
+	State.Directive.Manual = Some(State.Turn.Counter);
 
-	serde_json::json!({"active": &State.ActiveDirectives})
+	serde_json::json!({"active": &State.Directive.Active})
 }

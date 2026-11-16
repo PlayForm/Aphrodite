@@ -26,7 +26,7 @@ fn ChunksOf(Content:&str) -> Vec<&str> {
 #[test]
 fn Identical() {
 	let mut s = AphroditeState::default(); // live_container = false
-	s.ToolThreshold = 0;
+	s.Configuration.ToolThreshold = 0;
 	let Content = "fn main() {\n    println!(\"hello\");\n}\n";
 	let r = Tool(&mut s, Content, "terminal");
 	assert_eq!(r["status"], "ok");
@@ -42,11 +42,11 @@ fn Identical() {
 	);
 	assert_eq!(r["marker"], ExpectMarker, "off must keep the exact marker grammar");
 	assert!(
-		!s.InlineStore.contains_key(&MetaKey(hash)),
+		!s.Store.Map.contains_key(&MetaKey(hash)),
 		"off must not store a container envelope"
 	);
 	assert!(
-		!s.InlineStore.contains_key(&ChunkKey(hash, 0)),
+		!s.Store.Map.contains_key(&ChunkKey(hash, 0)),
 		"off must not store container chunks"
 	);
 	assert_eq!(crate::Resolve::Expand::Fn(&mut s, hash), Some(Content.to_string()));
@@ -57,16 +57,16 @@ fn Identical() {
 #[test]
 fn Below() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
-	s.ToolThreshold = 10_000;
+	s.Configuration.LiveContainer = true;
+	s.Configuration.ToolThreshold = 10_000;
 	let r = Tool(&mut s, "short output", "terminal");
 	assert_eq!(r["compressed"], false);
 	assert_eq!(r["reason"], "below_threshold");
 	assert!(r.get("live").is_none(), "below-threshold must not emit a container");
 
 	let mut S2 = AphroditeState::default();
-	S2.LiveContainer = true;
-	S2.TerminalThreshold = 10_000;
+	S2.Configuration.LiveContainer = true;
+	S2.Configuration.TerminalThreshold = 10_000;
 	let R2 = Terminal(&mut S2, "tiny terminal output");
 	assert_eq!(R2["compressed"], false);
 	assert_eq!(R2["reason"], "below_threshold");
@@ -80,8 +80,8 @@ fn Below() {
 #[test]
 fn Progress() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
-	s.ToolThreshold = 0; // always compress
+	s.Configuration.LiveContainer = true;
+	s.Configuration.ToolThreshold = 0; // always compress
 	let Content = (0..40)
 		.map(|i| format!("tool payload line {i:02} with some text\n"))
 		.collect::<String>();
@@ -111,13 +111,13 @@ fn Progress() {
 		"marker must carry the progress annotation: {Marker}"
 	);
 	// Container store: meta envelope + per-chunk entries + round-trip hash.
-	assert!(s.InlineStore.contains_key(&MetaKey(hash)), "meta envelope must be stored");
+	assert!(s.Store.Map.contains_key(&MetaKey(hash)), "meta envelope must be stored");
 	(0..Chunks.len()).for_each(|i| {
-		assert!(s.InlineStore.contains_key(&ChunkKey(hash, i)), "chunk {i} must be stored");
+		assert!(s.Store.Map.contains_key(&ChunkKey(hash, i)), "chunk {i} must be stored");
 	});
 	assert_eq!(crate::Resolve::Expand::Fn(&mut s, hash), Some(Content.clone()));
 	assert!(
-		s.RecentMarkers.iter().any(|m| m.hash == hash && m.CCRType == "live"),
+		s.Marker.Recent.iter().any(|m| m.hash == hash && m.CCRType == "live"),
 		"the live entry must be recorded in the catalog"
 	);
 }
@@ -127,8 +127,8 @@ fn Progress() {
 #[test]
 fn Instant() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
-	s.TerminalThreshold = 0;
+	s.Configuration.LiveContainer = true;
+	s.Configuration.TerminalThreshold = 0;
 	let Content = (0..40)
 		.map(|i| format!("cargo step {i:02} done - line content\n"))
 		.collect::<String>();
@@ -151,7 +151,7 @@ fn Instant() {
 #[test]
 fn Default() {
 	let s = AphroditeState::default();
-	assert!(!s.LiveContainer, "default state must keep live_container off");
+	assert!(!s.Configuration.LiveContainer, "default state must keep live_container off");
 }
 
 // Auto-expand wins over the container path: under auto-expand (within
@@ -160,10 +160,10 @@ fn Default() {
 #[test]
 fn Defer() {
 	let mut s = AphroditeState::default();
-	s.LiveContainer = true;
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 102400;
-	s.ToolThreshold = 0;
+	s.Configuration.LiveContainer = true;
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 102400;
+	s.Configuration.ToolThreshold = 0;
 	let Content = "some content that would otherwise become a live container\n";
 	let r = Tool(&mut s, Content, "terminal");
 	assert_eq!(r["auto_expanded"], true, "auto-expand must win over the container path");

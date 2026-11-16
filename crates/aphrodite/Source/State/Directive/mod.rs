@@ -7,10 +7,9 @@
 //! here rather than in `crate::Directive` is what stops the ephemeral path from
 //! growing a name-resolution path it does not have.
 //!
-//! - `Struct.rs` - the loaded set, the active names, the nudges and the latch.
-//! - `Default.rs` - the seed: nothing loaded, nothing active, no latch.
+//! - `Struct.rs` - the loaded set, the active names, the nudges, the latch and
+//!   their seed.
 //! - `Entry/` - one ephemeral activation (the item).
 
-pub mod Default;
 pub mod Entry;
 pub mod Struct;

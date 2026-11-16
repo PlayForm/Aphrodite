@@ -19,19 +19,15 @@ fn Essential() {
 // (`state.file_tools`); both must hold at once. Previously the essential-
 // tool early return ran before file-reference tracking, so the single
 // most common file reference (reading a file) was silently never
-// recorded in `ReferencedFiles`.
+// recorded in `File::Recent`.
 #[test]
 fn Tracked() {
 	let mut s = AphroditeState::default();
 	let r = Transform(&mut s, "/tmp/some/file.rs\nfn main() {}\n", "read_file");
 	assert_eq!(r["compressed"], false, "read_file must never be compressed");
 	assert_eq!(r["reason"], "essential_tool");
-	assert_eq!(
-		s.ReferencedFiles.len(),
-		1,
-		"read_file must still be tracked as a file reference"
-	);
-	assert_eq!(s.ReferencedFiles[0].0, "/tmp/some/file.rs");
+	assert_eq!(s.File.Recent.len(), 1, "read_file must still be tracked as a file reference");
+	assert_eq!(s.File.Recent[0].0, "/tmp/some/file.rs");
 }
 
 // ── T9 (F10): `search_files` reaches the file-reference tracker (it's
@@ -40,11 +36,11 @@ fn Tracked() {
 #[test]
 fn Search() {
 	let mut s = AphroditeState::default();
-	s.ToolThreshold = 0; // always compress, to also exercise the non-essential path
+	s.Configuration.ToolThreshold = 0; // always compress, to also exercise the non-essential path
 	let Content = "/tmp/some/file.rs:42:    let x = 1;\n/tmp/other/file.rs:7:    let y = 2;\n";
 	let _ = Transform(&mut s, Content, "search_files");
-	assert_eq!(s.ReferencedFiles.len(), 1);
-	assert_eq!(s.ReferencedFiles[0].0, "/tmp/some/file.rs");
+	assert_eq!(s.File.Recent.len(), 1);
+	assert_eq!(s.File.Recent[0].0, "/tmp/some/file.rs");
 }
 
 #[test]
@@ -57,7 +53,7 @@ fn Empty() {
 #[test]
 fn Below() {
 	let mut s = AphroditeState::default();
-	s.ToolThreshold = 10000;
+	s.Configuration.ToolThreshold = 10000;
 	let r = Transform(&mut s, "short", "terminal");
 	assert_eq!(r["compressed"], false);
 }
@@ -65,7 +61,7 @@ fn Below() {
 #[test]
 fn Success() {
 	let mut s = AphroditeState::default();
-	s.ToolThreshold = 0; // always compress
+	s.Configuration.ToolThreshold = 0; // always compress
 	let Content = "fn main() {\n    println!(\"hello world\");\n}\n";
 	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["compressed"], true);
@@ -86,9 +82,9 @@ fn Success() {
 #[test]
 fn Expand() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 102400;
-	s.ToolThreshold = 0;
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 102400;
+	s.Configuration.ToolThreshold = 0;
 	// A nested entry whose marker text is embedded in the tool output:
 	// the resolved content must differ from the raw marker text, proving
 	// the hook actually resolves instead of just passing through.
@@ -111,9 +107,9 @@ fn Expand() {
 #[test]
 fn OverLimit() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 8;
-	s.ToolThreshold = 0;
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 8;
+	s.Configuration.ToolThreshold = 0;
 	let Content = "this content is far longer than eight bytes";
 	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["compressed"], true);
@@ -133,7 +129,7 @@ fn OverLimit() {
 #[test]
 fn Identical() {
 	let mut s = AphroditeState::default(); // auto_expand = false
-	s.ToolThreshold = 0;
+	s.Configuration.ToolThreshold = 0;
 	let Content = "fn main() {\n    println!(\"hello\");\n}\n";
 	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(r["status"], "ok");
@@ -162,9 +158,9 @@ fn Identical() {
 #[test]
 fn Bypass() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.AutoExpandLimit = 102400;
-	s.ToolThreshold = 10000; // content below the threshold
+	s.Configuration.AutoExpand = true;
+	s.Configuration.AutoExpandLimit = 102400;
+	s.Configuration.ToolThreshold = 10000; // content below the threshold
 	let Content = "tiny tool output";
 	let r = Transform(&mut s, Content, "terminal");
 	assert_eq!(

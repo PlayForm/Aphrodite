@@ -12,10 +12,10 @@ use std::collections::VecDeque;
 #[derive(Clone)]
 pub struct Struct {
 	/// Referenced files: {filepath: last_tool_name}
-	pub ReferencedFiles:VecDeque<(String, String)>,
+	pub Recent:VecDeque<(String, String)>,
 	/// File tools set.
-	pub FileTools:Vec<String>,
+	pub Tools:Vec<String>,
 	/// Number of referenced files the last time catalog_summary rendered,
 	/// for delta-only file listing (04-F4: stops re-listing same 5 files).
-	pub LastEmittedFileCount:usize,
+	pub Emitted:usize,
 }

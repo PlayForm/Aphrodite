@@ -13,7 +13,7 @@ use crate::{
 #[test]
 fn TestExpandSimple() {
 	let mut s = AphroditeState::default();
-	s.Put("simple".into(), "just content".into());
+	s.Store.Put("simple".into(), "just content".into());
 	assert_eq!(Expand(&mut s, "simple"), Some("just content".into()));
 }
 
@@ -21,8 +21,8 @@ fn TestExpandSimple() {
 fn TestExpandWithNesting() {
 	let mut s = AphroditeState::default();
 	let Inner = "<<<CCR:inner123|text|10>>>";
-	s.Put("outer".into(), format!("before {} after", Inner));
-	s.Put("inner123".into(), "RESOLVED".into());
+	s.Store.Put("outer".into(), format!("before {} after", Inner));
+	s.Store.Put("inner123".into(), "RESOLVED".into());
 	let Result = Expand(&mut s, "outer");
 	assert_eq!(Result, Some("before RESOLVED after".into()));
 }
@@ -36,7 +36,7 @@ fn TestExpandUnresolved() {
 	// persisting it back over the original content) made that
 	// impossible.
 	let mut s = AphroditeState::default();
-	s.Put("outer".into(), "before <<<CCR:missing|text|10>>> after".into());
+	s.Store.Put("outer".into(), "before <<<CCR:missing|text|10>>> after".into());
 	let Result = Expand(&mut s, "outer");
 	assert_eq!(Result, Some("before <<<CCR:missing|text|10>>> after".to_string()));
 }
@@ -54,8 +54,8 @@ fn TestExpandMissingHash() {
 fn TestExpandNeverWritesBackOverTheOriginalKey() {
 	let mut s = AphroditeState::default();
 	let Original = "before <<<CCR:inner|t|1>>> after";
-	s.Put("outer".into(), Original.to_string());
-	s.Put("inner".into(), "X".to_string());
+	s.Store.Put("outer".into(), Original.to_string());
+	s.Store.Put("inner".into(), "X".to_string());
 
 	let _ = Expand(&mut s, "outer");
 	// The raw stored entry under "outer" must be untouched - not
@@ -66,8 +66,8 @@ fn TestExpandNeverWritesBackOverTheOriginalKey() {
 #[test]
 fn TestExpandIsIdempotent() {
 	let mut s = AphroditeState::default();
-	s.Put("outer".into(), "<<<CCR:inner|t|1>>>".into());
-	s.Put("inner".into(), "X".into());
+	s.Store.Put("outer".into(), "<<<CCR:inner|t|1>>>".into());
+	s.Store.Put("inner".into(), "X".into());
 	let First = Expand(&mut s, "outer");
 	let Second = Expand(&mut s, "outer");
 	assert_eq!(First, Second);
@@ -83,7 +83,7 @@ fn TestExpandPreservesLiteralMarkerShapedTextInContent() {
 	// the original text on failed resolution) is what protects it.
 	let mut s = AphroditeState::default();
 	let Content = "see the format <<<CCR:deadbeef|text|4>>> for reference";
-	s.Put("doc".into(), Content.to_string());
+	s.Store.Put("doc".into(), Content.to_string());
 	let Result = Expand(&mut s, "doc");
 	assert_eq!(Result, Some(Content.to_string()));
 }

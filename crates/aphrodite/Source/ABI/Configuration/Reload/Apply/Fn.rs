@@ -16,12 +16,12 @@ use crate::{ABI::Configuration::Reload::Assessment::Enum::Enum as Assessment, St
 pub(crate) fn Fn(State:&mut AphroditeState, Assessment:Assessment) -> Option<String> {
 	match Assessment {
 		Assessment::Ready { Enabled } => {
-			State.ContextEngineEnabled = Enabled;
+			State.Configuration.ContextEngineEnabled = Enabled;
 
 			None
 		},
 		Assessment::Invalid { Diagnostic } => {
-			State.ConfigurationError = Some(Diagnostic.clone());
+			State.Configuration.Error = Some(Diagnostic.clone());
 
 			Some(Diagnostic)
 		},

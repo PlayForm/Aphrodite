@@ -1,7 +1,7 @@
 //! The terminal entry point that also carries Hermes' call metadata.
 //!
 //! Same pipeline as `Entry::Classify`, plus the Hermes-supplied `command` and
-//! `Returncode` recorded into the `ToolEvents` telemetry ring - the signals the
+//! `Returncode` recorded into the `Event::Recent` telemetry ring - the signals the
 //! error-loop breaker reads. `returncode == 0` (or absent) is `Okay`.
 
 use crate::{

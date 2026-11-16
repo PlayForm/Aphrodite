@@ -37,9 +37,9 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 		&[
 			("tool", Tool.to_string()),
 			("args_bytes", Bytes.to_string()),
-			("tool_threshold", State.ToolThreshold.to_string()),
-			("terminal_threshold", State.TerminalThreshold.to_string()),
-			("auto_expand_limit", State.AutoExpandLimit.to_string()),
+			("tool_threshold", State.Configuration.ToolThreshold.to_string()),
+			("terminal_threshold", State.Configuration.TerminalThreshold.to_string()),
+			("auto_expand_limit", State.Configuration.AutoExpandLimit.to_string()),
 			("expected", Expected),
 		],
 	);
@@ -47,7 +47,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	// ── Auto-backgrounding: intercept BEFORE execution ──
 	// Returns {"action":"modify","args":{"background":true,"notify_on_complete":true}}
 	// so Hermes runs the tool in background instead of blocking.
-	let Background = match (State.PollWorkerEnabled, Tool) {
+	let Background = match (State.PollWorker.Enable, Tool) {
 		(true, "terminal" | "process") => {
 			let Command = Input
 				.Parsed
@@ -91,7 +91,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	// Tier 1 teaching loop: only chains with at least
 	// `chain_split_min_segments` segments are rewritten - the
 	// threshold adapts from retrieval consequences (invisible).
-	let Chain = match (State.ChainSplitEnabled, Tool) {
+	let Chain = match (State.ChainSplit.Enable, Tool) {
 		(true, "terminal") => {
 			Input
 				.Parsed
@@ -100,7 +100,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 				.and_then(|v| v.as_str())
 				.and_then(|Command| {
 					aphrodite::ChainSplit::Split::Fn::Fn(Command)
-						.filter(|Segments| Segments.len() >= State.ChainSplitMinimumSegments)
+						.filter(|Segments| Segments.len() >= State.ChainSplit.Minimum)
 						.map(|Segments| (Command, Segments))
 				})
 				.map(|(Command, Segments)| {

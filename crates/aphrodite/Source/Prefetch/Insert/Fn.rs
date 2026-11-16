@@ -44,5 +44,5 @@ pub fn Fn(State:&mut AphroditeState, Outcomes:Vec<(String, Outcome)>) -> serde_j
 		})
 		.collect();
 
-	Report(Records, State.Bytes(), State.Budget())
+	Report(Records, State.Store.Bytes, State.Store.Budget)
 }

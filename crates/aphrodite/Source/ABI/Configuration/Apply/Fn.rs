@@ -15,22 +15,22 @@ use crate::{
 pub(crate) fn Fn(State:&mut AphroditeState, Parsed:Result<Update, Outcome>) -> Outcome {
 	match Parsed {
 		Ok(Update::Model(Value)) => {
-			State.Model = Value;
+			State.Configuration.Model = Value;
 
 			Outcome::Applied
 		},
 		Ok(Update::Engine(Value)) => {
-			State.EngineThresholdPct = Value;
+			State.Configuration.EngineThresholdPct = Value;
 
 			Outcome::Applied
 		},
 		Ok(Update::Tool(Value)) => {
-			State.ToolThreshold = Value;
+			State.Configuration.ToolThreshold = Value;
 
 			Outcome::Applied
 		},
 		Ok(Update::Context(Value)) => {
-			State.ContextEngineEnabled = Value;
+			State.Configuration.ContextEngineEnabled = Value;
 
 			Outcome::Applied
 		},

@@ -10,7 +10,7 @@ use crate::State::Struct::AphroditeState;
 /// renderer. `Table::Fn::Fn` then owns the whole non-empty shape - header, rows and the
 /// "N more entries" footer - so the two cases cannot drift into one another.
 pub fn Fn(State:&AphroditeState) -> String {
-	let Items = &State.RecentMarkers;
+	let Items = &State.Marker.Recent;
 
 	let Some(Items) = (!Items.is_empty()).then_some(Items) else {
 		return "No compressed items yet.".to_string();

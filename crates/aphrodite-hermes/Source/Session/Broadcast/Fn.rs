@@ -41,7 +41,7 @@ pub(crate) fn Fn(f:impl Fn(&mut AphroditeState)) -> Report::Struct::Struct {
 					f(&mut Guard);
 
 					Report.Applied += 1;
-					Report.Reload += usize::from(Guard.AutoReload);
+					Report.Reload += usize::from(Guard.Configuration.AutoReload);
 				},
 				// Wedged session: count it and move on (fail-open - it stays
 				// degraded, and the caller decides whether that is a reason to

@@ -11,7 +11,8 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 	("aphrodite_files", |_Args| {
 		crate::Session::With::Fn::with_shared(|State| {
 			let Files:Vec<serde_json::Value> = State
-				.ReferencedFiles
+				.File
+				.Recent
 				.iter()
 				.map(|(Path, Tool)| serde_json::json!({"path": Path, "tool": Tool}))
 				.collect();

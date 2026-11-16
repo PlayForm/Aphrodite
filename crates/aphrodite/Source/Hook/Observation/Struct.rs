@@ -14,7 +14,7 @@ use crate::Hook::{Observation::Outcome::Enum::Enum as Outcome, Path::Resolved::S
 /// `WrotePath` and `ReferencedPath` are distinct fields because they feed
 /// different signals: a written path is what the call changed (the `WrotePath`
 /// telemetry column), a referenced path is what it looked at (the
-/// `ReferencedFiles` catalog). A `patch` both writes and references; a
+/// `File::Recent` catalog). A `patch` both writes and references; a
 /// `read_file` only references.
 pub struct Struct {
 	/// Tool name, or `"terminal"` for terminal output.

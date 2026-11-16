@@ -25,14 +25,14 @@ pub(crate) fn Fn(State:&AphroditeState, T0:Option<std::time::Instant>, Budget:us
 			.map(|Section| serde_json::json!({"label": SectionLabel(&Section.Text), "bytes": Section.Text.len()}))
 			.collect();
 		crate::Debug::Log::At::Fn::Fn(
-			State.DebugLevel,
+			State.Configuration.DebugLevel,
 			"pre_turn_sections",
 			&[
-				("turn", State.TurnCounter.to_string()),
+				("turn", State.Turn.Counter.to_string()),
 				("budget", Budget.to_string()),
 				("always_survive", Floor.to_string()),
 				("sections", serde_json::to_string(&Secs).unwrap_or_default()),
-				("pending_markers", State.RecentMarkers.len().to_string()),
+				("pending_markers", State.Marker.Recent.len().to_string()),
 				("metrics", crate::Debug::Metrics::Fn::Fn().to_string()),
 				("elapsed_us", Us.to_string()),
 			],

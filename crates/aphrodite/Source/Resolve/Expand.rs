@@ -56,12 +56,12 @@ pub fn Fn(State:&mut AphroditeState, Hash:&str) -> Option<String> {
 		let Us = T0.elapsed().as_micros() as u64;
 		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::Retrieve, Us);
 		crate::Debug::Log::At::Fn::Fn(
-			State.DebugLevel,
+			State.Configuration.DebugLevel,
 			"retrieve",
 			&[
 				("hash", Hash.to_string()),
 				("found", Out.is_some().to_string()),
-				("depth_cap", State.RecursiveDepth.to_string()),
+				("depth_cap", State.Configuration.RecursiveDepth.to_string()),
 				("elapsed_us", Us.to_string()),
 			],
 		);

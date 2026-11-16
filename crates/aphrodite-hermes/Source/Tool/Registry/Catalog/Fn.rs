@@ -16,7 +16,8 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 
 		crate::Session::With::Fn::with_shared(|State| {
 			let Items:Vec<serde_json::Value> = State
-				.RecentMarkers
+				.Marker
+				.Recent
 				.iter()
 				.rev()
 				.map(|Marker| {
@@ -37,7 +38,7 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 				})
 				.collect();
 
-			serde_json::json!({"mode": Mode, "total": Items.len(), "items": Items, "turn": State.TurnCounter})
+			serde_json::json!({"mode": Mode, "total": Items.len(), "items": Items, "turn": State.Turn.Counter})
 		})
 	})
 }

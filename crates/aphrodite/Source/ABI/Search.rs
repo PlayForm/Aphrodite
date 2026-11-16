@@ -28,7 +28,8 @@ pub unsafe extern "C" fn AphroditeSearch(Handle:*const c_char, Query:*const c_ch
 		let Query = Optional(Query)?.to_lowercase();
 
 		let Results:Vec<serde_json::Value> = s
-			.RecentMarkers
+			.Marker
+			.Recent
 			.iter()
 			.filter(|Marker| {
 				Marker.Preview.to_lowercase().contains(&Query) || Marker.CCRType.to_lowercase().contains(&Query)

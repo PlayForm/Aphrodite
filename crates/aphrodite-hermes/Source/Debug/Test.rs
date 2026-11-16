@@ -66,7 +66,7 @@ fn probe_bridge_hands_the_record_to_its_sink() {
 	let mut State = crate::Configuration::Template::Fn::Fn().clone();
 	// A non-zero level wins over the flag file, so this probe reads no
 	// filesystem and depends on no session.
-	State.DebugLevel = 1;
+	State.Configuration.DebugLevel = 1;
 
 	let Captured = std::cell::RefCell::new(Vec::new());
 
@@ -103,7 +103,7 @@ fn probe_bridge_hands_the_record_to_its_sink() {
 #[test]
 fn probe_bridge_stays_silent_at_level_zero() {
 	let mut State = crate::Configuration::Template::Fn::Fn().clone();
-	State.DebugLevel = 0;
+	State.Configuration.DebugLevel = 0;
 
 	let mut Called = false;
 	At::Fn::Fn(&State, "probe-quiet-no-flag-file", "quiet", &[], |_, _, _| Called = true);

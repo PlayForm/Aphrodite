@@ -28,7 +28,8 @@ use crate::{Prefetch::Status::Live::Fn::Fn as LiveFields, State::Struct::Aphrodi
 /// shape, so flipping the flag cannot change which entries appear.
 pub fn Fn(State:&AphroditeState) -> serde_json::Value {
 	let Ready:Vec<serde_json::Value> = State
-		.RecentMarkers
+		.Marker
+		.Recent
 		.iter()
 		.filter_map(|Marker| {
 			let Meta = Marker.meta.as_ref()?;
@@ -41,6 +42,7 @@ pub fn Fn(State:&AphroditeState) -> serde_json::Value {
 			});
 
 			State
+				.Configuration
 				.LiveContainer
 				.then(|| LiveFields(Meta))
 				.into_iter()
@@ -63,6 +65,7 @@ pub fn Fn(State:&AphroditeState) -> serde_json::Value {
 	// The flag is the value the overlay exists as: when it is off there is no
 	// field to set, and the base document stays byte-identical.
 	State
+		.Configuration
 		.LiveContainer
 		.then_some(serde_json::json!(true))
 		.into_iter()

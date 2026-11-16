@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use crate::{
 	Catalog::Size::Fn::Fn as FmtSize,
-	State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState},
+	State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState},
 	StructExtract::Format::Floor::Fn as FloorBoundary,
 };
 
@@ -24,8 +24,8 @@ pub(crate) fn Fn(State:&AphroditeState, Items:&VecDeque<MarkerEntry>) -> String 
 			"Catalog: {} items {} saved {} turns {} files",
 			Items.len(),
 			FmtSize(Items.iter().map(|Marker| Marker.Size).sum()),
-			State.ConvIndex.len(),
-			State.ReferencedFiles.len(),
+			State.Turn.Index.len(),
+			State.File.Recent.len(),
 		),
 		String::new(),
 		"| Hash | Type | Size | Preview |".to_string(),

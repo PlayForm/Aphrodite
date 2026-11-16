@@ -7,8 +7,11 @@
 //! `Window::Const::Minimum` floor keeps a one-off split from being read as a
 //! trend at all.
 
-use super::Trend::{Decide::Fn::Fn as Decide, Enum::Enum as Trend};
-use super::{Struct::Struct, Window::Const::Minimum};
+use super::{
+	Struct::Struct,
+	Trend::{Decide::Fn::Fn as Decide, Enum::Enum as Trend},
+	Window::Const::Minimum,
+};
 
 impl Struct {
 	/// Consequence-driven threshold adaptation (Tier 1, invisible): with at
@@ -16,7 +19,7 @@ impl Struct {
 	/// retrieval ratio (retrieved/produced) over the window. Agents that
 	/// retrieve the segments (> 50%) keep the threshold at the floor (split
 	/// eagerly); agents that ignore them (< 25%) raise it (only split long
-	/// chains), capped by `ChainSplitMaximumSegments`. The threshold is
+	/// chains), capped by `ChainSplit::Maximum`. The threshold is
 	/// internal machinery - never rendered to the LLM.
 	///
 	/// The two early returns of the original are the two `Option` stages below:
@@ -25,27 +28,20 @@ impl Struct {
 	/// "there is nothing to adapt from" - and `then`/`filter` keep the fold from
 	/// running when either condition already failed.
 	pub(super) fn Adapt(&mut self) {
-		let Trend = (self.SplitEvents.len() >= Minimum)
+		let Trend = (self.Ledger.len() >= Minimum)
 			.then(|| {
-				self.SplitEvents.iter().fold((0usize, 0usize), |(Produced, Retrieved), Event| {
+				self.Ledger.iter().fold((0usize, 0usize), |(Produced, Retrieved), Event| {
 					(Produced + Event.Produced, Retrieved + Event.Retrieved)
 				})
 			})
 			.filter(|(Produced, _)| *Produced > 0)
 			.map(|(Produced, Retrieved)| Retrieved as f64 / Produced as f64)
-			.map(|Ratio| {
-				Decide(
-					Ratio,
-					self.ChainSplitMinimumSegments,
-					self.ChainSplitFloor,
-					self.ChainSplitMaximumSegments,
-				)
-			})
+			.map(|Ratio| Decide(Ratio, self.Minimum, self.Floor, self.Maximum))
 			.unwrap_or(Trend::Hold);
 
 		match Trend {
-			Trend::Decrease => self.ChainSplitMinimumSegments -= 1,
-			Trend::Increase => self.ChainSplitMinimumSegments += 1,
+			Trend::Decrease => self.Minimum -= 1,
+			Trend::Increase => self.Minimum += 1,
 			Trend::Hold => (),
 		}
 	}

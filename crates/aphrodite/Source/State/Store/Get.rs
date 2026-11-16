@@ -12,8 +12,8 @@ impl Struct {
 	pub fn Get(&mut self, hash:&str) -> Option<String> {
 		// Promote to most-recent (O(1) `LruCache::get`, no retain scan -
 		// fix 1) without cloning the content.
-		let _ = self.InlineOrder.get(hash);
+		let _ = self.Order.get(hash);
 
-		self.InlineStore.get(hash).cloned()
+		self.Map.get(hash).cloned()
 	}
 }

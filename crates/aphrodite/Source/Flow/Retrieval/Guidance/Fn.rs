@@ -14,7 +14,7 @@ use crate::State::Struct::AphroditeState;
 /// rather than injecting nothing (warn + degrade house style; never panics).
 /// Empty string = no section this turn.
 pub(crate) fn Fn(State:&AphroditeState) -> String {
-	let Text = match State.RetrieveGuidance.as_str() {
+	let Text = match State.Configuration.RetrieveGuidance.as_str() {
 		"minimal" | "" => return String::new(),
 		"verbose" => Verbose,
 		Other => {

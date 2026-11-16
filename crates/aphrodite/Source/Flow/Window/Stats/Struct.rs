@@ -5,7 +5,7 @@
 //! `Distinct` is the only field that depends on hashing, which is
 //! why it is computed from `ErrorSig` rather than from message text.
 
-/// Cheap aggregate over the last `n` turns of `ToolEvents` (P2/T7). Scans
+/// Cheap aggregate over the last `n` turns of `Event::Recent` (P2/T7). Scans
 /// events with `turn > turn_counter - n`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Struct {

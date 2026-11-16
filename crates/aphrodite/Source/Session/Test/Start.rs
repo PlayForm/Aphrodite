@@ -5,8 +5,8 @@ use crate::{Session::Start::Fn::Fn as Start, State::Struct::AphroditeState};
 #[test]
 fn Resets() {
 	let mut s = AphroditeState::default();
-	s.TurnCounter = 42;
-	s.RecordMarker(crate::State::Marker::Struct::Struct {
+	s.Turn.Counter = 42;
+	s.Marker.Record(crate::State::Marker::Entry::Struct::Struct {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -17,8 +17,8 @@ fn Resets() {
 	});
 	let r = Start(&mut s);
 	assert_eq!(r["status"], "ok");
-	assert_eq!(s.TurnCounter, 0);
-	assert_eq!(s.RecentMarkers.len(), 0);
+	assert_eq!(s.Turn.Counter, 0);
+	assert_eq!(s.Marker.Recent.len(), 0);
 }
 
 #[test]
@@ -27,11 +27,11 @@ fn Threshold() {
 	// Simulate a previous session that adapted the threshold upward
 	// (and a non-default configured floor, so the reset is proven to
 	// restore the configured value, not a hardcoded constant).
-	s.ChainSplitFloor = 3;
-	s.ChainSplitMinimumSegments = 9;
+	s.ChainSplit.Floor = 3;
+	s.ChainSplit.Minimum = 9;
 	Start(&mut s);
-	assert_eq!(s.ChainSplitMinimumSegments, s.ChainSplitFloor);
-	assert_eq!(s.ChainSplitMinimumSegments, 3);
+	assert_eq!(s.ChainSplit.Minimum, s.ChainSplit.Floor);
+	assert_eq!(s.ChainSplit.Minimum, 3);
 }
 
 #[test]
@@ -39,15 +39,18 @@ fn Ledger() {
 	// The ledger the threshold adapts FROM is per-conversation too: a carried-over
 	// ledger would immediately move the threshold that was just reset to its floor.
 	let mut s = AphroditeState::default();
-	s.RecordSplit(vec!["a".into(), "b".into()]);
-	assert_eq!(s.SplitEvents.len(), 1);
-	assert_eq!(s.SplitSegmentMap.len(), 2);
+	s.ChainSplit.Record(s.Turn.Counter, vec!["a".into(), "b".into()]);
+	assert_eq!(s.ChainSplit.Ledger.len(), 1);
+	assert_eq!(s.ChainSplit.Segments.len(), 2);
 
 	Start(&mut s);
 
-	assert!(s.SplitEvents.is_empty(), "the consequence ledger is per-session");
-	assert!(s.SplitSegmentMap.is_empty(), "no segment stays attributable across sessions");
-	assert_eq!(s.SplitNextEventID, 0, "event ids restart with the session");
+	assert!(s.ChainSplit.Ledger.is_empty(), "the consequence ledger is per-session");
+	assert!(
+		s.ChainSplit.Segments.is_empty(),
+		"no segment stays attributable across sessions"
+	);
+	assert_eq!(s.ChainSplit.Next, 0, "event ids restart with the session");
 }
 
 #[test]
@@ -60,15 +63,15 @@ fn Background() {
 
 	Start(&mut s);
 
-	assert_eq!(s.BgTasks.len(), 1, "a live background task must survive session start");
+	assert_eq!(s.PollWorker.Tasks.len(), 1, "a live background task must survive session start");
 }
 
 #[test]
 fn Catalog() {
 	let mut s = AphroditeState::default();
-	s.LastEmittedMarkerCount = 10;
-	s.LastEmittedFileCount = 5;
+	s.Marker.Emitted = 10;
+	s.File.Emitted = 5;
 	Start(&mut s);
-	assert_eq!(s.LastEmittedMarkerCount, 0);
-	assert_eq!(s.LastEmittedFileCount, 0);
+	assert_eq!(s.Marker.Emitted, 0);
+	assert_eq!(s.File.Emitted, 0);
 }

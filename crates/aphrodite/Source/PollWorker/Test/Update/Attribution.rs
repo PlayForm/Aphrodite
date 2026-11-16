@@ -36,7 +36,7 @@ fn TwoRunning(State:&mut AphroditeState) {
 #[test]
 fn One() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	TwoRunning(&mut State);
 
 	let Poll = serde_json::json!({
@@ -49,17 +49,21 @@ fn One() {
 	assert!(Update(&mut State, "process", &Poll));
 
 	assert!(
-		matches!(State.BgTasks[0].Status, Status::Done { .. }),
+		matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }),
 		"the polled task completes"
 	);
-	assert_eq!(State.BgTasks[1].Status, Status::Running, "the other task keeps running");
+	assert_eq!(
+		State.PollWorker.Tasks[1].Status,
+		Status::Running,
+		"the other task keeps running"
+	);
 	assert!(
-		Stored(&State.BgTasks[1].Status).is_none(),
+		Stored(&State.PollWorker.Tasks[1].Status).is_none(),
 		"the other task records no stored output"
 	);
-	assert_eq!(State.BgTasks[1].PollCount, 0, "the other task was not polled");
+	assert_eq!(State.PollWorker.Tasks[1].PollCount, 0, "the other task was not polled");
 	assert!(
-		State.BgTasks[1].AccumulatedOutput.AsStr().is_empty(),
+		State.PollWorker.Tasks[1].AccumulatedOutput.AsStr().is_empty(),
 		"the other task accumulated nothing"
 	);
 }
@@ -67,7 +71,7 @@ fn One() {
 #[test]
 fn Untracked() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	TwoRunning(&mut State);
 
 	let Poll = serde_json::json!({
@@ -78,14 +82,14 @@ fn Untracked() {
 	.to_string();
 
 	assert!(!Update(&mut State, "process", &Poll), "an untracked process is not consumed");
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
-	assert_eq!(State.BgTasks[1].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[1].Status, Status::Running);
 }
 
 #[test]
 fn Fallback() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	TwoRunning(&mut State);
 
 	// A bare text poll names no command and no session - the only attribution it
@@ -93,16 +97,16 @@ fn Fallback() {
 	assert!(Update(&mut State, "process", "building...\nexit code: 2\n"));
 
 	assert!(
-		matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2),
+		matches!(State.PollWorker.Tasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2),
 		"the oldest running task takes the failure"
 	);
-	assert_eq!(State.BgTasks[1].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[1].Status, Status::Running);
 }
 
 #[test]
 fn Execution() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	TwoRunning(&mut State);
 
 	// First poll names the process only; it is attributed to the oldest running
@@ -113,7 +117,7 @@ fn Execution() {
 		&serde_json::json!({"session_id": "proc-7", "output": "a", "exit_code": null}).to_string(),
 	);
 	assert_eq!(
-		State.BgTasks[0].Execution.as_ref().map(Execution::as_str),
+		State.PollWorker.Tasks[0].Execution.as_ref().map(Execution::as_str),
 		Some("proc-7"),
 		"the execution identity is recorded on the task it was attributed to"
 	);
@@ -126,6 +130,6 @@ fn Execution() {
 		"process",
 		&serde_json::json!({"session_id": "proc-7", "output": "b", "exit_code": 0}).to_string(),
 	);
-	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
-	assert_eq!(State.BgTasks[1].Status, Status::Running);
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }));
+	assert_eq!(State.PollWorker.Tasks[1].Status, Status::Running);
 }

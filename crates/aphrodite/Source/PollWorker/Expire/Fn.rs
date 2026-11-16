@@ -12,8 +12,8 @@ use crate::{
 
 /// Expire background tasks that the agent has stopped polling.
 pub fn Fn(State:&mut AphroditeState) {
-	let Turn = State.TurnCounter;
-	let mut Tasks = Registry(&mut State.BgTasks);
+	let Turn = State.Turn.Counter;
+	let mut Tasks = Registry(&mut State.PollWorker.Tasks);
 
 	let _Report = Apply(&mut Tasks, Turn);
 }

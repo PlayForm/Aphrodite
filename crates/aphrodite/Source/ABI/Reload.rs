@@ -14,7 +14,7 @@ use crate::ABI::{
 /// miss and changes nothing, and a file that exists but does not parse keeps the
 /// previous value, warns on a real log surface, records the failure on the
 /// session (so `AphroditeStats` self-diagnoses) and echoes it in this
-/// response's `ConfigurationError`. The status stays `"ok"` in every case, because a
+/// response's `Configuration::Error`. The status stays `"ok"` in every case, because a
 /// host must not stop running over a config file it can simply ignore.
 ///
 /// The file is read and parsed BEFORE the session lock is taken (F9): this fn

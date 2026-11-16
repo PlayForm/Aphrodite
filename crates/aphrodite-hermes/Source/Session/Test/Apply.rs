@@ -41,6 +41,7 @@ fn probe_apply_reaches_the_registered_session() {
 	State
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
+		.Configuration
 		.TerminalThreshold = 1024;
 
 	let Configuration = Load("[compression]\nterminal_threshold = 2048\n");
@@ -73,6 +74,7 @@ fn probe_apply_reaches_the_registered_session() {
 	let Applied = State
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
+		.Configuration
 		.TerminalThreshold;
 	assert_eq!(Applied, 2048, "the watcher's apply must reach a registered session");
 }
@@ -87,8 +89,8 @@ fn probe_apply_reports_a_parse_failure_and_keeps_watching() {
 	let State = Get::Fn::Fn(PROBE_SESSION);
 	{
 		let mut Guard = State.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-		Guard.TerminalThreshold = 1024;
-		Guard.ConfigurationError = None;
+		Guard.Configuration.TerminalThreshold = 1024;
+		Guard.Configuration.Error = None;
 	}
 
 	let Broken = Load("[compression\nterminal_threshold = 2048\n");
@@ -105,9 +107,12 @@ fn probe_apply_reports_a_parse_failure_and_keeps_watching() {
 		Watcher::Continue::Fn::Fn(&Pass),
 		"a parse failure must keep watching: the next successful write clears it"
 	);
-	assert_eq!(Guard.TerminalThreshold, 1024, "a broken file must keep the previous values");
+	assert_eq!(
+		Guard.Configuration.TerminalThreshold, 1024,
+		"a broken file must keep the previous values"
+	);
 	assert!(
-		Guard.ConfigurationError.is_some(),
+		Guard.Configuration.Error.is_some(),
 		"a broken file must be reported on the session, not silently dropped"
 	);
 }

@@ -21,22 +21,22 @@ use std::collections::HashMap;
 pub struct Struct {
 	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
 	/// get/put/contains (was an O(n) `VecDeque` linear scan per op - bug
-	/// 18-P14); `InlineOrder` preserves LRU recency so eviction can drop
+	/// 18-P14); `Store::Order` preserves LRU recency so eviction can drop
 	/// the least-recently-used entry in O(1).
-	pub InlineStore:HashMap<String, String>,
-	/// LRU recency order of `InlineStore` keys (unit values). Capacity is
+	pub Map:HashMap<String, String>,
+	/// LRU recency order of `Store::Map` keys (unit values). Capacity is
 	/// `Store::Entry::Const::Cap + 1` so the cache never self-evicts before
 	/// the explicit `Evict` pass in `Put` (fix 1: previously a
 	/// `VecDeque` whose promotion/upsert needed an O(n) `retain` scan).
-	pub InlineOrder:lru::LruCache<String, ()>,
-	/// Running total of `content.len()` across every entry in `InlineStore`,
+	pub Order:lru::LruCache<String, ()>,
+	/// Running total of `content.len()` across every entry in `Store::Map`,
 	/// maintained incrementally by `Put` so eviction doesn't
 	/// need an O(n) rescan on every insert (report 05 F11).
-	pub InlineStoreBytes:usize,
-	/// Byte budget for `InlineStore`; entries are evicted from the back
+	pub Bytes:usize,
+	/// Byte budget for `Store::Map`; entries are evicted from the back
 	/// (oldest/least-recently-used) until the running total is at or under
 	/// this, in addition to the existing entry-count cap
 	/// (`Store::Entry::Const::Cap`). Defaults to `Store::Const::Budget`; see
 	/// `Set`.
-	pub InlineStoreByteBudget:usize,
+	pub Budget:usize,
 }

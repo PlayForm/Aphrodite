@@ -17,7 +17,8 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 			// from each one's stored content: a row appended during the pass
 			// cannot be half-reclassified.
 			let Targets:Vec<String> = State
-				.RecentMarkers
+				.Marker
+				.Recent
 				.iter()
 				.filter(|Marker| Only.is_none_or(|Hash| Marker.hash == Hash))
 				.map(|Marker| Marker.hash.clone())
@@ -35,10 +36,10 @@ pub(crate) fn Fn() -> (&'static str, Handler) {
 /// `None` means nothing was updated: the content is gone from the inline store, or
 /// the row was removed while the pass ran.
 fn Reclassify(State:&mut aphrodite::State::Struct::AphroditeState, Hash:&str) -> Option<()> {
-	let Content = State.Get(Hash)?;
+	let Content = State.Store.Get(Hash)?;
 	let Detected = aphrodite::Preview::Detect::Type::Fn(&Content);
 	let Preview = aphrodite::Preview::Builder::Entry::Fn(&Detected, &Content);
-	let Marker = State.RecentMarkers.iter_mut().find(|Marker| Marker.hash == Hash)?;
+	let Marker = State.Marker.Recent.iter_mut().find(|Marker| Marker.hash == Hash)?;
 
 	Marker.CCRType = Detected;
 	Marker.Preview = Preview;

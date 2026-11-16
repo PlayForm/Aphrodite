@@ -9,7 +9,7 @@ use serde_json::Value;
 /// The tool and the flag are tested before the args are parsed, so the JSON walk
 /// only happens for the one tool that can ever be chained.
 pub(crate) fn Fn(State:&AphroditeState, Tool:&str, Parsed:&serde_json::Value) -> bool {
-	(Tool == "terminal" && State.ChainSplitEnabled)
+	(Tool == "terminal" && State.ChainSplit.Enable)
 		&& Parsed
 			.get("args")
 			.and_then(|Args| Args.get("command"))

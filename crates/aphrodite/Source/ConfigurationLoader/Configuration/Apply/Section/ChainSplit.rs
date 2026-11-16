@@ -15,13 +15,13 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// pollute captured stdout when commands are redirected to files, and
 	// every split also adds marker lines to live tool output. Opt in per
 	// session with APHRODITE_CHAIN_SPLIT=1 (or TOML chain_split = true).
-	State.ChainSplitEnabled = Configuration.Bool("APHRODITE_CHAIN_SPLIT", "compression", "chain_split", false);
+	State.ChainSplit.Enable = Configuration.Bool("APHRODITE_CHAIN_SPLIT", "compression", "chain_split", false);
 
 	// ── Tier 1 teaching loop: adaptive split threshold ──
-	// `ChainSplitMinimumSegments` is the initial threshold (floor). The
+	// `ChainSplit::Minimum` is the initial threshold (floor). The
 	// threshold adapts within [floor, max] from the retrieval ratio of
 	// split segments; see `AdaptChainSplitThreshold`.
-	State.ChainSplitMinimumSegments = Configuration
+	State.ChainSplit.Minimum = Configuration
 		.Size(
 			"APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS",
 			"compression",
@@ -29,13 +29,13 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 			2,
 		)
 		.max(2);
-	State.ChainSplitFloor = State.ChainSplitMinimumSegments;
-	State.ChainSplitMaximumSegments = Configuration
+	State.ChainSplit.Floor = State.ChainSplit.Minimum;
+	State.ChainSplit.Maximum = Configuration
 		.Size(
 			"APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS",
 			"compression",
 			"chain_split_max_segments",
 			6,
 		)
-		.max(State.ChainSplitMinimumSegments);
+		.max(State.ChainSplit.Minimum);
 }

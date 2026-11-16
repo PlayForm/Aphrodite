@@ -13,7 +13,7 @@ use crate::{
 #[test]
 fn Success() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
@@ -30,9 +30,9 @@ fn Success() {
 
 	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed, "poll result should be consumed");
-	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }));
 	assert!(
-		Stored(&State.BgTasks[0].Status).is_some(),
+		Stored(&State.PollWorker.Tasks[0].Status).is_some(),
 		"the completion records its stored output"
 	);
 }
@@ -40,7 +40,7 @@ fn Success() {
 #[test]
 fn Failure() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
@@ -57,13 +57,13 @@ fn Failure() {
 
 	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed);
-	assert!(matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 1));
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 1));
 }
 
 #[test]
 fn Running() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(
 		&mut State,
 		headroom_core::ccr::compute_key(b"cargo build").into(),
@@ -80,9 +80,9 @@ fn Running() {
 
 	let Consumed = Update(&mut State, "process", &PollJSON);
 	assert!(Consumed);
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
-	assert_eq!(State.BgTasks[0].PollCount, 1);
-	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("still compiling"));
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].PollCount, 1);
+	assert!(State.PollWorker.Tasks[0].AccumulatedOutput.AsStr().contains("still compiling"));
 }
 
 // ── Repetition & edge-case tests ──────────────────────────
@@ -90,7 +90,7 @@ fn Running() {
 #[test]
 fn Multiple() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(&mut State, "t1".into(), "terminal".into(), "long-running".into(), 1);
 
 	// Rapid successive polls - each should accumulate.
@@ -104,16 +104,16 @@ fn Multiple() {
 		assert!(Consumed, "poll {} should be consumed", i);
 	});
 
-	assert_eq!(State.BgTasks[0].PollCount, 5);
-	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 0"));
-	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 4"));
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].PollCount, 5);
+	assert!(State.PollWorker.Tasks[0].AccumulatedOutput.AsStr().contains("line 0"));
+	assert!(State.PollWorker.Tasks[0].AccumulatedOutput.AsStr().contains("line 4"));
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
 }
 
 #[test]
 fn Exit() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 10;
+	State.Turn.Counter = 10;
 	Insert(&mut State, "t1".into(), "terminal".into(), "npm install".into(), 1);
 
 	// First: running poll
@@ -123,7 +123,7 @@ fn Exit() {
 	})
 	.to_string();
 	Update(&mut State, "process", &PollRunning);
-	assert_eq!(State.BgTasks[0].Status, Status::Running);
+	assert_eq!(State.PollWorker.Tasks[0].Status, Status::Running);
 
 	// Second: completion poll
 	let PollDone = serde_json::json!({
@@ -132,26 +132,26 @@ fn Exit() {
 	})
 	.to_string();
 	Update(&mut State, "process", &PollDone);
-	assert!(matches!(State.BgTasks[0].Status, Status::Done { .. }));
-	assert!(Stored(&State.BgTasks[0].Status).is_some());
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Done { .. }));
+	assert!(Stored(&State.PollWorker.Tasks[0].Status).is_some());
 }
 
 #[test]
 fn Text() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(&mut State, "t1".into(), "terminal".into(), "make build".into(), 1);
 
 	// No JSON wrapper - just raw output with "exit code: 2" in text.
 	let Consumed = Update(&mut State, "process", "building...\nfailed!\nexit code: 2\n");
 	assert!(Consumed);
-	assert!(matches!(State.BgTasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2));
+	assert!(matches!(State.PollWorker.Tasks[0].Status, Status::Failed { ExitCode, .. } if ExitCode.get() == 2));
 }
 
 #[test]
 fn Cap() {
 	let mut State = AphroditeState::default();
-	State.TurnCounter = 5;
+	State.Turn.Counter = 5;
 	Insert(&mut State, "t1".into(), "terminal".into(), "very-verbose".into(), 1);
 
 	// Push 300KB of output across multiple polls.
@@ -167,8 +167,8 @@ fn Cap() {
 
 	// Should be capped at ~256KB (256 * 1024).
 	assert!(
-		State.BgTasks[0].AccumulatedOutput.Len() <= 256 * 1024 + 100,
+		State.PollWorker.Tasks[0].AccumulatedOutput.Len() <= 256 * 1024 + 100,
 		"accumulated output must be capped near 256KB, got {}",
-		State.BgTasks[0].AccumulatedOutput.Len()
+		State.PollWorker.Tasks[0].AccumulatedOutput.Len()
 	);
 }

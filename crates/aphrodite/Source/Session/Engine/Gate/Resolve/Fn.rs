@@ -14,9 +14,11 @@ use crate::{Session::Engine::Gate::Enum::Enum as Gate, State::Struct::AphroditeS
 /// reason is fieldless, so evaluating the whole table costs nothing and cannot
 /// skip work a later row needed.
 pub(crate) fn Fn(State:&AphroditeState, Total:usize, FillPct:u64, MiddleN:usize) -> Option<Gate> {
-	let Disabled = !State.ContextEngineEnabled || State.EngineThresholdPct == 0 || State.EngineThresholdPct >= 100;
-	let BelowMinimum = Total < State.EngineMinimumMsgs;
-	let BelowThreshold = FillPct < State.EngineThresholdPct;
+	let Disabled = !State.Configuration.ContextEngineEnabled
+		|| State.Configuration.EngineThresholdPct == 0
+		|| State.Configuration.EngineThresholdPct >= 100;
+	let BelowMinimum = Total < State.Configuration.EngineMinimumMsgs;
+	let BelowThreshold = FillPct < State.Configuration.EngineThresholdPct;
 	let Small = MiddleN < 3;
 
 	[

@@ -19,7 +19,7 @@ use crate::{
 pub(crate) fn Fn(Configuration:&aphrodite::ConfigurationLoader::Configuration::Struct::Struct) -> Outcome::Enum::Enum {
 	match Configuration.ParseFailure.clone() {
 		Some(Failure) => {
-			Outcome::Enum::Enum::Failed(Broadcast::Fn::Fn(|State| State.ConfigurationError = Some(Failure.clone())))
+			Outcome::Enum::Enum::Failed(Broadcast::Fn::Fn(|State| State.Configuration.Error = Some(Failure.clone())))
 		},
 		None => {
 			// The process-global rendering settings are published ONCE per reload,

@@ -1,7 +1,7 @@
 //! Store content as a live container and emit the instant marker.
 
 use super::super::{Marker, Object::Install::Fn::Fn as InstallObject};
-use crate::State::{Marker::Struct::Struct as MarkerEntry, Struct::AphroditeState};
+use crate::State::{Marker::Entry::Struct::Struct as MarkerEntry, Struct::AphroditeState};
 
 /// Live-container transform (pre-Rust port of `_wrap_as_live_container`):
 /// store the content as one container object, record a `Live` marker entry, and
@@ -27,12 +27,12 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde
 	let Preview = crate::Preview::Builder::Entry::Fn(TypeStr, Content);
 	let Marker = Marker::Fn::Fn(&Object.Hash, Object.Total, Object.Chunks, &Preview);
 
-	State.RecordMarker(MarkerEntry {
+	State.Marker.Record(MarkerEntry {
 		hash:Object.Hash.clone(),
 		CCRType:"live".to_string(),
 		Size:Object.Total,
 		Preview:Preview.clone(),
-		Turn:State.TurnCounter,
+		Turn:State.Turn.Counter,
 		Center:None,
 		meta:None,
 	});

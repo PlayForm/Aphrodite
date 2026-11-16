@@ -7,9 +7,9 @@ use crate::{Flow::TurnContext::Fn::Fn as Assemble, State::Struct::AphroditeState
 #[test]
 fn Injected() {
 	let mut s = AphroditeState::default();
-	s.AutoExpand = true;
-	s.TurnCounter = 5;
-	s.FlowBudgetChars = 4000;
+	s.Configuration.AutoExpand = true;
+	s.Turn.Counter = 5;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[auto-expand:") && Context.contains("Tool outputs are auto-expanded"),
@@ -20,8 +20,8 @@ fn Injected() {
 #[test]
 fn Absent() {
 	let mut s = AphroditeState::default(); // auto_expand = false
-	s.TurnCounter = 5;
-	s.FlowBudgetChars = 4000;
+	s.Turn.Counter = 5;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		!Context.contains("[auto-expand:") && !Context.contains("auto-expanded"),
@@ -32,9 +32,9 @@ fn Absent() {
 #[test]
 fn Template() {
 	let mut s = WithPrompt("auto_expand_guidance", "inline {limit} limit");
-	s.AutoExpand = true;
-	s.TurnCounter = 5;
-	s.FlowBudgetChars = 4000;
+	s.Configuration.AutoExpand = true;
+	s.Turn.Counter = 5;
+	s.Configuration.FlowBudgetChars = 4000;
 	let Context = Assemble(&mut s, None);
 	assert!(
 		Context.contains("[auto-expand: inline {limit} limit]"),
