@@ -1,8 +1,8 @@
 //! Reading from the inline store.
 
-use crate::State::Struct::AphroditeState;
+use super::Struct::Struct;
 
-impl AphroditeState {
+impl Struct {
 	/// Retrieve from inline store with LRU promotion (O(1) hash lookup).
 	///
 	/// One map lookup answers the question; the promotion is a second,

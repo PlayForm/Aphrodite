@@ -1,75 +1,36 @@
 //! The seed state every session starts from.
 //!
 //! The hermes bridge clones a config-seeded `AphroditeState` per session, so
-//! these values are the defaults a session has before `Apply::Startup::Fn` runs
-//! over it. Two of them are deliberately NOT the shipped configuration:
-//! `ChainSplitEnabled` and `AutoExpand` start false here so the shipped
-//! default is reachable through the config layer alone, and a missing config
-//! can never turn either feature on.
-
-use std::collections::{HashMap, VecDeque};
+//! this is the state a session has before `Apply::Startup::Fn` runs over it.
+//! Each domain seeds itself (`Store::Default`, `Marker::Default`, ...) so a
+//! domain's defaults live with the domain that owns them and this file stays a
+//! composition, not a second copy of the field list.
+//!
+//! Two values are deliberately NOT the shipped configuration:
+//! `ChainSplit::Enable` and `Configuration::AutoExpand` start false in their own
+//! `Default.rs` so the shipped default is reachable through the config layer
+//! alone, and a missing config can never turn either feature on.
 
 use super::{
-	Const::{DefaultInlineByteBudget, InlineMaximum},
-	Struct::AphroditeState,
+	ChainSplit::Struct::Struct as ChainSplit, Configuration::Struct::Struct as Configuration,
+	Directive::Struct::Struct as Directive, Event::Struct::Struct as Event,
+	File::Struct::Struct as File, Marker::Struct::Struct as Marker,
+	PollWorker::Struct::Struct as PollWorker, Store::Struct::Struct as Store,
+	Struct::AphroditeState, Turn::Struct::Struct as Turn,
 };
 
 impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
-			InlineStore:HashMap::with_capacity(InlineMaximum),
-			// +1 headroom: the LruCache must never self-evict before the
-			// explicit evict loop enforces INLINE_MAX and the byte budget.
-			InlineOrder:lru::LruCache::new(std::num::NonZeroUsize::new(InlineMaximum + 1).unwrap()),
-			InlineStoreBytes:0,
-			InlineStoreByteBudget:DefaultInlineByteBudget,
-			RecentMarkers:VecDeque::new(),
-			ConvIndex:HashMap::new(),
-			ReferencedFiles:VecDeque::new(),
-			TurnCounter:0,
-			ScannedMessageIndex:0,
-			FileTools:vec!["read_file".into(), "write_file".into(), "patch".into(), "search_files".into()],
-			APIURL:String::new(),
-			Model:"gpt-4o".into(),
-			EngineThresholdPct:45,
-			EngineMinimumMsgs:8,
-			EngineProtectFirst:2,
-			EngineProtectLast:5,
-			ContextEngineEnabled:true,
-			ToolThreshold:512,
-			TerminalThreshold:256,
-			ConfigurationError:None,
-			AutoReload:false,
-			DebugLevel:0,
-			CatalogMode:"tool".into(),
-			ExpandGuidance:false,
-			DevMode:false,
-			Directives:std::collections::HashMap::new(),
-			ActiveDirectives:Vec::new(),
-			EphemeralDirectives:Vec::new(),
-			FlowBudgetChars:4000,
-			SessionInject:String::new(),
-			Templates:None,
-			AutoExpand:false,
-			AutoExpandLimit:102400,
-			LiveContainer:false,
-			RecursiveDepth:5,
-			MaximumRequestBodySize:None,
-			RetrieveGuidance:"minimal".into(),
-			CatalogIntentHints:false,
-			ManualDirectiveTurn:None,
-			ToolEvents:VecDeque::new(),
-			BgTasks:VecDeque::new(),
-			PollWorkerEnabled:true,
-			ChainSplitEnabled:false,
-			ChainSplitMinimumSegments:2,
-			ChainSplitFloor:2,
-			ChainSplitMaximumSegments:6,
-			SplitEvents:VecDeque::new(),
-			SplitSegmentMap:HashMap::new(),
-			SplitNextEventID:0,
-			LastEmittedMarkerCount:0,
-			LastEmittedFileCount:0,
+			Store:Store::default(),
+			Marker:Marker::default(),
+			Event:Event::default(),
+			File:File::default(),
+			Turn:Turn::default(),
+			ChainSplit:ChainSplit::default(),
+			Directive:Directive::default(),
+			PollWorker:PollWorker::default(),
+			Configuration:Configuration::default(),
 		}
 	}
 }

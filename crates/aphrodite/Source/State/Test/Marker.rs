@@ -1,6 +1,9 @@
 //! The recent-marker catalog cap and its front-eviction arithmetic.
 
-use crate::State::{Const::RecentMarkersCap, Marker::Struct::Struct as Entry, Struct::AphroditeState};
+use crate::State::{
+	Marker::{Const::Cap, Struct::Struct as Entry},
+	Struct::AphroditeState,
+};
 
 #[test]
 fn Eviction() {
@@ -17,9 +20,9 @@ fn Eviction() {
 			meta:None,
 		});
 	});
-	assert!(s.RecentMarkers.len() <= RecentMarkersCap);
+	assert!(s.RecentMarkers.len() <= Cap);
 	// Eviction arithmetic: RECORDED - cap = 250 - 200 = 50 dropped from the
 	// front; front eviction keeps index zero as the oldest survivor (h50).
-	const Evicted:usize = Recorded - RecentMarkersCap;
+	const Evicted:usize = Recorded - Cap;
 	assert_eq!(s.RecentMarkers[0].hash, format!("h{Evicted}"));
 }

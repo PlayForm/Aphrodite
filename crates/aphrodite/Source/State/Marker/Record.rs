@@ -1,8 +1,8 @@
 //! Recording a marker into the catalog.
 
-use crate::State::{Const::RecentMarkersCap, Marker::Struct::Struct as Entry, Struct::AphroditeState};
+use super::{Const::Cap, Entry::Struct::Struct as Entry, Struct::Struct};
 
-impl AphroditeState {
+impl Struct {
 	/// Record a compression marker.
 	///
 	/// The cap is arithmetic on the length the ring already knows (`len - cap`),
@@ -10,15 +10,15 @@ impl AphroditeState {
 	/// tool-event ring uses the same expression, which is what lets a reader
 	/// assume "oldest at index 0" for both without checking which convention a
 	/// ring picked.
-	pub fn RecordMarker(&mut self, Entry:Entry) {
+	pub fn Record(&mut self, Entry:Entry) {
 		// DEV-ONLY debug metrics (crate::Debug): one atomic add when the
 		// logger is on; a no-op single load when off.
 		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::MarkersCreated);
 		self.RecentMarkers.push_back(Entry);
 
-		// Keep the last RECENT_MARKERS_CAP markers; front eviction (fix 6)
+		// Keep the last `Marker::Const::Cap` markers; front eviction (fix 6)
 		// keeps index 0 as the oldest survivor.
-		let Excess = self.RecentMarkers.len().saturating_sub(RecentMarkersCap);
+		let Excess = self.RecentMarkers.len().saturating_sub(Cap);
 
 		let _ = self.RecentMarkers.drain(..Excess);
 	}

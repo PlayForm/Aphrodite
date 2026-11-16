@@ -2,7 +2,7 @@
 //! every adaptation branch (raise, hold, clamp at both ends, minimum events).
 
 use crate::State::{
-	Const::{SplitAdaptMinimumEvents, SplitEventCap},
+	ChainSplit::{Const::Cap, Window},
 	Struct::AphroditeState,
 };
 
@@ -31,8 +31,8 @@ fn Ring() {
 	(0..40).for_each(|i| {
 		s.RecordSplit(vec![format!("h{i}")]);
 	});
-	assert!(s.SplitEvents.len() <= SplitEventCap);
-	assert_eq!(s.SplitEvents.len(), SplitEventCap);
+	assert!(s.SplitEvents.len() <= Cap);
+	assert_eq!(s.SplitEvents.len(), Cap);
 }
 
 #[test]
@@ -42,16 +42,16 @@ fn Evicted() {
 	// hashes of the events it drops - no more (a live event must stay attributable)
 	// and no fewer (the map would grow again).
 	let mut s = AphroditeState::default();
-	let Recorded:usize = SplitEventCap * 2;
+	let Recorded:usize = Cap * 2;
 
 	(0..Recorded).for_each(|i| {
 		s.RecordSplit(vec![format!("segment-{i}")]);
 	});
 
-	assert_eq!(s.SplitEvents.len(), SplitEventCap);
+	assert_eq!(s.SplitEvents.len(), Cap);
 	assert_eq!(
 		s.SplitSegmentMap.len(),
-		SplitEventCap,
+		Cap,
 		"the map holds one hash per live event, not one per split ever recorded"
 	);
 
@@ -128,8 +128,8 @@ fn Bounds() {
 #[test]
 fn Minimum() {
 	let mut s = AphroditeState::default();
-	// Fewer than SPLIT_ADAPT_MIN_EVENTS: no adaptation.
-	(0..(SplitAdaptMinimumEvents - 1)).for_each(|i| {
+	// Fewer than `Window::Const::Minimum`: no adaptation.
+	(0..(Window::Const::Minimum - 1)).for_each(|i| {
 		s.RecordSplit(vec![format!("a{i}"), format!("b{i}")]);
 	});
 	assert_eq!(s.ChainSplitMinimumSegments, 2);

@@ -1,8 +1,8 @@
 //! Inserting into the inline store.
 
-use crate::State::Struct::AphroditeState;
+use super::Struct::Struct;
 
-impl AphroditeState {
+impl Struct {
 	/// Insert into inline store with LRU + byte-budget eviction (report 05
 	/// F11: previously bounded by entry count only - `aphrodite_prefetch`
 	/// admits files up to 10MB each and the ABI admits blobs up to 16MB, so
@@ -19,8 +19,8 @@ impl AphroditeState {
 		self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(Previous);
 		self.InlineStoreBytes += Content.len();
 		self.InlineStore.insert(hash.clone(), Content);
-		// Capacity INLINE_MAX + 1 guarantees this never self-evicts before
-		// the explicit evict loop below.
+		// Capacity `Entry::Const::Cap + 1` guarantees this never self-evicts
+		// before the explicit evict loop below.
 		self.InlineOrder.put(hash, ());
 		self.Evict();
 	}

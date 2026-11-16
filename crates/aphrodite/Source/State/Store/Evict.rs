@@ -2,11 +2,11 @@
 
 use std::ops::ControlFlow;
 
-use crate::State::{Const::InlineMaximum, Struct::AphroditeState};
+use super::{Entry::Const::Cap, Struct::Struct};
 
 /// Whether either bound is exceeded with something left to evict.
-fn OverBudget(State:&AphroditeState) -> bool {
-	State.InlineStore.len() > InlineMaximum
+fn OverBudget(State:&Struct) -> bool {
+	State.InlineStore.len() > Cap
 		|| (State.InlineStoreBytes > State.InlineStoreByteBudget && !State.InlineStore.is_empty())
 }
 
@@ -15,7 +15,7 @@ fn OverBudget(State:&AphroditeState) -> bool {
 /// The popped entry is the value: `Some` means a bound was exceeded and the LRU
 /// left the order, `None` means the pass is finished - both bounds satisfied, or
 /// the order ran dry. `Break` carries the finish because it is not a failure.
-fn Step(State:&mut AphroditeState) -> ControlFlow<()> {
+fn Step(State:&mut Struct) -> ControlFlow<()> {
 	let Over = OverBudget(State);
 
 	match Over.then(|| State.InlineOrder.pop_lru()).flatten() {
@@ -30,9 +30,9 @@ fn Step(State:&mut AphroditeState) -> ControlFlow<()> {
 	}
 }
 
-impl AphroditeState {
+impl Struct {
 	/// Evict the least-recently-used entry until both the entry-count cap
-	/// (`InlineMaximum`) and the byte budget (`InlineStoreByteBudget`) are
+	/// (`Entry::Const::Cap`) and the byte budget (`InlineStoreByteBudget`) are
 	/// satisfied. `inline_order.pop_lru` removes the LRU in O(1); the pass ends
 	/// when the order is empty (map and order are kept in sync, so this guards
 	/// against divergence rather than a reachable state).

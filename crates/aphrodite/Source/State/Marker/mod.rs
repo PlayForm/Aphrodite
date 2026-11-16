@@ -8,6 +8,14 @@
 //! `Entry` is `serde::Serialize` because `AphroditeCatalog` hands it
 //! straight to the model as JSON; its field names are therefore part of a wire
 //! shape and stay `snake_case`.
+//!
+//! - `Struct.rs` - the catalog's fields: the ring and the delta counter.
+//! - `Default.rs` - the seed: an empty ring, a zero counter.
+//! - `Entry/` - one catalog entry (the item).
+//! - `Const.rs` - the ring's cap.
 
+pub mod Const;
+pub mod Default;
+pub mod Entry;
 pub mod Record;
 pub mod Struct;

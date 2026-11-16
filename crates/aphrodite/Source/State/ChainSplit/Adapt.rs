@@ -4,15 +4,15 @@
 //! using the segments, so split more eagerly; below 25% it is ignoring them, so
 //! only split long chains. The dead band between the two is deliberate - a
 //! single noisy window must not oscillate the threshold every turn, and the
-//! `SplitAdaptMinimumEvents` floor keeps a one-off split from being read as a
+//! `Window::Const::Minimum` floor keeps a one-off split from being read as a
 //! trend at all.
 
 use super::Trend::{Decide::Fn::Fn as Decide, Enum::Enum as Trend};
-use crate::State::{Const::SplitAdaptMinimumEvents, Struct::AphroditeState};
+use super::{Struct::Struct, Window::Const::Minimum};
 
-impl AphroditeState {
+impl Struct {
 	/// Consequence-driven threshold adaptation (Tier 1, invisible): with at
-	/// least `SplitAdaptMinimumEvents` split events recorded, compute the
+	/// least `Window::Const::Minimum` split events recorded, compute the
 	/// retrieval ratio (retrieved/produced) over the window. Agents that
 	/// retrieve the segments (> 50%) keep the threshold at the floor (split
 	/// eagerly); agents that ignore them (< 25%) raise it (only split long
@@ -25,7 +25,7 @@ impl AphroditeState {
 	/// "there is nothing to adapt from" - and `then`/`filter` keep the fold from
 	/// running when either condition already failed.
 	pub(super) fn Adapt(&mut self) {
-		let Trend = (self.SplitEvents.len() >= SplitAdaptMinimumEvents)
+		let Trend = (self.SplitEvents.len() >= Minimum)
 			.then(|| {
 				self.SplitEvents.iter().fold((0usize, 0usize), |(Produced, Retrieved), Event| {
 					(Produced + Event.Produced, Retrieved + Event.Retrieved)

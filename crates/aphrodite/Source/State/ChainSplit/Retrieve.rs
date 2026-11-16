@@ -5,14 +5,14 @@
 //! counts once. A `get`-then-increment would let a single popular marker
 //! dominate the ratio and pin the threshold at its floor.
 
-use crate::State::Struct::AphroditeState;
+use super::Struct::Struct;
 
-impl AphroditeState {
+impl Struct {
 	/// Attribute a successful resolve to a split event (consequence signal).
 	/// A hash counts at most once - removed from `SplitSegmentMap` after
 	/// attribution, so re-retrieving the same marker never double-counts.
 	/// Returns the event id when the hash belonged to a chain split.
-	pub fn NoteRetrieval(&mut self, hash:&str) -> Option<usize> {
+	pub fn Retrieve(&mut self, hash:&str) -> Option<usize> {
 		let Eid = self.SplitSegmentMap.remove(hash)?;
 		// The linear scan below is bounded by SPLIT_EVENT_CAP (16) events -
 		// deliberately not restructured (fix 7): an id→event map would need

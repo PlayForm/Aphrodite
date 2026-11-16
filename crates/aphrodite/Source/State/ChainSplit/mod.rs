@@ -11,13 +11,21 @@
 //! learns from the consequence (a marker it did or did not need), never from
 //! an instruction.
 //!
-//! - `Struct.rs` - one event's consequence record.
+//! - `Struct.rs` - the switch, the three bounds, the ledger and the map.
+//! - `Default.rs` - the seed: off, floor 2, ceiling 6, empty ledger.
+//! - `Entry/` - one event's consequence record (the item).
 //! - `Record.rs` - record a split and register its segment hashes.
 //! - `Retrieve.rs` - attribute a resolve to its event, once.
 //! - `Adapt.rs` - the ratio rule and its bounds.
+//! - `Const.rs` - the ledger's ring cap.
+//! - `Window/` - how much evidence the adaptation requires.
 
 pub mod Adapt;
+pub mod Const;
+pub mod Default;
+pub mod Entry;
 pub mod Record;
 pub mod Retrieve;
 pub mod Struct;
 pub mod Trend;
+pub mod Window;

@@ -1,21 +1,20 @@
-//! One recorded tool/terminal call.
+//! The per-tool-call telemetry ring's own field.
+//!
+//! Split out of `AphroditeState` so the ring's readers and writers can take
+//! `&mut Event::Struct` or `&Event::Struct`: phase detection, error-loop
+//! breaking and the window statistics all scan the ring, and none of them needs
+//! the marker catalog, the store or the configuration the session also carries.
+//!
+//! `Entry` is the item; this struct is the bounded collection.
 
-/// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
-/// stored, never raw args, so no PII lands in state.
-#[derive(Debug, Clone)]
+use std::collections::VecDeque;
+
+use super::Entry::Struct::Struct as Entry;
+
+/// The bounded ring of per-call events (cap `Event::Const::Cap`, evict front).
+#[derive(Clone)]
 pub struct Struct {
-	/// Turn on which the call happened.
-	pub Turn:usize,
-	/// Tool name (or `"terminal"` for terminal output).
-	pub Tool:String,
-	/// FNV-1a of tool + normalized args (P8 similarity key).
-	pub Sig:u64,
-	/// `status != "error" && returncode == 0` (fail-open: missing → true).
-	pub Okay:bool,
-	/// FNV-1a of `ErrorType` + first line of `ErrorMessage`, when failing.
-	pub ErrorSig:Option<u64>,
-	/// Byte length of the call's result content.
-	pub bytes:usize,
-	/// `write_file`/`patch` target path, when this call wrote a file (P11).
-	pub WrotePath:Option<String>,
+	/// Bounded ring of per-tool-call events (cap 200, evict front). Feeds phase
+	/// detection, error-loop breaking, delta previews, checkpoints (P6-P11).
+	pub ToolEvents:VecDeque<Entry>,
 }

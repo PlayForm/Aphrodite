@@ -1,8 +1,8 @@
 //! Non-promoting membership test for the inline store.
 
-use crate::State::Struct::AphroditeState;
+use super::Struct::Struct;
 
-impl AphroditeState {
+impl Struct {
 	/// Non-promoting membership test for the inline store (P4/T12): unlike
 	/// `Get`, this does NOT move the entry to the front, so the
 	/// recall renderer can check resolvability without perturbing LRU order.

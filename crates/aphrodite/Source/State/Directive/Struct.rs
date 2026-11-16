@@ -1,16 +1,29 @@
-//! An ephemeral directive activation entry.
+//! The conversational-directive domain's own fields.
+//!
+//! Split out of `AphroditeState` so the directive verbs and the turn-context
+//! assembler take `&mut Directive::Struct`: loading, activating, swapping and
+//! resetting directives needs the loaded set, the active names, the ephemeral
+//! nudges and the manual-mutation latch - not the store, the markers or the
+//! configuration.
 
-/// An ephemeral directive activation entry (P3/T9). Named entries key into
-/// `state.directives`; inline entries carry literal nudge text synthesized by a
-/// feature (error-loop breaker, redundant-read deflector, auto-swap announce).
-/// `expires_after_turn = None` is permanent; `Some(n)` renders while
-/// `turn_counter <= n` and is purged in `PostLLMCall` once past.
-#[derive(Debug, Clone)]
+use std::collections::HashMap;
+
+use super::Entry::Struct::Struct as Entry;
+
+/// The directive set: everything loaded, the subset active, the ephemeral
+/// nudges, and the turn a manual mutation last happened on.
+#[derive(Clone)]
 pub struct Struct {
-	/// Key into `state.directives`, or empty for an inline entry.
-	pub name:String,
-	/// Literal nudge text for synthesized entries (rendered as `[nudge: ...]`).
-	pub inline:Option<String>,
-	/// Last turn on which this entry renders; `None` = permanent.
-	pub ExpiresAfterTurn:Option<usize>,
+	/// All loaded directives (name → content).
+	pub Directives:HashMap<String, crate::Directive::Model::Struct>,
+	/// Currently active directive names (the ones injected into context).
+	pub ActiveDirectives:Vec<String>,
+	/// Ephemeral (one-shot / TTL) directives - inline nudges that render once
+	/// (or for a bounded number of turns) then self-purge (P3/T9). Distinct
+	/// from `ActiveDirectives` (permanent-until-removed named entries).
+	pub EphemeralDirectives:Vec<Entry>,
+	/// Turn number of the most recent MANUAL `AphroditeDirective` mutation
+	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
+	/// `Directive::Action::Fn` on any successful mutation.
+	pub ManualDirectiveTurn:Option<usize>,
 }
