@@ -53,13 +53,13 @@ pub fn Fn(Directory:&PathBuf) -> HashMap<String, Struct> {
 	// The directory exists but yields no readable `.md` files - an intentionally empty
 	// set, NOT a builtin-fallback trigger. Logged so the distinction is observable rather
 	// than inferred from an empty map.
-	let _ = Directives.is_empty().then(|| {
-		tracing::info!(
-			DirectiveSource = "disk",
-			path = %Directory.display(),
-			"directives directory exists but contains no readable .md files - treating as intentionally empty"
-		);
-	});
+	Directives
+		.is_empty()
+		.then_some("directives directory exists but contains no readable .md files - treating as intentionally empty")
+		.into_iter()
+		.for_each(|Notice| {
+			tracing::info!(DirectiveSource = "disk", path = %Directory.display(), "{}", Notice);
+		});
 
 	Directives
 }

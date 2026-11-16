@@ -5,10 +5,10 @@
 //! unrelated churn (an editor's swap files, the CCR database, the runtime home's own
 //! state) never reaches the channel at all.
 
-use notify::{Event, EventKind, RecursiveMode, Watcher};
+use notify::{Event, RecursiveMode, Watcher};
 
 use super::Struct::Struct;
-use crate::Boot::Listen::Watcher::Target;
+use crate::Boot::Listen::Watcher::{Select, Target};
 
 /// Start watching the target's directory, non-recursively.
 ///
@@ -37,14 +37,11 @@ pub(crate) fn Fn(Target:&Target::Struct::Struct) -> Result<Struct, String> {
 	let mut Watcher = notify::recommended_watcher(move |Res:Result<Event, notify::Error>| {
 		// A watch error is not an event: there is nothing to reload from it, and
 		// `notify` reports a dead watch through the same channel it reports events on.
-		let Some(Event) = Res.ok() else {
-			return;
-		};
-
-		let IsTarget = matches!(Event.kind, EventKind::Modify(_) | EventKind::Create(_))
-			&& Event.paths.iter().any(|Path| Path == &Watched.File);
-
-		let _ = IsTarget.then(|| Tx.try_send(Watched.clone()));
+		Res.ok()
+			.filter(|Event| Select::Fn::Fn(Event, &Watched))
+			.map(|_| Tx.try_send(Watched.clone()))
+			.into_iter()
+			.for_each(drop);
 	})
 	.map_err(|e| format!("failed to create the config watcher: {e}"))?;
 

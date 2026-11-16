@@ -3,14 +3,8 @@
 use crate::{
 	Configuration::CLI::Setup::Struct::Struct as SetupArgs,
 	Setup::{
-		Dylib::Copy::Fn::Fn as CopyDylibs,
-		Execute::{Binary, Configuration, Directory, Failure, Plugin, Registration, Report},
-		Plan::{self, Step},
-		Write::{
-			BinaryVersion::Fn as WriteBinaryVersion,
-			InitPy::Fn as WriteInitPy,
-			PluginYAML::Fn as WritePluginYAML,
-		},
+		Execute::{Apply, Failure, Report},
+		Plan,
 	},
 };
 
@@ -29,30 +23,8 @@ pub(crate) fn Fn(
 	Plan:&Plan::Struct::Struct,
 	Args:&SetupArgs,
 ) -> Result<Report::Struct::Struct, Failure::Struct::Struct> {
-	let mut Report = Report::Struct::Struct { Completed:Vec::new(), Registration:None };
-
-	for Step in &Plan.Steps {
-		let Outcome = match Step {
-			Step::Enum::Enum::CreateDirectories => Directory::Fn::Fn(&Plan.Context),
-			Step::Enum::Enum::PreparePluginDirectory => Plugin::Directory::Fn::Fn(Plan),
-			Step::Enum::Enum::InstallBinary => Binary::Fn::Fn(&Plan.Context),
-			Step::Enum::Enum::InstallDylibs => CopyDylibs(&Plan.Context),
-			Step::Enum::Enum::WriteConfiguration => Configuration::Fn::Fn(&Plan.Context, Args),
-			Step::Enum::Enum::WriteManifest => WritePluginYAML(&Plan.Context, Args),
-			Step::Enum::Enum::WriteLoader => WriteInitPy(&Plan.Context),
-			Step::Enum::Enum::WriteVersionPin => WriteBinaryVersion(&Plan.Context),
-			Step::Enum::Enum::RegisterPlugin => {
-				Registration::Fn::Fn().map(|Registered| Report.Registration = Some(Registered))
-			},
-		};
-
-		match Outcome {
-			Ok(()) => Report.Completed.push(*Step),
-			Err(Error) => {
-				return Err(Failure::Struct::Struct { Completed:Report.Completed, Error });
-			},
-		}
-	}
-
-	Ok(Report)
+	Plan.Steps.iter().try_fold(
+		Report::Struct::Struct { Completed:Vec::new(), Registration:None },
+		|mut Report, Step| Apply::Fn::Fn(&mut Report, Step, Plan, Args).map(|()| Report),
+	)
 }

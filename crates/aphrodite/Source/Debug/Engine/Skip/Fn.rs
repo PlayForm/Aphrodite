@@ -12,7 +12,9 @@ use crate::{Debug::Log::At::Fn::Fn as LogAt, State::Struct::AphroditeState};
 /// The level-0 gate is a fast path in front of `LogAt`'s own gate: a quiet
 /// session formats nothing and touches no path.
 pub fn Fn(State:&AphroditeState, Reason:&str) {
-	if State.DebugLevel != 0 {
-		LogAt(State.DebugLevel, "engine_skip", &[("reason", Reason.to_string())]);
-	}
+	// A level of 0 is "off", which is exactly what `NonZeroU8` refuses to hold: the
+	// level is the value that logs, and the reason is formatted only for it.
+	std::num::NonZeroU8::new(State.DebugLevel)
+		.into_iter()
+		.for_each(|Level| LogAt(Level.get(), "engine_skip", &[("reason", Reason.to_string())]));
 }

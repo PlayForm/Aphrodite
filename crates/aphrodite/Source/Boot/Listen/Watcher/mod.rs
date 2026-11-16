@@ -23,6 +23,7 @@ pub mod Debounce;
 pub mod Fn;
 pub mod Loop;
 pub mod Outcome;
+pub mod Select;
 pub mod Source;
 pub mod Stop;
 pub mod Target;

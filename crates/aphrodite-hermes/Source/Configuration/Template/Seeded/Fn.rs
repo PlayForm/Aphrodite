@@ -48,12 +48,15 @@ pub(crate) fn Fn() -> AphroditeState {
 	// them; fa85dfa).
 	let Started = State.AutoReload.then(spawn_config_watcher);
 
-	if matches!(Started, Some(Start::Enum::Enum::NotRunning)) {
-		Warn::Fn::Fn(
-			"config auto-reload was requested (auto_reload = true) but its watcher did not start; aphrodite.toml \
-			 changes will not be picked up until this process restarts",
-		);
-	}
+	matches!(Started, Some(Start::Enum::Enum::NotRunning))
+		.then_some(WATCHER_NOTICE)
+		.into_iter()
+		.for_each(Warn::Fn::Fn);
 
 	State
 }
+
+/// Said when `auto_reload = true` produced no watcher, which would otherwise look
+/// exactly like `auto_reload = false` for the life of the process.
+const WATCHER_NOTICE:&str = "config auto-reload was requested (auto_reload = true) but its watcher did not start; \
+                             aphrodite.toml changes will not be picked up until this process restarts";

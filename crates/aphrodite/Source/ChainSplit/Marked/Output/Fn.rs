@@ -1,6 +1,6 @@
 //! Split marked tool output back into per-segment pieces.
 
-use crate::ChainSplit::{Const::SegMarker, Marked::Output::Part::Struct::Struct as Part};
+use crate::ChainSplit::Marked::Output::{Line, Part::Struct::Struct as Part};
 
 /// Split tool output on segment markers into owned parts.
 /// Output before the first marker belongs to segment 0. Marker lines are
@@ -22,26 +22,29 @@ pub fn Fn(Output:&str) -> Vec<Part> {
 	let mut Current = String::new();
 	let mut CurrentIndex = 0usize;
 
-	Output.lines().for_each(|Line| {
-		if Line.trim() == SegMarker {
-			let Text = Current.trim().to_string();
+	Output.lines().for_each(|Raw| {
+		match Line::Fn::Fn(Raw) {
+			Line::Enum::Enum::Boundary => {
+				let Text = Current.trim().to_string();
 
-			let _ = (!Text.is_empty()).then(|| Parts.push(Part { Index:CurrentIndex, Text }));
+				Parts.extend((!Text.is_empty()).then_some(Part { Index:CurrentIndex, Text }));
 
-			CurrentIndex += 1;
-			// `clear()` rather than `Current = String::new()`: same observable
-			// behaviour, but the buffer is reused - clippy's
-			// `new_instead_of_clear` denies the reallocation under
-			// `-D warnings` on the CI toolchain.
-			Current.clear();
-		} else {
-			Current.push_str(Line);
-			Current.push('\n');
+				CurrentIndex += 1;
+				// `clear()` rather than `Current = String::new()`: same observable
+				// behaviour, but the buffer is reused - clippy's
+				// `new_instead_of_clear` denies the reallocation under
+				// `-D warnings` on the CI toolchain.
+				Current.clear();
+			},
+			Line::Enum::Enum::Text(Text) => {
+				Current.push_str(Text);
+				Current.push('\n');
+			},
 		}
 	});
 
 	let Tail = Current.trim().to_string();
-	let _ = (!Tail.is_empty()).then(|| Parts.push(Part { Index:CurrentIndex, Text:Tail }));
+	Parts.extend((!Tail.is_empty()).then_some(Part { Index:CurrentIndex, Text:Tail }));
 
 	Parts
 }

@@ -23,7 +23,10 @@ pub(crate) fn Fn(State:&mut AphroditeState, Observation:&Struct) {
 	let Failed = matches!(Observation.Outcome, Outcome::Failed);
 
 	// DEV-ONLY debug metrics (crate::debug): count tool-reported errors.
-	let _ = Failed.then(|| crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::ToolErrors));
+	Failed
+		.then_some(crate::Debug::Count::Enum::Enum::ToolErrors)
+		.into_iter()
+		.for_each(crate::Debug::Count::Bump::Fn::Fn);
 
 	State.RecordToolEvent(ToolEvent {
 		Turn:State.TurnCounter,

@@ -32,9 +32,7 @@ const Rules:[(&str, Rule); 4] = [
 /// that short carries no language evidence and guessing one would put a wrong language in the
 /// marker. It is not a parser and it is not a tie-break: the first matching rule wins.
 pub(crate) fn Fn(Content:&str) -> Option<&'static str> {
-	if Content.lines().count() <= MinimumEvidenceLines {
-		return None;
-	}
-
-	Rules.into_iter().find(|(_, Rule)| Rule(Content)).map(|(Name, _)| Name)
+	(Content.lines().count() > MinimumEvidenceLines)
+		.then_some(Content)
+		.and_then(|Content| Rules.into_iter().find(|(_, Rule)| Rule(Content)).map(|(Name, _)| Name))
 }

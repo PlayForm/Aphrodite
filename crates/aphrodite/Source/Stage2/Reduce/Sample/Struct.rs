@@ -30,9 +30,10 @@ impl<T, const N: usize> Struct<T, N> {
 	pub(crate) fn Push(&mut self, Item:impl FnOnce() -> T) {
 		self.Total += 1;
 
-		if self.Sample.len() < N {
-			self.Sample.push(Item());
-		}
+		// `then` keeps the item unbuilt when the sample is already full.
+		let Room = self.Sample.len() < N;
+
+		self.Sample.extend(Room.then(Item));
 	}
 
 	/// How many items were offered, including the ones not retained.

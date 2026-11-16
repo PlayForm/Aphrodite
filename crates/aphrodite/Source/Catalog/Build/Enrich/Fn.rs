@@ -8,8 +8,8 @@ use crate::{
 /// Add the fields only a TOC catalog carries.
 ///
 /// One decision: a `Full` catalog gets nothing, a `TOC` catalog gets its
-/// recommendations and the configured `search_hint`. `inspect` is the shape because the
-/// enrichment is a side effect on a value that may not exist - the recommendation list
+/// recommendations and the configured `search_hint`. `for_each` over the `Option` is the
+/// shape because the enrichment is a side effect on a value that may not exist - the list
 /// answers `None` when there is nothing to suggest, and a `None` must leave the JSON
 /// untouched rather than add an empty field.
 ///
@@ -22,8 +22,8 @@ pub(crate) fn Fn(State:&AphroditeState, Mode:&Mode::Enum::Enum, Result:&mut serd
 		Mode::Enum::Enum::TOC => Recommendation::Fn::Fn(State),
 	};
 
-	if let Some(Recommendations) = Recommendations {
+	Recommendations.into_iter().for_each(|Recommendations| {
 		Result["recommendations"] = serde_json::json!(Recommendations);
 		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
-	}
+	});
 }

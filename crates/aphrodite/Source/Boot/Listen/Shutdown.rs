@@ -12,8 +12,19 @@ pub async fn Signal() {
 	};
 	#[cfg(unix)]
 	let Terminate = async {
-		if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-			s.recv().await;
+		// The registration is the decision: a handler the OS installed yields the
+		// signal to wait on. One it refused leaves nothing to wait for, so this half
+		// of the `select!` resolves at once and the shutdown proceeds - the shape the
+		// non-unix arm has, where there is likewise no signal.
+		//
+		// The match stays a match: `if let` is the branch form the house style keeps
+		// out of the tree, and the empty arm is the whole point of the shape.
+		#[allow(clippy::single_match)]
+		match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+			Ok(mut s) => {
+				s.recv().await;
+			},
+			Err(_) => (),
 		}
 	};
 	#[cfg(not(unix))]

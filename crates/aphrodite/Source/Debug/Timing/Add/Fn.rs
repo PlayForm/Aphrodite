@@ -14,13 +14,13 @@ use crate::Debug::{
 ///
 /// The caller measures the duration itself and only when `enabled()` - this
 /// function must never be the thing that makes a hot path call `Instant::now`.
-/// `then` keeps the two `fetch_add`s inside a closure the disabled path never
+/// `then_some` keeps the two `fetch_add`s inside a closure the disabled path never
 /// calls, so the gate still costs one relaxed load.
 pub fn Fn(Cat:TimingCat, Us:u64) {
-	if Enabled() {
-		let Index = Cat as usize;
-
+	// The slot index is what the gate buys: both tallies land on the same one, and
+	// the disabled path has no index at all - one relaxed load, no `fetch_add`.
+	Enabled().then_some(Cat as usize).into_iter().for_each(|Index| {
 		TimingSum[Index].fetch_add(Us, Ordering::Relaxed);
 		TimingN[Index].fetch_add(1, Ordering::Relaxed);
-	}
+	});
 }

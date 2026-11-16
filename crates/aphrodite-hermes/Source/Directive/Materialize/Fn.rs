@@ -15,6 +15,7 @@ use std::fs;
 
 use crate::Directive::{
 	Builtin,
+	Entry,
 	Materialize::{Outcome, Report, Write},
 };
 
@@ -36,28 +37,37 @@ pub(crate) fn Fn(Dir:&std::path::Path) -> Report::Struct::Struct {
 		Warnings:Vec::new(),
 	};
 
-	if let Err(e) = fs::create_dir_all(Dir) {
-		let Message = format!("could not create directives dir {}: {}; nothing materialized", Dir.display(), e);
-		crate::Debug::Warn::Fn::Fn(&Message);
-		Report.Warnings.push(Message);
-
-		return Report;
+	// The directory is the precondition for every write, so the result of creating
+	// it IS the decision: `Ok` folds the embedded set in, `Err` reports and stops.
+	match fs::create_dir_all(Dir)
+		.map_err(|e| format!("could not create directives dir {}: {}; nothing materialized", Dir.display(), e))
+	{
+		Ok(()) => Builtin::Fn::Fn().into_iter().for_each(|Entry| Fill(&mut Report, Entry)),
+		Err(Message) => Fail(&mut Report, Message),
 	}
-
-	Builtin::Fn::Fn().into_iter().for_each(|Entry| {
-		match Write::Fn::Fn(Dir, &Entry) {
-			Outcome::Enum::Enum::Written(File) => Report.Written.push(File),
-			Outcome::Enum::Enum::Skipped(File) => Report.Skipped.push(File),
-			Outcome::Enum::Enum::Warned { File, Message } => {
-				crate::Debug::Warn::Fn::Fn(&Message);
-				Report.Warnings.push(Message);
-				Report.Skipped.push(File);
-			},
-		}
-	});
 
 	Report.Written.sort();
 	Report.Skipped.sort();
 
 	Report
+}
+
+/// Fold one embedded directive's outcome into the report.
+fn Fill(Report:&mut Report::Struct::Struct, Entry:Entry::Struct::Struct) {
+	match Write::Fn::Fn(&Report.Dir, &Entry) {
+		Outcome::Enum::Enum::Written(File) => Report.Written.push(File),
+		Outcome::Enum::Enum::Skipped(File) => Report.Skipped.push(File),
+		Outcome::Enum::Enum::Warned { File, Message } => {
+			crate::Debug::Warn::Fn::Fn(&Message);
+			Report.Warnings.push(Message);
+			Report.Skipped.push(File);
+		},
+	}
+}
+
+/// Nothing was materialized: say why, once, in both the log and the report.
+fn Fail(Report:&mut Report::Struct::Struct, Message:String) {
+	crate::Debug::Warn::Fn::Fn(&Message);
+
+	Report.Warnings.push(Message);
 }

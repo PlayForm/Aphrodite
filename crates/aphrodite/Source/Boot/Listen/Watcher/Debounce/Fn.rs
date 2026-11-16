@@ -36,15 +36,20 @@ pub(crate) async fn Fn(Rx:&mut tokio::sync::mpsc::Receiver<Target::Struct::Struc
 	let First = tokio::time::Instant::now();
 
 	loop {
-		let Remaining = Ceiling.saturating_sub(First.elapsed());
+		// The ceiling is a budget, and a spent ceiling is the absence of a window
+		// rather than a zero-length one: a zero window would still poll the channel
+		// once and consume an event the overdue reload is about to account for.
+		let Left = Ceiling.saturating_sub(First.elapsed());
+		let Budget = (!Left.is_zero()).then_some(Left);
 
 		// The ceiling has already expired: the reload is overdue, and waiting any
 		// longer would let a directory that never goes quiet starve it.
-		if Remaining.is_zero() {
-			return Outcome::Enum::Enum::Settled;
-		}
+		let Step = match Budget {
+			None => return Outcome::Enum::Enum::Settled,
+			Some(Remaining) => tokio::time::timeout(Quiet.min(Remaining), Rx.recv()).await,
+		};
 
-		match tokio::time::timeout(Quiet.min(Remaining), Rx.recv()).await {
+		match Step {
 			// Another write landed inside the window: the file is still being
 			// written, so the quiet window restarts from now.
 			Ok(Some(_)) => continue,

@@ -44,22 +44,7 @@ pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
 	Active
 		.iter()
 		.filter_map(|name| all.get(name).map(|Directive| (name, Directive)))
-		.for_each(|(name, Directive)| {
-			Out.push_str(name);
-			Out.push_str(":\n");
-
-			Directive.Content.lines().for_each(|Line| {
-				let Line = Line.trim_start_matches('#').trim();
-
-				// A blank line contributes nothing; `then` is the gate and nothing follows it, so
-				// the accepted path allocates no fallback.
-				let _ = (!Line.is_empty()).then(|| {
-					Out.push_str("  ");
-					Out.push_str(Line);
-					Out.push('\n');
-				});
-			});
-		});
+		.for_each(|(Name, Directive)| Out.push_str(&Section(Name, Directive)));
 
 	// T19: the cap is compared as a CHARACTER count. `Out.len()` is a byte length, so multibyte
 	// content (em-dashes etc.) tripped the truncation on text that never exceeded the char
@@ -68,4 +53,20 @@ pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
 		Some((Offset, _Char)) => format!("{}...\n", &Out[..Offset]),
 		None => Out,
 	}
+}
+
+/// One directive's section: its heading, then every non-blank body line indented.
+///
+/// A blank line contributes nothing - the `filter` is the gate, and the accepted
+/// path is the only one that allocates a rendered line.
+fn Section(Name:&str, Directive:&Struct) -> String {
+	let Body:String = Directive
+		.Content
+		.lines()
+		.map(|Line| Line.trim_start_matches('#').trim())
+		.filter(|Line| !Line.is_empty())
+		.map(|Line| format!("  {Line}\n"))
+		.collect();
+
+	format!("{Name}:\n{Body}")
 }

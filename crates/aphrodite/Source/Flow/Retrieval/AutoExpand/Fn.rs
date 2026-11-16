@@ -15,15 +15,11 @@ use crate::{Flow::Prompt::Render::Fn::RenderPrompt, State::Struct::AphroditeStat
 /// wins, the compiled-in fallback otherwise. Disabled (default) = no
 /// guidance, current behavior; an unknown/empty template renders nothing.
 pub(crate) fn AutoExpandGuidanceBlock(State:&AphroditeState) -> String {
-	if !State.AutoExpand {
-		return String::new();
-	}
-
-	let Text = RenderPrompt(State, "auto_expand_guidance", &[]);
-
-	if Text.is_empty() {
-		return String::new();
-	}
-
-	format!("[auto-expand: {}]", Text)
+	// Rendering is the work the flag buys: `then` keeps it out of the disabled
+	// path, and an empty render is an absent section rather than a gate.
+	State
+		.AutoExpand
+		.then(|| RenderPrompt(State, "auto_expand_guidance", &[]))
+		.filter(|Text| !Text.is_empty())
+		.map_or_else(String::new, |Text| format!("[auto-expand: {}]", Text))
 }

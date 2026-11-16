@@ -47,10 +47,11 @@ pub(crate) async fn Fn(
 		let mut HdrLog = String::new();
 
 		Headers.iter().for_each(|(Name, Value)| {
-			let Rendered = if Name.as_str() != "authorization" {
-				format!("  {}: {}", Name.as_str(), TruncateCharSafe(Value.to_str().unwrap_or("?"), 80))
-			} else {
-				"  authorization: ***".to_string()
+			// The header's own name decides its rendering: the one credential
+			// header is redacted, every other one is printed truncated.
+			let Rendered = match Name.as_str() {
+				"authorization" => "  authorization: ***".to_string(),
+				Header => format!("  {Header}: {}", TruncateCharSafe(Value.to_str().unwrap_or("?"), 80)),
 			};
 
 			HdrLog.push_str(&Rendered);

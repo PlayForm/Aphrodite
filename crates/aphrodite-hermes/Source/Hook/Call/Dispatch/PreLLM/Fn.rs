@@ -33,40 +33,36 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	// Per-session debug: pre_llm_call is the ONE hook Hermes threads
 	// `parent_session_id` through, so record session -> parent here to build
 	// the tree the debug flag resolves against.
-	if let (Some(Session), Some(Parent)) = (
-		Parsed.get("session_id").and_then(|v| v.as_str()),
-		Parsed.get("parent_session_id").and_then(|v| v.as_str()),
-	) {
-		Debug::Session::Record::Fn::Fn(Session, Parent);
-	}
+	Parsed
+		.get("session_id")
+		.and_then(|v| v.as_str())
+		.zip(Parsed.get("parent_session_id").and_then(|v| v.as_str()))
+		.into_iter()
+		.for_each(|(Session, Parent)| Debug::Session::Record::Fn::Fn(Session, Parent));
 
 	// DEV-ONLY debug logger (crate::Debug): pre-turn bridge line
 	// (turn/session/request-size); the per-section sizes and the cumulative
 	// metrics are logged inside build_turn_context.
 	let Session = Parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
 
-	match Session {
-		"" => {},
-		Session => {
-			crate::Debug::Log::Bridge::Fn::Fn(
-				State,
-				Session,
-				"pre_turn",
-				&[
-					("turn", State.TurnCounter.to_string()),
-					("session", Session.to_string()),
-					("est_request_bytes", ArgsLength.to_string()),
-					("pending_markers", State.RecentMarkers.len().to_string()),
-				],
-			);
-			Log::Fn::Fn(State, Session);
-		},
-	}
+	(!Session.is_empty()).then_some(Session).into_iter().for_each(|Session| {
+		crate::Debug::Log::Bridge::Fn::Fn(
+			State,
+			Session,
+			"pre_turn",
+			&[
+				("turn", State.TurnCounter.to_string()),
+				("session", Session.to_string()),
+				("est_request_bytes", ArgsLength.to_string()),
+				("pending_markers", State.RecentMarkers.len().to_string()),
+			],
+		);
+		Log::Fn::Fn(State, Session);
+	});
 
 	let Context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(State, Some(ArgsLength));
 
-	match Context.is_empty() {
-		true => serde_json::Value::Null,
-		false => serde_json::json!({ "context": Context }),
-	}
+	(!Context.is_empty())
+		.then(|| serde_json::json!({ "context": Context }))
+		.unwrap_or(serde_json::Value::Null)
 }

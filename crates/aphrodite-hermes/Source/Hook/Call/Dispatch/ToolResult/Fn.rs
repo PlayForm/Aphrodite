@@ -25,9 +25,12 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 
 	// Poll-result tracking: update running BgTasks from
 	// process(action='poll') results. Only active when poll_worker is enabled.
-	if State.PollWorkerEnabled && Tool == "process" {
-		aphrodite::PollWorker::Update::Fn::UpdateFromPoll(State, Tool, ToolContent);
-	}
+	(State.PollWorkerEnabled && Tool == "process")
+		.then_some(())
+		.into_iter()
+		.for_each(|()| {
+			aphrodite::PollWorker::Update::Fn::UpdateFromPoll(State, Tool, ToolContent);
+		});
 
 	let Classify = crate::Tool::Unwrap::Fn::Fn(ToolContent);
 	// 05-P2/T8: parse the error/args/timing signals Hermes ships
@@ -52,11 +55,11 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 		Classify.as_ref().map(|(Body, Kind)| (Body.as_str(), Kind.as_str())),
 		&Meta,
 	);
-	if let Some(Started) = Started {
+	Started.into_iter().for_each(|Started| {
 		let Micros = Started.elapsed().as_micros() as u64;
 		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, Micros);
 		PostTool::Fn::Fn(State, Session, &Result, ToolContent.len(), Micros);
-	}
+	});
 
 	// Per-session debug: the caller's session_id rides in the
 	// hook kwargs - thread it so the flag resolves against the

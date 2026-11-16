@@ -20,6 +20,7 @@ pub mod Continue;
 pub mod Debounce;
 pub mod Event;
 pub mod Outcome;
+pub mod Select;
 pub mod Wait;
 
 #[cfg(not(test))]

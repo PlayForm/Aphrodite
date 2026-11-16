@@ -34,7 +34,8 @@ pub(crate) fn Fn(Message:&str) {
 	// must not also fire when this crate installed one.
 	let Reported = matches!(Ownership::Fn::Fn(), None | Some(Ownership::Enum::Enum::HostOwned));
 
-	if Reported {
-		eprintln!("aphrodite-hermes: {Message}");
-	}
+	Reported
+		.then_some(Message)
+		.into_iter()
+		.for_each(|Message| eprintln!("aphrodite-hermes: {Message}"));
 }

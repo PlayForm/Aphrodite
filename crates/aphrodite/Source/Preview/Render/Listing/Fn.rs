@@ -11,11 +11,9 @@ const ExtensionsShown:usize = 3;
 /// differ only by their suffix. A listing that recognised nothing renders as a bare line count. It is
 /// not a tree: no depth, no sizes, no permissions.
 pub(crate) fn Fn(Summary:&Summary, Total:usize) -> String {
-	if Summary.IsEmpty() {
-		return format!("[ls:{Total}L]");
-	}
-
-	Body(Summary)
+	(!Summary.IsEmpty())
+		.then_some(Summary)
+		.map_or_else(|| format!("[ls:{Total}L]"), Body)
 }
 
 /// The counts and extensions of a listing that recognised at least one entry.

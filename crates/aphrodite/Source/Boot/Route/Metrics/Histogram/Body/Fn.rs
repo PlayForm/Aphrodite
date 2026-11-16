@@ -10,7 +10,7 @@ use crate::Boot::Route::Metrics::Histogram::Bucket;
 /// The buckets are cumulative by definition: a Prometheus bucket is `<= le`, not
 /// `== le`, so each line carries the running total rather than its own count.
 pub fn Fn(Stats:&Value, Buckets:&[Value]) -> String {
-	let Filled = Buckets.iter().enumerate().fold(Bucket::Struct::Struct::New(), Bucket::Step::Fn::Fn);
+	let Filled = Buckets.iter().enumerate().fold(Bucket::New::Fn::Fn(), Bucket::Step::Fn::Fn);
 	let Count = format!("aphrodite_latency_seconds_count {}\n", Filled.Total);
 	let Sum = Stats["total_latency_micros"]
 		.as_u64()

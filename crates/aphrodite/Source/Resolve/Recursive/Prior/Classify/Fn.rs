@@ -13,15 +13,22 @@ use super::super::Enum::Enum;
 /// hash answered "absent" when it fell back to the cache; F4: a nested hash already loaded was
 /// skipped instead of substituted from the cache).
 ///
+/// The cycle answer is a value, not a return: a hash already on the path carries the
+/// answer with it, so the other two questions are the fallback that answer skips.
+///
 /// This function ASKS; it does not mark. Entering the path belongs to the walk that must also
 /// leave it (`Recursive::Walk::Fn`), because a prelude that marked on the way past would mark
 /// a hash whose expansion never started - which is exactly what the old never-popped set did
 /// when a capped hash was recorded as visited for the rest of the tree.
 pub(crate) fn Fn(Traversal:&Traversal, HashValue:&str, Depth:usize) -> Enum {
-	if Traversal.OnPath(HashValue) {
-		return Enum::Revisit;
-	}
+	Traversal
+		.OnPath(HashValue)
+		.then_some(Enum::Revisit)
+		.unwrap_or_else(|| Remaining(Traversal, HashValue, Depth))
+}
 
+/// The two questions after the cycle check: the depth cap, then the cache.
+fn Remaining(Traversal:&Traversal, HashValue:&str, Depth:usize) -> Enum {
 	// The cap is compared as an ordering rather than as a boolean so the "there is depth
 	// left" case is the only one that continues.
 	let Ordering::Less = Depth.cmp(&Traversal.Cap()) else {

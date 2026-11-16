@@ -27,11 +27,10 @@ impl Struct {
 	pub(crate) fn Charge(&mut self, Length:usize) -> ControlFlow<(), ()> {
 		self.Remaining -= Length as isize + 1;
 
-		if self.Exhausted() {
-			ControlFlow::Break(())
-		} else {
-			ControlFlow::Continue(())
-		}
+		// Exhaustion is the value the caller matches: `Some` when the charge spent the remainder.
+		self.Exhausted()
+			.then_some(())
+			.map_or(ControlFlow::Continue(()), |_| ControlFlow::Break(()))
 	}
 
 	fn Exhausted(&self) -> bool { self.Remaining <= 0 }

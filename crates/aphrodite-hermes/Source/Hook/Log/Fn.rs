@@ -38,9 +38,11 @@ pub(crate) fn Fn(State:&AphroditeState, Session:&str) {
 
 	// code_multiplier is proxy-side config; surface the env override only
 	// (the dylib has no proxy thresholds loaded).
-	if let Ok(Multiplier) = std::env::var("APHRODITE_CODE_MULTIPLIER") {
-		Fields.push(("code_multiplier", Multiplier));
-	}
+	Fields.extend(
+		std::env::var("APHRODITE_CODE_MULTIPLIER")
+			.ok()
+			.map(|Multiplier| ("code_multiplier", Multiplier)),
+	);
 
 	Fields.push(("proxy", proxy_health().to_string()));
 	crate::Debug::Log::Bridge::Fn::Fn(State, Session, "init", &Fields);

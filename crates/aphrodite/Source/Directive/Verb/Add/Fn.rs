@@ -15,7 +15,10 @@ use super::super::Push;
 pub(crate) fn Fn(State:&mut AphroditeState, name:&str) -> serde_json::Value {
 	let Known = State.Directives.contains_key(name);
 
-	let _ = Known.then(|| Push::Fn::Fn(&mut State.ActiveDirectives, name));
+	Known
+		.then_some(name)
+		.into_iter()
+		.for_each(|Name| Push::Fn::Fn(&mut State.ActiveDirectives, Name));
 
 	State.ManualDirectiveTurn = Some(State.TurnCounter);
 

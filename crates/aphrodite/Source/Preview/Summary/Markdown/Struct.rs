@@ -27,9 +27,8 @@ impl Struct {
 	pub(crate) fn Push(&mut self, Heading:Heading) {
 		self.Counts[Heading.Level] += 1;
 
-		if self.First.is_none() {
-			self.First = Some(Heading.Text);
-		}
+		// The first heading wins; a later one is dropped by the same slot.
+		self.First.get_or_insert(Heading.Text);
 	}
 
 	/// The levels that occurred, in level order, as `(level, count)` pairs.

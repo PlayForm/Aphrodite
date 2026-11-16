@@ -31,6 +31,8 @@ fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
 	}
 
 	tokio::runtime::Runtime::new().unwrap().block_on(async {
+		// Residue: a `for` whose body contains `.await` - an iterator adapter cannot
+		// await, and this crate's `futures` dependency is optional.
 		for HashArgument in ["abc123", "abc123|tool|1024", "  abc123  "] {
 			let Response = HandleRetrieve(
 				State(state.clone()),

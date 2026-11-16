@@ -11,5 +11,6 @@ pub mod Directive;
 pub mod Engine;
 pub mod Flow;
 pub mod Prompt;
+pub mod Probe;
 pub mod Runtime;
 pub mod Template;

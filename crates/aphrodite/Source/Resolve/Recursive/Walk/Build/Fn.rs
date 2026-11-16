@@ -4,10 +4,34 @@ use crate::Resolve::{
 	Expansion,
 	Halt,
 	Nested,
-	Parse::Find,
-	Recursive::Recursive,
+	Parse::{Find, Occurrence},
+	Recursive::{Recursive, Walk::Build::Writer},
 	Traversal::Struct::Struct as Traversal,
 };
+
+/// Resolve one occurrence into the text that replaces it.
+///
+/// A hash this expansion already loaded contributes the CACHED value (F4). A
+/// nested expansion whose hash the store does not hold leaves the original marker
+/// (F1); one that ran out of budget abandons the whole walk, because inlining a
+/// document that still carries a marker is what the budget exists to prevent.
+fn Replace(Traversal:&mut Traversal, Occurrence:&Occurrence::Struct::Struct<'_>, Depth:usize) -> Nested::Enum::Enum {
+	let Cached = Traversal
+		.Cached(Occurrence.Hash)
+		.map(Expansion::Enum::Enum::Text)
+		.map(str::to_owned);
+
+	match Cached {
+		Some(Cached) => Nested::Enum::Enum::Replaced(Cached),
+		None => {
+			match Recursive::Fn(Traversal, Occurrence.Hash, Depth + 1) {
+				Ok(Expanded) => Nested::Enum::Enum::Replaced(Expanded.IntoText()),
+				Err(Halt::Enum::Enum::Absent) => Nested::Enum::Enum::Unresolved,
+				Err(Halt::Enum::Enum::OverBudget) => Nested::Enum::Enum::Abandoned,
+			}
+		},
+	}
+}
 
 /// Expand one loaded entry, charging every segment against the traversal's budget before it
 /// is appended.
@@ -46,51 +70,20 @@ pub(crate) fn Fn(
 
 	// Resolve every occurrence first, in document order, so the construction below is a
 	// single pass with no recursion in the middle of it.
-	let mut Replacements = Vec::with_capacity(Occurrences.len());
+	let Replacements:Vec<Nested::Enum::Enum> = Occurrences
+		.iter()
+		.map(|Occurrence| Replace(Traversal, Occurrence, Depth))
+		.collect();
 
-	for Occurrence in &Occurrences {
-		let Cached = Traversal
-			.Cached(Occurrence.Hash)
-			.map(Expansion::Enum::Enum::Text)
-			.map(str::to_owned);
+	let Writer = Occurrences
+		.iter()
+		.zip(Replacements.iter())
+		.try_fold(Writer::Struct::Struct { Out:String::new(), Cursor:0 }, |Writer, Pair| {
+			Writer::Step::Fn::Fn(Writer, Pair, &Content, Traversal)
+		})?;
 
-		let Resolved = match Cached {
-			// Already loaded in this expansion: substitute the cached value (F4).
-			Some(Cached) => Nested::Enum::Enum::Replaced(Cached),
-			None => {
-				match Recursive::Fn(Traversal, Occurrence.Hash, Depth + 1) {
-					Ok(Expanded) => Nested::Enum::Enum::Replaced(Expanded.IntoText()),
-					// Tolerance: unresolved - the reference stays exactly as written (F1).
-					Err(Halt::Enum::Enum::Absent) => Nested::Enum::Enum::Unresolved,
-					Err(Halt::Enum::Enum::OverBudget) => Nested::Enum::Enum::Abandoned,
-				}
-			},
-		};
-
-		Replacements.push(Resolved);
-	}
-
-	let mut Out = String::new();
-	let mut Cursor = 0usize;
-
-	for (Occurrence, Resolved) in Occurrences.iter().zip(Replacements.iter()) {
-		let Gap = &Content[Cursor..Occurrence.Span.start];
-
-		let Filled = match Resolved {
-			Nested::Enum::Enum::Replaced(Text) => Text.as_str(),
-			Nested::Enum::Enum::Unresolved => Occurrence.Marker,
-			Nested::Enum::Enum::Abandoned => return Err(Halt::Enum::Enum::OverBudget),
-		};
-
-		Traversal
-			.Charge(Out.len() + Gap.len() + Filled.len())
-			.ok_or(Halt::Enum::Enum::OverBudget)?;
-
-		Out.push_str(Gap);
-		Out.push_str(Filled);
-
-		Cursor = Occurrence.Span.end;
-	}
+	let mut Out = Writer.Out;
+	let Cursor = Writer.Cursor;
 
 	let Tail = &Content[Cursor..];
 

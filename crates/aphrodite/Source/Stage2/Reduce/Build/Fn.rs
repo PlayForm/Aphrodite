@@ -46,22 +46,21 @@ pub fn ReduceBuild(Content:&str) -> Option<String> {
 		}
 	});
 
-	let mut Parts:Vec<String> = Vec::new();
+	let HasSummaries = !Summaries.IsEmpty();
+	let HasErrors = !Errors.IsEmpty();
+	let HasWarnings = !Warnings.IsEmpty();
 
-	if !Summaries.IsEmpty() {
-		Parts.push("[build summary]".into());
-		Parts.extend(Summaries.IntoSample());
-	}
-
-	if !Errors.IsEmpty() {
-		Parts.push(format!("[{} errors]", Errors.Total()));
-		Parts.extend(Errors.IntoSample());
-	}
-
-	if !Warnings.IsEmpty() {
-		Parts.push(format!("[{} warnings]", Warnings.Total()));
-		Parts.extend(Warnings.IntoSample());
-	}
+	// One entry per group: its header and the lines it kept. A group that kept nothing has no
+	// entry, so the table decides what the reduction holds instead of three tests deciding it.
+	let Parts:Vec<String> = [
+		HasSummaries.then(|| ("[build summary]".to_string(), Summaries.IntoSample())),
+		HasErrors.then(|| (format!("[{} errors]", Errors.Total()), Errors.IntoSample())),
+		HasWarnings.then(|| (format!("[{} warnings]", Warnings.Total()), Warnings.IntoSample())),
+	]
+	.into_iter()
+	.flatten()
+	.flat_map(|(Header, Lines)| std::iter::once(Header).chain(Lines))
+	.collect();
 
 	match Parts.as_slice() {
 		[] => None,

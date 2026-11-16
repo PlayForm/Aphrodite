@@ -6,5 +6,7 @@
 /// set, so a name already in the list must not appear twice - a duplicate would render the
 /// directive's body twice in the context string.
 pub(crate) fn Fn(Active:&mut Vec<String>, name:&str) {
-	let _ = (!Active.iter().any(|Active| Active == name)).then(|| Active.push(name.to_string()));
+	let Missing = (!Active.iter().any(|Existing| Existing == name)).then(|| name.to_string());
+
+	Active.extend(Missing);
 }

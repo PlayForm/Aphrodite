@@ -19,7 +19,7 @@
 //! - `Verify/` checks prerequisites and hashes the artifact;
 //! - `Dylib/` locates, downloads and checksums the shared libraries;
 //! - `Write/` writes every installed file, the two `include_str!` templates included;
-//! - `MacOS.rs` applies the Gatekeeper-safe treatment to each artifact copy on macOS.
+//! - `MacOS/` applies the Gatekeeper-safe treatment to each artifact copy on macOS.
 //!
 //! `Run::Entry::Fn` is the only item anything outside `Setup/` names, and `Run` is
 //! `pub` because the binary - a separate crate target - calls it. The rest of the tree

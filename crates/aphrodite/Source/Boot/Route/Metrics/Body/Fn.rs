@@ -18,5 +18,8 @@ use crate::Boot::Route::Metrics::{Piece, Table};
 /// the order of `Table::ORDER` is the only thing that decides which metrics
 /// exist, and `Piece::Render` answers one piece with its lines.
 pub fn Fn(Stats:&Value) -> String {
-	Table::Const::ORDER.iter().map(|Piece| Piece::Render::Fn::Fn(*Piece, Stats)).collect()
+	Table::Const::ORDER
+		.iter()
+		.map(|Piece| Piece::Render::Fn::Fn(*Piece, Stats))
+		.collect()
 }

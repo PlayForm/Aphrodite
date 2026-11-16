@@ -35,10 +35,14 @@ pub fn ReduceDiff(Content:&str) -> Option<String> {
 
 	State.Flush().into_iter().for_each(|Summary| Files.Push(|| Summary));
 
-	if Files.IsEmpty() {
-		return None;
-	}
+	(!Files.IsEmpty()).then(|| Render(Files))
+}
 
+/// One line per retained file section, under a header carrying the exact file count.
+///
+/// The header is built from `Total`, not from the sample, so a diff of a thousand files still
+/// reports a thousand while only the retained sections are formatted.
+fn Render(Files:Sample<Summary, FilesShown>) -> String {
 	let mut Parts:Vec<String> = vec![format!("[diff:{} files]", Files.Total())];
 
 	Parts.extend(
@@ -48,5 +52,5 @@ pub fn ReduceDiff(Content:&str) -> Option<String> {
 			.map(|File| format!("  {} ({} hunks)", File.Header, File.Hunks)),
 	);
 
-	Some(Parts.join("\n"))
+	Parts.join("\n")
 }

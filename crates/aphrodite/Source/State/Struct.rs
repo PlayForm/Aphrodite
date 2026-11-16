@@ -35,7 +35,7 @@ pub struct AphroditeState {
 	pub InlineStore:HashMap<String, String>,
 	/// LRU recency order of `InlineStore` keys (unit values). Capacity is
 	/// `INLINE_MAX + 1` so the cache never self-evicts before the explicit
-	/// `EvictOverBudget` loop in `InlineStorePut` (fix 1: previously a
+	/// `EvictOverBudget` pass in `InlineStorePut` (fix 1: previously a
 	/// `VecDeque` whose promotion/upsert needed an O(n) `retain` scan).
 	pub InlineOrder:lru::LruCache<String, ()>,
 	/// Running total of `content.len()` across every entry in `InlineStore`,

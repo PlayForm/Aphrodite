@@ -55,7 +55,7 @@ pub fn Fn(Content:&str, Mode:&Mode::Enum::Enum) -> anyhow::Result<Outcome::Enum:
 			let mut Text = Lines[Start..End].join("\n");
 			// 02-F4: a partial window that still reaches the document's end
 			// keeps the trailing newline the original had.
-			let _ = (ReachesEnd && Content.ends_with('\n')).then(|| Text.push('\n'));
+			Text.extend((ReachesEnd && Content.ends_with('\n')).then_some('\n'));
 
 			Ok(Outcome::Enum::Enum::Window { Text, Start:Start + 1, End, Total })
 		},

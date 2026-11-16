@@ -19,10 +19,10 @@ impl AphroditeState {
 	/// for retrieval attribution. Bounded ring (cap `SplitEventCap`), then
 	/// re-adapts the split threshold from the retrieval ratio.
 	///
-	/// An empty batch records nothing - a plain guard rather than a combinator, because
-	/// everything inside it mutates: the id, the map and the ring move together and a
-	/// reader should see that as one block. It also keeps the event id from advancing for
-	/// a split that produced no segments.
+	/// An empty batch records nothing, and the count carries that decision: the
+	/// recording only exists for a batch with at least one segment, so the id, the
+	/// map and the ring move together - and the event id never advances for a split
+	/// that produced no segments.
 	///
 	/// The ring bound is `drain` over the excess rather than a pop loop: the
 	/// length is known, so the number to drop is arithmetic, and the eviction
@@ -30,21 +30,23 @@ impl AphroditeState {
 	/// evicted event takes its hashes out of `SplitSegmentMap`, so the map holds
 	/// exactly the segment identities the ring can still explain.
 	pub fn RecordChainSplit(&mut self, Hashes:Vec<String>) {
-		if Hashes.is_empty() {
+		// A batch with no segments records nothing, and the count is the whole
+		// decision: `NonZeroUsize` exists only when the split produced something,
+		// so the id, the map and the ring move together for exactly those batches.
+		let Some(Produced) = std::num::NonZeroUsize::new(Hashes.len()) else {
 			return;
-		}
+		};
 
 		self.SplitNextEventID += 1;
 
 		let ID = self.SplitNextEventID;
-		let Produced = Hashes.len();
 
 		Hashes.iter().for_each(|h| {
 			self.SplitSegmentMap.insert(h.clone(), ID);
 		});
 
 		self.SplitEvents
-			.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced, Retrieved:0 });
+			.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced:Produced.get(), Retrieved:0 });
 
 		let Excess = self.SplitEvents.len().saturating_sub(SplitEventCap);
 		let Evicted:Vec<usize> = self.SplitEvents.drain(..Excess).map(|Event| Event.ID).collect();

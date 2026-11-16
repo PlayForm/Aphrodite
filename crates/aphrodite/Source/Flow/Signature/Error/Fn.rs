@@ -15,9 +15,11 @@ pub fn ErrorSig(ErrorType:Option<&str>, ErrorMessage:Option<&str>) -> u64 {
 	Buffer.push_str(ErrorType.unwrap_or(""));
 	Buffer.push('\u{1}');
 
-	if let Some(Message) = ErrorMessage {
+	// An error with no message contributes nothing; one with a message contributes
+	// its first line. The `Option` is the whole decision.
+	ErrorMessage.into_iter().for_each(|Message| {
 		Buffer.push_str(Message.lines().next().unwrap_or("").trim());
-	}
+	});
 
 	Fnv1a(Buffer.as_bytes())
 }

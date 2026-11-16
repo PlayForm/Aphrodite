@@ -16,22 +16,20 @@ pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {
 	let mut SeenPaths = std::collections::HashSet::new();
 	State.ToolEvents.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
 		Stats.TotalCalls += 1;
+		// A failed call is one count and (maybe) one signature; a successful one
+		// contributes neither, so the boolean is the quantity rather than a gate.
+		Stats.Errors += (!Event.Okay) as usize;
 
-		if !Event.Okay {
-			Stats.Errors += 1;
-
-			if let Some(Sig) = Event.ErrorSig {
-				ErrorSigs.insert(Sig);
-			}
-		}
+		// The set decides what it holds: `None` from a successful call or from an
+		// error without a signature extends it with nothing.
+		ErrorSigs.extend((!Event.Okay).then_some(Event.ErrorSig).flatten());
 
 		match &Event.WrotePath {
 			Some(path) => {
 				Stats.Writes += 1;
-
-				if SeenPaths.insert(path.clone()) {
-					Stats.NewFiles += 1;
-				}
+				// `insert` reports whether the path was new, which is exactly the
+				// increment - the set decides, no second lookup.
+				Stats.NewFiles += SeenPaths.insert(path.clone()) as usize;
 			},
 			None => {
 				match Event.Tool.as_str() {

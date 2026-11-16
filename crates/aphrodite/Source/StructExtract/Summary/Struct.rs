@@ -22,9 +22,7 @@ impl Struct {
 	/// The key is the wire category (`fns`, `structs`, `traits`, `impls`, `classes`, `types`) and is
 	/// carried by the policy rather than by the recogniser, so a recogniser cannot invent a category.
 	pub(crate) fn Push(&mut self, Key:&str, Lines:Vec<String>) {
-		if !Lines.is_empty() {
-			self.Categories.push((Key.to_string(), Lines));
-		}
+		self.Categories.extend((!Lines.is_empty()).then(|| (Key.to_string(), Lines)));
 	}
 
 	/// The public shape: category key to signature lines.

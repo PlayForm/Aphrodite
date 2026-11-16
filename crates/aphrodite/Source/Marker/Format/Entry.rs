@@ -60,9 +60,7 @@ pub fn CCRMarker(
 		Limit::Unlimited => None,
 		Limit::At(Characters) => Safe.char_indices().nth(Characters).map(|(Byte, _)| Byte),
 	};
-	if let Some(Byte) = Truncate {
-		Safe.truncate(Byte);
-	}
+	Truncate.into_iter().for_each(|Byte| Safe.truncate(Byte));
 
 	// Metadata string. `BTreeMap` order is key order, so the joined line is the
 	// same on every render.

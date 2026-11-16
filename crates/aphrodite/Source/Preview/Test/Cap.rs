@@ -98,23 +98,23 @@ fn TestPreviewCapFitsUnchangedAtBoundary() {
 /// it is returned byte-identical, and every preview over it is capped to at most the limit.
 #[test]
 fn TestPreviewCapIdentityAtAndBelowLimit() {
-	for Maximum in 1..=16usize {
-		for Length in 0..=Maximum {
+	(1..=16usize).for_each(|Maximum| {
+		(0..=Maximum).for_each(|Length| {
 			let Bracketed = (Length >= 2).then(|| format!("[{}]", "a".repeat(Length - 2)));
 
-			for Preview in std::iter::once("a".repeat(Length)).chain(Bracketed) {
+			std::iter::once("a".repeat(Length)).chain(Bracketed).for_each(|Preview| {
 				assert_eq!(
 					Capped(Preview.clone(), Maximum),
 					Preview,
 					"{Preview:?} at {Maximum} must be unchanged"
 				);
-			}
-		}
+			});
+		});
 
-		for Length in Maximum + 1..=Maximum + 8 {
+		(Maximum + 1..=Maximum + 8).for_each(|Length| {
 			let Preview = "a".repeat(Length);
 			let Count = Capped(Preview.clone(), Maximum).chars().count();
 			assert!(Count <= Maximum, "{Preview:?} at {Maximum} must be capped, got {Count}");
-		}
-	}
+		});
+	});
 }

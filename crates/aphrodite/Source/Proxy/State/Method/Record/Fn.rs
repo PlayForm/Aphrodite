@@ -7,7 +7,7 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::Proxy::State::Struct::Struct as AppState;
+use crate::Proxy::State::{Method::Record::Cap, Struct::Struct as AppState};
 
 /// Upper bounds of the four bounded latency buckets, in microseconds.
 const BucketLimits:[u64; 4] = [1_000, 10_000, 100_000, 1_000_000];
@@ -29,7 +29,7 @@ impl AppState {
 		let _ = self.LastErrors.lock().map(|mut Errors| {
 			Errors.push_back(Message);
 
-			let _ = (Errors.len() > 100).then(|| Errors.pop_front());
+			Cap::Fn::Fn(&mut Errors, 100);
 		});
 	}
 
@@ -50,7 +50,7 @@ impl AppState {
 				"elapsed_ms": ElapsedMs,
 			}));
 
-			let _ = (History.len() > 50).then(|| History.pop_front());
+			Cap::Fn::Fn(&mut History, 50);
 		});
 	}
 }

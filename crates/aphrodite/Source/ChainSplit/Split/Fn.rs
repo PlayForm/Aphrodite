@@ -36,14 +36,12 @@ pub fn Fn(command:&str) -> Option<Vec<Segment>> {
 				continue;
 			},
 			('&', Quoting::None) => {
-				// `&&` separator; a lone `&` (async) is left alone.
-				let Paired = Chars.peek() == Some(&'&');
-
-				let _ = Paired.then(|| {
-					Chars.next();
-					SegIndex = CloseSegment(&mut Segments, &mut Current, SegIndex);
-				});
-				let _ = (!Paired).then(|| Current.push(c));
+				// `&&` separator; a lone `&` (async) is left alone. The peek is the
+				// decision, and its two answers are the two things to do.
+				match Chars.next_if(|Next| *Next == '&') {
+					Some(_) => SegIndex = CloseSegment(&mut Segments, &mut Current, SegIndex),
+					None => Current.push(c),
+				}
 
 				continue;
 			},

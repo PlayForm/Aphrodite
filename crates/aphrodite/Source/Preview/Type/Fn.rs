@@ -35,8 +35,7 @@ pub(crate) fn Fn<'a>(Hint:&'a str, Inp:&Struct<'_>) -> Cow<'a, str> {
 		},
 		"build_output" | "build_error" => {
 			Detect::SemanticType::Fn(Inp.raw)
-				.filter(|Detected| *Detected == "test")
-				.filter(|_| !Inp.raw.lines().any(Failure::Fn))
+				.filter(|Detected| *Detected == "test" && !Inp.raw.lines().any(Failure::Fn))
 				.map_or(Cow::Borrowed(Hint), Cow::Borrowed)
 		},
 		Other => Cow::Borrowed(Other),

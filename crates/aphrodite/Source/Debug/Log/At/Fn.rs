@@ -28,9 +28,11 @@ use crate::Debug::{
 /// unopenable file and a failed seek all end the append without touching the
 /// record already emitted.
 pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
-	if Level == 0 {
+	// A level of 0 is "off", which is exactly what `NonZeroU8` refuses to hold: the
+	// record is formatted and emitted only for a level that exists.
+	let Some(Level) = std::num::NonZeroU8::new(Level) else {
 		return;
-	}
+	};
 
 	let mut Line = format!("[{}] [aphrodite-debug] lvl={Level} event={Event}", IsoTimestamp());
 
@@ -47,7 +49,7 @@ pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
 	// proxy's spans. Emitted BEFORE the destination is resolved: a record that
 	// cannot reach the file (no session id, missing dir, permissions) still
 	// reaches the operator.
-	EmitDebugRecord(Level, &Line);
+	EmitDebugRecord(Level.get(), &Line);
 
 	let Some(path) = LogPath() else { return };
 
@@ -64,15 +66,25 @@ pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
 	// Fresh-line guarantee: a legacy flag file may lack a trailing newline
 	// (the toggle writes "on"/"off" with no terminator), so a raw append
 	// would merge the first log line into the flag value and flip the flag
-	// off. Prefix a newline when the file does not already end with one.
-	// `&&` keeps the short circuit: a failed read never inspects `Last`.
-	if f.seek(SeekFrom::End(-1)).is_ok() {
-		let mut Last = [0u8; 1];
+	// off. The last byte is the value: a file that does not end with a newline
+	// gets one, and every other case (no file, unreadable, already terminated)
+	// gets an empty prefix - which `write_all` does not write at all.
+	let LastByte = f
+		.seek(SeekFrom::End(-1))
+		.is_ok()
+		.then(|| {
+			let mut Last = [0u8; 1];
 
-		if f.read_exact(&mut Last).is_ok() && Last[0] != b'\n' {
-			let _ = f.write_all(b"\n");
-		}
-	}
+			f.read_exact(&mut Last).is_ok().then_some(Last[0])
+		})
+		.flatten();
+
+	let Separator:&[u8] = match LastByte.filter(|Last| *Last != b'\n') {
+		Some(_) => b"\n",
+		None => b"",
+	};
+
+	let _ = f.write_all(Separator);
 
 	let _ = f.write_all(Line.as_bytes());
 }

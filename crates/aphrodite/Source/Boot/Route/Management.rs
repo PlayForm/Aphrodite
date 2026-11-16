@@ -88,5 +88,5 @@ pub fn Route(State:&Arc<AppState>) -> Router<Arc<AppState>> {
 				}
 			}),
 		)
-		.merge(Metrics::Route(State))
+		.merge(Metrics::Route::Route(State))
 }

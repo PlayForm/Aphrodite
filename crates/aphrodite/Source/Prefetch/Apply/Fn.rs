@@ -23,13 +23,19 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared, ArrivedAtUnix:u64
 
 	State.InlineStorePut(Hash.as_str().to_string(), Content);
 
-	let _ = (!State.InlineStoreContains(Hash.as_str())).then(|| {
-		tracing::warn!(
-			Path = %Path,
-			Hash = Hash.as_str(),
-			"prefetch: entry was evicted by the inline store budget immediately after it was stored"
-		);
-	});
+	// The store decides whether the content is still there: an entry the budget
+	// evicted immediately is a listed hash that cannot resolve, so the hash it lost
+	// is what the warning reports.
+	(!State.InlineStoreContains(Hash.as_str()))
+		.then_some(Hash.as_str())
+		.into_iter()
+		.for_each(|Hash| {
+			tracing::warn!(
+				Path = %Path,
+				Hash = Hash,
+				"prefetch: entry was evicted by the inline store budget immediately after it was stored"
+			);
+		});
 
 	State.RecordMarker(MarkerEntry {
 		hash:Hash.as_str().to_string(),
@@ -39,21 +45,29 @@ pub(crate) fn Fn(State:&mut AphroditeState, Prepared:Prepared, ArrivedAtUnix:u64
 		Turn:State.TurnCounter,
 		Center:None,
 		meta:Some({
-			let mut Meta = std::collections::HashMap::new();
-			Meta.insert("path".to_string(), Path.clone());
+			// The base entry is the one item the map always holds; the live fields are
+			// an optional tail fed in beside it, so the flag decides what the collection
+			// contains instead of gating inserts into it.
+			let Base = std::iter::once(("path".to_string(), Path.clone()));
+
 			// Live-container mode (pre-Rust `_hooks/live.py`): the schedule entry
 			// carries container semantics - arrival timestamp, byte progress, ETA - so
 			// the prefetch_status surface can expose them. Off by default: meta keeps
 			// only `path` (byte-identical current behavior).
-			if State.LiveContainer {
-				let Arrival = LiveArrival::Arrived(Size as u64, ArrivedAtUnix);
+			let Live = State
+				.LiveContainer
+				.then(|| LiveArrival::Arrived(Size as u64, ArrivedAtUnix))
+				.into_iter()
+				.flat_map(|Arrival| {
+					[
+						("live".to_string(), "1".to_string()),
+						("live_arrived_at".to_string(), Arrival.ArrivedAtUnix.to_string()),
+						("live_bytes_arrived".to_string(), Arrival.BytesArrived.to_string()),
+						("live_eta_s".to_string(), Arrival.EtaS.to_string()),
+					]
+				});
 
-				Meta.insert("live".to_string(), "1".to_string());
-				Meta.insert("live_arrived_at".to_string(), Arrival.ArrivedAtUnix.to_string());
-				Meta.insert("live_bytes_arrived".to_string(), Arrival.BytesArrived.to_string());
-				Meta.insert("live_eta_s".to_string(), Arrival.EtaS.to_string());
-			}
-			Meta
+			Base.chain(Live).collect()
 		}),
 	});
 

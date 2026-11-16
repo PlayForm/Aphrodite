@@ -23,22 +23,25 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 				.map(|Marker| Marker.hash.clone())
 				.collect();
 
-			let mut Updated = 0usize;
-
-			Targets.into_iter().for_each(|Hash| {
-				if let Some(Content) = State.InlineStoreGet(&Hash) {
-					let Detected = aphrodite::Preview::Detect::Type::Fn(&Content);
-					let Preview = aphrodite::Preview::Builder::Entry::Fn(&Detected, &Content);
-
-					if let Some(Marker) = State.RecentMarkers.iter_mut().find(|Marker| Marker.hash == Hash) {
-						Marker.CCRType = Detected;
-						Marker.Preview = Preview;
-						Updated += 1;
-					}
-				}
-			});
+			let Updated = Targets.into_iter().filter_map(|Hash| Reclassify(State, &Hash)).count();
 
 			serde_json::json!({"status": "ok", "reclassified": Updated})
 		})
 	})
+}
+
+/// Recompute one marker's type and preview from its stored content.
+///
+/// `None` means nothing was updated: the content is gone from the inline store, or
+/// the row was removed while the pass ran.
+fn Reclassify(State:&mut aphrodite::State::Struct::AphroditeState, Hash:&str) -> Option<()> {
+	let Content = State.InlineStoreGet(Hash)?;
+	let Detected = aphrodite::Preview::Detect::Type::Fn(&Content);
+	let Preview = aphrodite::Preview::Builder::Entry::Fn(&Detected, &Content);
+	let Marker = State.RecentMarkers.iter_mut().find(|Marker| Marker.hash == Hash)?;
+
+	Marker.CCRType = Detected;
+	Marker.Preview = Preview;
+
+	Some(())
 }

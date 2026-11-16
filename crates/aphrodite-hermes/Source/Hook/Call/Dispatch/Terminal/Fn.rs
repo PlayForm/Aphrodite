@@ -33,20 +33,20 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	// fall back to the current turn's session so terminal output keeps the
 	// same session scope as tool results.
 	let Session = Parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-	let Session = match Session.is_empty() {
-		true => crate::Debug::Session::Last::Fn::Fn(),
-		false => Session.to_string(),
-	};
+	let Session = Session
+		.is_empty()
+		.then(crate::Debug::Session::Last::Fn::Fn)
+		.unwrap_or_else(|| Session.to_string());
 
 	// DEV-ONLY debug logger (crate::Debug): post-tool outcome +
 	// elapsed microseconds for the terminal path.
 	let Started = crate::Debug::Log::Any::Fn::Fn(State, &Session).then(std::time::Instant::now);
 
-	if let Some(Started) = Started {
+	Started.into_iter().for_each(|Started| {
 		let Micros = Started.elapsed().as_micros() as u64;
 		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, Micros);
 		PostTool::Fn::Fn(State, &Session, &Result, TermContent.len(), Micros);
-	}
+	});
 
 	Replacement::Fn::Fn(&Result, &Session)
 }

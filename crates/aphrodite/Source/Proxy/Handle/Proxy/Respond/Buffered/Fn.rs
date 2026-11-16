@@ -121,7 +121,10 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 
 	DevLog(Context.State.Dev, || {
 		let Text = std::str::from_utf8(&Payload).unwrap_or("?");
-		let BodyPreview = if Payload.len() > 500 {
+		// A long body is previewed by its first 200 characters; a short one is
+		// logged whole. The truncated preview is the value, its absence the
+		// whole body.
+		let Truncated = (Payload.len() > 500).then(|| {
 			let Preview:String = Text
 				.char_indices()
 				.take_while(|(Index, _)| *Index < 200)
@@ -129,8 +132,11 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 				.collect();
 
 			format!("{Preview}... ({} total)", Payload.len())
-		} else {
-			Text.to_string()
+		});
+
+		let BodyPreview = match Truncated {
+			Some(BodyPreview) => BodyPreview,
+			None => Text.to_string(),
 		};
 
 		tracing::info!(
@@ -163,8 +169,9 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 		RequestCacheability::Cacheable { Identity } => Some(Identity.clone()),
 		RequestCacheability::Uncacheable => None,
 	};
-	Identity
-		.filter(|_| Head.Status.is_success() && Payload.len() <= ResponseCacheMaximumBodyBytes)
+	(Head.Status.is_success() && Payload.len() <= ResponseCacheMaximumBodyBytes)
+		.then_some(Identity)
+		.flatten()
 		.into_iter()
 		.for_each(|Identity| Context.State.CachePut(Identity, Payload.clone(), Now));
 

@@ -38,27 +38,14 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let Images = Inp.raw.matches("<img ").count() + Inp.raw.matches("<IMG ").count();
 	let Scripts = Inp.raw.matches("<script").count() + Inp.raw.matches("<SCRIPT").count();
 
-	let mut Stats:Vec<String> = Vec::new();
-
-	if Headings > 0 {
-		Stats.push(format!("{Headings}h"));
-	}
-
-	if Links > 0 {
-		Stats.push(format!("{Links}a"));
-	}
-
-	if Images > 0 {
-		Stats.push(format!("{Images}img"));
-	}
-
-	if Scripts > 0 {
-		Stats.push(format!("{Scripts}script"));
-	}
-
-	Stats.push(format!("{}L", Inp.Total));
-
-	let Stats = Stats.join(" ");
+	// The tally is the table: a count and its label, rendered only when the count is non-zero.
+	let Stats = [(Headings, "h"), (Links, "a"), (Images, "img"), (Scripts, "script")]
+		.into_iter()
+		.filter(|(Count, _)| *Count > 0)
+		.map(|(Count, Label)| format!("{Count}{Label}"))
+		.chain(std::iter::once(format!("{}L", Inp.Total)))
+		.collect::<Vec<String>>()
+		.join(" ");
 
 	match Title {
 		Some(Title) => format!("[html:{Stats} | {Title}]"),

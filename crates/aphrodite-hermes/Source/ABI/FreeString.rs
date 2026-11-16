@@ -7,14 +7,14 @@
 //! allocation any other way is an invalid free. A null pointer is a no-op so a
 //! caller can free unconditionally.
 
-use std::{ffi::CString, os::raw::c_char};
+use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
 /// Free a string returned by any aphrodite_hermes_* function.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
 	// A null pointer is the one value that carries nothing to free; every other
 	// value came from a `CString` this crate handed out.
-	let _ = (!s.is_null()).then(|| unsafe {
-		let _ = CString::from_raw(s);
-	});
+	NonNull::new(s)
+		.into_iter()
+		.for_each(|Pointer| drop(unsafe { CString::from_raw(Pointer.as_ptr()) }));
 }

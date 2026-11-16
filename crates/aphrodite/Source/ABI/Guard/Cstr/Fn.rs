@@ -1,6 +1,6 @@
 //! `Cstr`: the caller's pointer as a bounded, borrowed view.
 
-use std::{ffi::CStr, os::raw::c_char, ptr::NonNull};
+use std::{cmp::Ordering, ffi::CStr, os::raw::c_char, ptr::NonNull};
 
 use super::Enum::Enum as Decoded;
 use crate::ABI::Guard::Content::Const::MaximumContent;
@@ -40,9 +40,10 @@ pub(crate) unsafe fn Fn<'a>(Ptr:*const c_char) -> Decoded<'a> {
 	// unmoved for the duration of this call.
 	let Raw = unsafe { CStr::from_ptr(Ptr.as_ptr()) };
 
-	if Raw.to_bytes().len() > MaximumContent {
-		return Decoded::Oversize;
+	// The refusal is the comparison, and it happens before the copy: an oversize
+	// argument never reaches `to_string_lossy`.
+	match Raw.to_bytes().len().cmp(&MaximumContent) {
+		Ordering::Greater => Decoded::Oversize,
+		Ordering::Equal | Ordering::Less => Decoded::Text(Raw.to_string_lossy()),
 	}
-
-	Decoded::Text(Raw.to_string_lossy())
 }

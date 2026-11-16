@@ -16,6 +16,11 @@ impl AppState {
 	pub(crate) fn FillPctText(&self) -> String {
 		let Percent = self.FillPct.load(Ordering::Relaxed) as f64 / 100.0;
 
-		if Percent.is_finite() { format!("{Percent:.1}") } else { "0.0".to_string() }
+		// The finiteness test yields the rendered text or nothing; the absent case
+		// is the fixed `0.0` the header has always shown for a non-finite fill.
+		match Percent.is_finite().then(|| format!("{Percent:.1}")) {
+			Some(Text) => Text,
+			None => "0.0".to_string(),
+		}
 	}
 }

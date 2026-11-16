@@ -6,3 +6,4 @@
 //! while `Fn` owns the document and never touches the path itself.
 
 pub mod Fn;
+pub mod Writer;

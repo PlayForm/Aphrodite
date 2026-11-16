@@ -13,16 +13,12 @@
 /// mistaken for a preview.
 pub(super) fn IsSelfBracketedPreview(Preview:&str) -> bool {
 	let p = Preview.trim();
-	if !p.starts_with('[') || !p.ends_with(']') {
-		return false;
-	}
 
-	let Inner = &p[1..];
-	match Inner.find(':') {
-		Some(Colon) => {
-			let Label = &Inner[..Colon];
-			!Label.is_empty() && Label.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-		},
-		None => false,
-	}
+	// Brackets, then a colon, then the label: each step is the `Option` the
+	// previous one produced, and a failure anywhere is simply `false`.
+	p.strip_prefix('[')
+		.and_then(|Inner| Inner.strip_suffix(']').map(|_| Inner))
+		.and_then(|Inner| Inner.find(':').map(|Colon| &Inner[..Colon]))
+		.filter(|Label| !Label.is_empty() && Label.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+		.is_some()
 }

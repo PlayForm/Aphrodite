@@ -8,13 +8,13 @@ use std::fs;
 use anyhow::Context;
 
 #[cfg(target_os = "macos")]
-use crate::Setup::MacOS::Fn as InstallMacOSArtifact;
+use crate::Setup::MacOS::Fn::Fn as InstallMacOSArtifact;
 #[cfg(not(target_os = "macos"))]
 use crate::Setup::Write::Permissions::Fn as SecurePerms;
 
 /// Copy one dylib into `Dest`, taking the platform's copy treatment.
 ///
-/// On macOS that is `MacOS::Fn`, which rewrites the install name and re-signs the
+/// On macOS that is `MacOS::Fn::Fn`, which rewrites the install name and re-signs the
 /// artifact - `cargo build` embeds the `target/deps/` path as the dylib's ID, and
 /// loading a copied dylib whose ID points at a non-existent build directory makes
 /// the dynamic linker SIGKILL the process. Every other target copies and chmods.

@@ -34,14 +34,11 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> Objec
 
 	// Chunk views: produced lazily, stored and counted in the same pass.
 	let Chunks = Policy.as_ref().map_or(0, |Policy| {
-		let mut Count = 0usize;
-
-		for Chunk in Policy.Chunks(Content) {
-			State.InlineStorePut(LiveChunkKey(&Hash, Count), Chunk.to_string());
-			Count += 1;
-		}
-
-		Count
+		Policy
+			.Chunks(Content)
+			.enumerate()
+			.map(|(Index, Chunk)| State.InlineStorePut(LiveChunkKey(&Hash, Index), Chunk.to_string()))
+			.count()
 	});
 	// The envelope reports the target the chunks were actually cut with, and zero
 	// when there was no policy to cut with - a container with no chunks, which the

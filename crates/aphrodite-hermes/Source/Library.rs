@@ -50,6 +50,8 @@
 // of `upper_case_acronyms`' default, so the lint is switched off crate-wide
 // rather than spelling acronyms down at every declaration.
 #![allow(clippy::upper_case_acronyms)]
+// A two-branch decision is a value, not a branch; see `aphrodite`'s `Library.rs`.
+#![allow(clippy::obfuscated_if_else)]
 
 pub mod ABI;
 pub mod Configuration;

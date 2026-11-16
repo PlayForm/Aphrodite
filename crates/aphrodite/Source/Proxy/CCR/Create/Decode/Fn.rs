@@ -16,13 +16,22 @@ use crate::Proxy::CCR::Create::{
 
 /// Decode the body according to its declared content type.
 pub(crate) fn Fn(ContentType:&str, Body:&Bytes) -> Result<DecodedBody, CreateRejection> {
-	if ContentType.contains("json") {
-		serde_json::from_slice::<CreateRequest>(Body)
-			.map(DecodedBody::Json)
-			.map_err(|e| CreateRejection::InvalidJson(format!("invalid JSON: {e}")))
-	} else {
-		String::from_utf8(Body.to_vec())
-			.map(DecodedBody::Opaque)
-			.map_err(|_| CreateRejection::InvalidUtf8)
+	// The declared content type is the value that decides which decoder runs: a
+	// `json` body is parsed structurally, anything else is carried as text, and
+	// only the chosen decoder is ever evaluated.
+	match ContentType
+		.contains("json")
+		.then(|| serde_json::from_slice::<CreateRequest>(Body))
+	{
+		Some(Parsed) => {
+			Parsed
+				.map(DecodedBody::Json)
+				.map_err(|e| CreateRejection::InvalidJson(format!("invalid JSON: {e}")))
+		},
+		None => {
+			String::from_utf8(Body.to_vec())
+				.map(DecodedBody::Opaque)
+				.map_err(|_| CreateRejection::InvalidUtf8)
+		},
 	}
 }

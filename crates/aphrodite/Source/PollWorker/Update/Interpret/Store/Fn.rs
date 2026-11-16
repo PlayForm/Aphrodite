@@ -26,13 +26,19 @@ pub(crate) fn Fn(State:&mut AphroditeState, Index:usize, Completion:Completion) 
 
 	State.InlineStorePut(Stored.Hash.as_str().to_string(), Output);
 
-	if !State.InlineStoreContains(Stored.Hash.as_str()) {
-		tracing::warn!(
-			Hash = %Stored.Hash,
-			Size = Stored.Size,
-			"poll worker: completion was evicted by the inline store budget immediately after it was stored"
-		);
-	}
+	// The store decides whether the completion is still there: an entry the budget
+	// evicted immediately is a listed hash that cannot resolve, so the size it lost
+	// is what the warning reports.
+	(!State.InlineStoreContains(Stored.Hash.as_str()))
+		.then_some(Stored.Size)
+		.into_iter()
+		.for_each(|Size| {
+			tracing::warn!(
+				Hash = %Stored.Hash,
+				Size = Size,
+				"poll worker: completion was evicted by the inline store budget immediately after it was stored"
+			);
+		});
 
 	State.RecordMarker(MarkerEntry {
 		hash:Stored.Hash.as_str().to_string(),

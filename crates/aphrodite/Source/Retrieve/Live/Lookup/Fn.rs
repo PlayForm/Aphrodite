@@ -1,5 +1,7 @@
 //! Reassemble a live container from its stored chunks.
 
+use std::ops::ControlFlow;
+
 use crate::{Proxy::State::Struct::Struct as AppState, Retrieve::Live::Container::Struct::Struct as LiveContainerMeta};
 
 /// Look up a live container's metadata envelope and reassemble its content.
@@ -40,21 +42,28 @@ pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveConta
 
 	let mut Assembled = String::new();
 
-	for Index in 0..Chunks {
-		let Some(Chunk) = Map.get(&crate::Hook::Live::Key::Fn::LiveChunkKey(hash, Index)) else {
-			tracing::warn!(
-				hash,
-				Chunk = Index,
-				"retrieve: live container chunk missing; serving assembled prefix"
-			);
+	let _ = (0..Chunks).try_fold((), |(), Index| {
+		match Map.get(&crate::Hook::Live::Key::Fn::LiveChunkKey(hash, Index)) {
+			Some(Chunk) => {
+				Assembled.push_str(Chunk);
 
-			break;
-		};
+				ControlFlow::Continue(())
+			},
+			None => {
+				tracing::warn!(
+					hash,
+					Chunk = Index,
+					"retrieve: live container chunk missing; serving assembled prefix"
+				);
 
-		Assembled.push_str(Chunk);
-	}
+				ControlFlow::Break(())
+			},
+		}
+	});
 
-	let Content = if Assembled.is_empty() { Resolved.to_string() } else { Assembled };
+	let Content = (!Assembled.is_empty())
+		.then_some(Assembled)
+		.unwrap_or_else(|| Resolved.to_string());
 
 	Some((Meta, Content))
 }

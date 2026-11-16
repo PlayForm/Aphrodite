@@ -10,7 +10,7 @@
 //! stays, and the budget is spent with `ControlFlow` instead of an error
 //! sentinel that made a successful scan look like a failed traversal.
 
-use std::ops::ControlFlow;
+use std::{cmp::Ordering, ops::ControlFlow};
 
 use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
 
@@ -49,10 +49,10 @@ fn CollectKeys(Content:&str) -> Vec<String> {
 	let _ = Content.lines().try_for_each(|Line| -> ControlFlow<()> {
 		ScanLine(Line, &mut Keys);
 
-		if Keys.len() >= KeysLimit {
-			ControlFlow::Break(())
-		} else {
-			ControlFlow::Continue(())
+		// The budget is a comparison, and reaching it is the only `Break`.
+		match Keys.len().cmp(&KeysLimit) {
+			Ordering::Less => ControlFlow::Continue(()),
+			Ordering::Equal | Ordering::Greater => ControlFlow::Break(()),
 		}
 	});
 

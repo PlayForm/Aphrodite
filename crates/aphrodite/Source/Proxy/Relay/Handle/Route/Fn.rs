@@ -95,11 +95,11 @@ pub(crate) async fn Fn(state:Arc<AppState>, Request:ToolRelayRequest) -> Respons
 		// only the synchronous path incremented these, so
 		// `tool_relay_success + tool_relay_failure` silently diverged from
 		// `ToolRelayCalls` for every async callback request.
-		let _ = if Result.is_ok() {
-			state.ToolRelaySuccess.fetch_add(1, Ordering::Relaxed)
-		} else {
-			state.ToolRelayFailure.fetch_add(1, Ordering::Relaxed)
-		};
+		let _ = Result
+			.is_ok()
+			.then_some(&state.ToolRelaySuccess)
+			.unwrap_or(&state.ToolRelayFailure)
+			.fetch_add(1, Ordering::Relaxed);
 
 		let _ = state
 			.Client

@@ -142,19 +142,22 @@ async fn Compress(
 	let AutoExpand = Context.State.AutoExpand.load(Ordering::Relaxed)
 		&& Content.len() <= Context.State.AutoExpandLimit.load(Ordering::Relaxed);
 
-	if AutoExpand {
-		ContentRewrite::StoredInline
-	} else {
-		let Marker = RenderMarker(Context.State, &Evidence, Analysis);
-		// Savings = bytes actually removed from the response (the original
-		// content minus the rendered marker that replaces it), not the bare hash
-		// length - the marker is hundreds of chars longer than the 40-char hash,
-		// so subtracting only the hash overstated savings (report 05 F5).
-		let Accounting = ContentAccounting { OriginalBytes:Evidence.Size(), EmittedBytes:Marker.len() };
-		Context.State.RecordCompression(Analysis.Ct());
-		Context.State.UpdateCompressionRatio(Evidence.Size(), Marker.len());
+	// The auto-expand decision yields a verdict or nothing; only its absence
+	// renders and accounts a marker.
+	match AutoExpand.then_some(ContentRewrite::StoredInline) {
+		Some(Rewrite) => Rewrite,
+		None => {
+			let Marker = RenderMarker(Context.State, &Evidence, Analysis);
+			// Savings = bytes actually removed from the response (the original
+			// content minus the rendered marker that replaces it), not the bare hash
+			// length - the marker is hundreds of chars longer than the 40-char hash,
+			// so subtracting only the hash overstated savings (report 05 F5).
+			let Accounting = ContentAccounting { OriginalBytes:Evidence.Size(), EmittedBytes:Marker.len() };
+			Context.State.RecordCompression(Analysis.Ct());
+			Context.State.UpdateCompressionRatio(Evidence.Size(), Marker.len());
 
-		ContentRewrite::Replaced { Content:Marker, Accounting }
+			ContentRewrite::Replaced { Content:Marker, Accounting }
+		},
 	}
 }
 

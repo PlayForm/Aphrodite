@@ -14,7 +14,8 @@ use super::super::{Apply, Debounce, Source};
 ///
 /// A burst that ends because the channel closed is still applied before the loop
 /// ends: the event that started it was real, and the pending change is the last thing
-/// this controller can honour. Only then does the loop stop.
+/// this controller can honour. Only then does the loop stop. That is why both arms of
+/// the outcome match apply the change and only one of them returns.
 ///
 /// The path is no longer a parameter. The event carries the resolved target, so there
 /// is one copy of "which file changed" and nothing to keep in step with the channel.
@@ -22,12 +23,11 @@ pub(crate) async fn Fn(Source:Source::Struct::Struct, States:Vec<Arc<AppState>>)
 	let mut Rx = Source.Rx;
 
 	while let Some(Target) = Rx.recv().await {
-		let Outcome = Debounce::Fn::Fn(&mut Rx).await;
-
-		Apply::Fn::Fn(&States, &Target);
-
-		if let Debounce::Outcome::Enum::Enum::Closed = Outcome {
-			return;
+		match Debounce::Fn::Fn(&mut Rx).await {
+			// The source closed mid-burst: this change is the last one the
+			// controller can honour, so it is applied and the loop ends.
+			Debounce::Outcome::Enum::Enum::Closed => return Apply::Fn::Fn(&States, &Target),
+			Debounce::Outcome::Enum::Enum::Settled => Apply::Fn::Fn(&States, &Target),
 		}
 	}
 }

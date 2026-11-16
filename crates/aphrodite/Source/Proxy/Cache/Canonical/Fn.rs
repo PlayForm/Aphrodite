@@ -17,6 +17,8 @@
 
 use serde_json::Value;
 
+use crate::Proxy::Cache::Canonical::Comma;
+
 /// The canonical byte form of `Body` under `APIKey`.
 pub(crate) fn Fn(Body:&Value, APIKey:&str) -> Vec<u8> {
 	let mut Out:Vec<u8> = Vec::new();
@@ -41,31 +43,16 @@ fn WriteValue(Value:&Value, Out:&mut Vec<u8>) {
 			Keys.sort_unstable();
 			Out.push(b'{');
 
-			for (Index, Key) in Keys.into_iter().enumerate() {
-				if Index > 0 {
-					Out.push(b',');
-				}
-
-				// `to_writer` is the only escaper in this walk: a key is JSON
-				// text, and re-escaping it by hand is how a canonical form stops
-				// being canonical.
-				let _ = serde_json::to_writer(&mut *Out, Key);
-				Out.push(b':');
-				WriteValue(&Members[Key.as_str()], Out);
-			}
+			Keys.into_iter()
+				.enumerate()
+				.for_each(|(Index, Key)| WriteMember(Out, Index, Key, Members));
 
 			Out.push(b'}');
 		},
 		serde_json::Value::Array(Items) => {
 			Out.push(b'[');
 
-			for (Index, Item) in Items.iter().enumerate() {
-				if Index > 0 {
-					Out.push(b',');
-				}
-
-				WriteValue(Item, Out);
-			}
+			Items.iter().enumerate().for_each(|(Index, Item)| WriteItem(Out, Index, Item));
 
 			Out.push(b']');
 		},
@@ -73,4 +60,21 @@ fn WriteValue(Value:&Value, Out:&mut Vec<u8>) {
 			let _ = serde_json::to_writer(Out, Scalar);
 		},
 	}
+}
+
+/// Emit one object member: its separator, the escaped key, the colon, the value.
+fn WriteMember(Out:&mut Vec<u8>, Index:usize, Key:&String, Members:&serde_json::Map<String, Value>) {
+	Out.extend_from_slice(Comma::Fn::Fn(Index));
+
+	// `to_writer` is the only escaper in this walk: a key is JSON text, and
+	// re-escaping it by hand is how a canonical form stops being canonical.
+	let _ = serde_json::to_writer(&mut *Out, Key);
+	Out.push(b':');
+	WriteValue(&Members[Key.as_str()], Out);
+}
+
+/// Emit one array element: its separator, then the element.
+fn WriteItem(Out:&mut Vec<u8>, Index:usize, Item:&Value) {
+	Out.extend_from_slice(Comma::Fn::Fn(Index));
+	WriteValue(Item, Out);
 }

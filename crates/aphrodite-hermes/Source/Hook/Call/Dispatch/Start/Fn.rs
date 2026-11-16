@@ -15,9 +15,12 @@ pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value 
 	let Result = aphrodite::Session::Start::Fn::OnSessionStart(State);
 	// DEV-ONLY debug logger (crate::Debug): session-init / config-summary
 	// line, emitted once per process.
-	if let Some(Session) = Input.Parsed.get("session_id").and_then(|v| v.as_str()) {
-		Log::Fn::Fn(State, Session);
-	}
+	Input
+		.Parsed
+		.get("session_id")
+		.and_then(|v| v.as_str())
+		.into_iter()
+		.for_each(|Session| Log::Fn::Fn(State, Session));
 
 	Result
 }

@@ -13,10 +13,13 @@ use crate::Debug::{
 /// The gate comes FIRST: with the logger off this must cost one atomic load,
 /// never a `fetch_add` on a cache line every thread contends for. That ordering
 /// is the whole reason the counters are safe to leave in a release build, and
-/// `then` is what keeps it: the increment lives in a closure the disabled path
+/// `then_some` is what keeps it: the increment lives in a closure the disabled path
 /// never calls.
 pub fn Fn(Counter:Counter) {
-	if Enabled() {
-		Counters[Counter as usize].fetch_add(1, Ordering::Relaxed);
-	}
+	// The slot exists only while the logger is on: the gate selects the counter the
+	// increment applies to, so the disabled path holds no slot at all and pays one
+	// relaxed load instead of a `fetch_add` on a contended line.
+	Enabled().then_some(&Counters[Counter as usize]).into_iter().for_each(|Slot| {
+		Slot.fetch_add(1, Ordering::Relaxed);
+	});
 }

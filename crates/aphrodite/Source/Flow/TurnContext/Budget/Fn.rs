@@ -7,10 +7,16 @@
 //! computed without joining - so the loop subtracts instead of re-allocating the
 //! whole string per iteration, and the two agree by construction (asserted below).
 //!
-//! `loop` with an explicit predicate rather than a compound `while`: the drop is
-//! "repeat while too long AND the last section is droppable", and naming the two
-//! facts separately is what keeps the second one - protection - visible instead of
-//! buried in a condition.
+//! The drop rule is two facts kept separate - "too long" and "the last section is
+//! droppable" - rather than one compound condition, because the second one is
+//! protection and it has to stay visible.
+//!
+//! The pass is a search, not a loop: the surviving list is the longest prefix of
+//! the candidates whose joined size fits, searched from the full list downwards
+//! over the trailing optional run. Dropping a section only ever shortens the
+//! measurement, so the first prefix that fits is the one the drop loop would have
+//! reached, and "no prefix fits" IS the overflow outcome rather than a second test
+//! on the bytes afterwards.
 //!
 //! The result is an `Outcome`, not a bare vector: the protected sections are never
 //! dropped, so a turn whose required text alone exceeds the budget CANNOT fit, and
@@ -28,9 +34,9 @@ use crate::Flow::{
 
 /// Drop trailing optional sections until the joined context fits `Budget`.
 ///
-/// A `Required` section stops the drop: the loop only ever removes from the end
-/// and only while the last section is `Optional`, so the protected text at the top
-/// of the list can never be trimmed away by a budget decision.
+/// A `Required` section stops the drop: the search only ever shortens the list
+/// from the end and only over sections that are `Optional`, so the protected text
+/// at the top of the list can never be trimmed away by a budget decision.
 pub(crate) fn DropToBudget(mut Sections:Vec<Section>, Budget:usize) -> Outcome {
 	debug_assert_eq!(
 		JoinedBytes(&Sections),
@@ -38,30 +44,32 @@ pub(crate) fn DropToBudget(mut Sections:Vec<Section>, Budget:usize) -> Outcome {
 		"the incremental measurement must equal the joined string"
 	);
 
-	let mut Bytes = JoinedBytes(&Sections);
+	// The trailing optional run is every drop the pass is allowed to make:
+	// everything below the last `Required` section is protected by position.
+	let Drops = Sections
+		.iter()
+		.rev()
+		.take_while(|Section| Section.Protection == Protection::Optional)
+		.count();
 
-	loop {
-		let Droppable = Sections
-			.last()
-			.is_some_and(|Section| Section.Protection == Protection::Optional);
+	// The longest prefix that fits, searched from the full list downwards. The
+	// measurement only shrinks as the prefix does, so the first fit is the prefix
+	// the drop loop stopped at; `None` means even the fully-dropped list overruns.
+	let Fitting = (0..=Drops)
+		.map(|Dropped| Sections.len() - Dropped)
+		.find(|Keep| JoinedBytes(&Sections[..*Keep]) <= Budget);
 
-		if Bytes <= Budget || !Droppable {
-			break;
-		}
+	Sections.truncate(Fitting.unwrap_or(Sections.len() - Drops));
 
-		Sections.pop();
-		Bytes = JoinedBytes(&Sections);
-	}
-
+	let Bytes = JoinedBytes(&Sections);
 	let Floor = Sections
 		.iter()
 		.filter(|Section| Section.Protection == Protection::Required)
 		.count();
 	let Surviving = Measured { Sections, Bytes, Floor };
 
-	if Bytes > Budget {
-		return Outcome::ProtectedOverflow { Excess:Bytes - Budget, Surviving, Limit:Budget };
+	match Fitting {
+		Some(_) => Outcome::Fits(Surviving),
+		None => Outcome::ProtectedOverflow { Excess:Bytes - Budget, Surviving, Limit:Budget },
 	}
-
-	Outcome::Fits(Surviving)
 }

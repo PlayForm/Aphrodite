@@ -67,10 +67,14 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 		);
 
 		// A miss degrades to a warning (dev metrics).
-		let _ = Out.is_none().then(|| {
-			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::RetrieveMisses);
-			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Warnings);
-		});
+		Out.is_none()
+			.then_some([
+				crate::Debug::Count::Enum::Enum::RetrieveMisses,
+				crate::Debug::Count::Enum::Enum::Warnings,
+			])
+			.into_iter()
+			.flatten()
+			.for_each(crate::Debug::Count::Bump::Fn::Fn);
 	});
 
 	Out

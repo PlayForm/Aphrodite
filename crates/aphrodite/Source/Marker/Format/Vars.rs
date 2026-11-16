@@ -25,36 +25,47 @@ pub(crate) fn SubstituteVars(Tmpl:&str, Vars:&[(&str, &str)]) -> String {
 	loop {
 		match Chars.get(i).copied() {
 			Some('{') => {
-				if let Some('{') = Chars.get(i + 1) {
-					Out.push('{');
-					i += 2;
-					continue;
+				match Chars.get(i + 1) {
+					// `{{` escapes to a literal brace.
+					Some('{') => {
+						Out.push('{');
+						i += 2;
+					},
+					_ => {
+						// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
+						let mut j = i + 1;
+						let mut name = String::new();
+						loop {
+							match Chars.get(j) {
+								Some(c) if c.is_ascii_alphanumeric() || *c == '_' => {
+									name.push(*c);
+									j += 1;
+								},
+								_ => break,
+							}
+						}
+						// A substitution needs a closed, non-empty group whose name is
+						// registered; anything else leaves the brace literal.
+						let Value = (!name.is_empty() && Chars.get(j) == Some(&'}'))
+							.then(|| Vars.iter().find(|(k, _)| *k == name.as_str()))
+							.flatten()
+							.map(|(_, v)| *v);
+
+						match Value {
+							Some(v) => {
+								Out.push_str(v);
+								i = j + 1;
+							},
+							None => {
+								// Unknown var or malformed group: emit the opening
+								// brace verbatim and keep scanning - the rest of the
+								// group text is then emitted literally.
+								Out.push('{');
+								i += 1;
+							},
+						}
+					},
 				}
-				// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
-				let mut j = i + 1;
-				let mut name = String::new();
-				loop {
-					match Chars.get(j) {
-						Some(c) if c.is_ascii_alphanumeric() || *c == '_' => {
-							name.push(*c);
-							j += 1;
-						},
-						_ => break,
-					}
-				}
-				if !name.is_empty()
-					&& Chars.get(j) == Some(&'}')
-					&& let Some((_, v)) = Vars.iter().find(|(k, _)| *k == name.as_str())
-				{
-					Out.push_str(v);
-					i = j + 1;
-					continue;
-				}
-				// Unknown var or malformed group: emit the opening brace
-				// verbatim and keep scanning - the rest of the group text is
-				// then emitted literally.
-				Out.push('{');
-				i += 1;
 			},
 			Some('}') => {
 				match Chars.get(i + 1) {

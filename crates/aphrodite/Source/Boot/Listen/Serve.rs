@@ -9,6 +9,13 @@ use crate::{
 	Guard::Token::Fn::MgmtToken,
 };
 
+/// The one-time notice printed when the management routes carry no credential.
+///
+/// Kept as data so the message is one string in one place, and so the gate that
+/// decides to print it stays a value rather than a branch.
+const MGMT_NOTICE:&str = "APHRODITE_MGMT_TOKEN not set - management routes (/stats, /retrieve, /ccr/*, /reload, \
+                          /tool/relay, ...) accept any loopback caller with no credential";
+
 /// Serve one bound listener until its shutdown receiver fires.
 ///
 /// The router is built here, per listener, because each listener has its own
@@ -41,12 +48,11 @@ pub async fn Serve(Bound:Bound, mut ShutdownRx:tokio::sync::watch::Receiver<bool
 	// 02-F1: one-time notice, not per-request - management routes
 	// (/stats, /retrieve, /ccr/*, /reload, /tool/relay, ...) accept any
 	// loopback caller with no credential until APHRODITE_MGMT_TOKEN is set.
-	let _ = MgmtToken().is_none().then(|| {
-		tracing::warn!(
-			name = %Name,
-			"APHRODITE_MGMT_TOKEN not set - management routes (/stats, /retrieve, /ccr/*, /reload, /tool/relay, ...) accept any loopback caller with no credential"
-		);
-	});
+	MgmtToken()
+		.is_none()
+		.then_some(MGMT_NOTICE)
+		.into_iter()
+		.for_each(|Notice| tracing::warn!(name = %Name, "{}", Notice));
 
 	let App = Route::Build::Build(State);
 

@@ -30,6 +30,6 @@ impl Struct {
 
 		// The guard above is released at the end of its statement, which is what lets
 		// `Reload` take the same mutex.
-		let _ = Needs.then(|| self.Reload());
+		Needs.then_some(()).into_iter().for_each(|()| self.Reload());
 	}
 }

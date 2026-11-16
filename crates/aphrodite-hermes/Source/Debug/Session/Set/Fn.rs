@@ -29,20 +29,15 @@ use crate::Debug::{
 /// error, which is the honest answer to "the toggle did not stick".
 pub(crate) fn Fn(on:bool) -> anyhow::Result<(String, String)> {
 	let root = Root::Fn::Fn();
-	let root = match root.is_empty() {
-		true => Last::Fn::Fn(),
-		false => root,
-	};
+	let root = root.is_empty().then(Last::Fn::Fn).unwrap_or(root);
 
-	if root.is_empty() {
-		anyhow::bail!("no session context yet - hooks have not fired in this process");
-	}
+	anyhow::ensure!(
+		!root.is_empty(),
+		"no session context yet - hooks have not fired in this process"
+	);
 
 	let flag = Flag::Scoped::Fn::Fn(&root);
-	let flag_text = match on {
-		true => "on",
-		false => "off",
-	};
+	let flag_text = on.then_some("on").unwrap_or("off");
 
 	std::fs::write(&flag, flag_text).with_context(|| format!("write the debug flag {}", flag.display()))?;
 

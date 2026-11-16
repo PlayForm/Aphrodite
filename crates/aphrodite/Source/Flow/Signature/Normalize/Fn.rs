@@ -18,7 +18,10 @@ pub fn NormalizeArgsSig(Tool:&str, Args:Option<&serde_json::Value>) -> u64 {
 	Buffer.push_str(Tool);
 	Buffer.push('\u{1}');
 
-	if let Some(v) = Args {
+	// The arguments are the value that may be absent: when the call carried none
+	// there is nothing to normalize, and `for_each` is the one-item iteration over
+	// the `Option` rather than a guard in front of the work.
+	Args.into_iter().for_each(|v| {
 		// Terminal-style calls: the command string is the whole identity.
 		match v.get("command").and_then(|c| c.as_str()) {
 			Some(Command) => {
@@ -45,7 +48,7 @@ pub fn NormalizeArgsSig(Tool:&str, Args:Option<&serde_json::Value>) -> u64 {
 				}
 			},
 		}
-	}
+	});
 
 	Fnv1a(Buffer.as_bytes())
 }

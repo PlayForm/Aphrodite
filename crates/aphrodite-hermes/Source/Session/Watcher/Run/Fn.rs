@@ -51,16 +51,10 @@ pub(crate) fn Fn(
 	};
 
 	// One blocking wake per burst, then one apply. `Wait` names the three ways
-	// the loop can wake, and `Continue` is the one place the "keep watching?"
-	// policy lives - this leaf only obeys it.
-	loop {
-		match Wait::Fn::Fn(&Receiver, &Stop) {
-			Event::Enum::Enum::Tick => {},
-			Event::Enum::Enum::Stop | Event::Enum::Enum::Closed => break,
-		}
-
-		let Pass = Apply::Fn::Fn(&aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load());
-
+	// the loop can wake, `Continue` is the one place the "keep watching?"
+	// policy lives, and `Step` composes them: it answers `None` when the loop is
+	// over, so the body below is the pass itself.
+	while let Some(Pass) = Step(&Receiver, &Stop) {
 		// The reach, at debug level. A reload that reached three of five sessions
 		// is a fact only this thread knows: the sweep counts it, and nobody else
 		// ever asks. `skipped` is the wedge count, which is the difference between
@@ -84,9 +78,21 @@ pub(crate) fn Fn(
 				)
 			},
 		}
+	}
+}
 
-		if !Continue::Fn::Fn(&Pass) {
-			break;
-		}
+/// One pass: wait for the source, apply the file, then ask the policy whether to
+/// keep watching.
+///
+/// `None` is the loop's exit - the source stopped or closed, or no session wants a
+/// reload any more - so the loop has one condition to obey instead of two.
+fn Step(Receiver:&Receiver<()>, Stop:&Arc<AtomicBool>) -> Option<Outcome::Enum::Enum> {
+	match Wait::Fn::Fn(Receiver, Stop) {
+		Event::Enum::Enum::Tick => {
+			let Pass = Apply::Fn::Fn(&aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load());
+
+			Continue::Fn::Fn(&Pass).then_some(Pass)
+		},
+		Event::Enum::Enum::Stop | Event::Enum::Enum::Closed => None,
 	}
 }

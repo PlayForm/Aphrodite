@@ -24,21 +24,20 @@ impl<'a> Iterator for Struct<'a> {
 	type Item = &'a str;
 
 	fn next(&mut self) -> Option<&'a str> {
-		if self.Remaining.is_empty() {
-			return None;
-		}
+		// Exhaustion is the empty remaining slice itself, not a guard in front of
+		// it: the `?` is the `None` this iterator produces.
+		let Remaining = (!self.Remaining.is_empty()).then_some(self.Remaining)?;
 
 		// The cut is the first char boundary at or beyond the target, or the end
 		// of the content when no boundary is that far out. `char_indices` never
 		// yields a mid-character index, which is what makes the split lossless.
-		let Cut = self
-			.Remaining
+		let Cut = Remaining
 			.char_indices()
 			.find(|(Index, _)| *Index >= self.Target.get())
 			.map(|(Index, _)| Index)
-			.unwrap_or(self.Remaining.len());
+			.unwrap_or(Remaining.len());
 
-		let (Chunk, Rest) = self.Remaining.split_at(Cut);
+		let (Chunk, Rest) = Remaining.split_at(Cut);
 		self.Remaining = Rest;
 
 		Some(Chunk)

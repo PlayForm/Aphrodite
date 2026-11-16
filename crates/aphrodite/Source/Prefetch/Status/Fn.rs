@@ -60,9 +60,15 @@ pub fn PrefetchStatus(State:&AphroditeState) -> serde_json::Value {
 		"total_ready": Ready.len(),
 	});
 
-	if State.LiveContainer {
-		Out["live_container"] = serde_json::json!(true);
-	}
+	// The flag is the value the overlay exists as: when it is off there is no
+	// field to set, and the base document stays byte-identical.
+	State
+		.LiveContainer
+		.then_some(serde_json::json!(true))
+		.into_iter()
+		.for_each(|Live| {
+			Out["live_container"] = Live;
+		});
 
 	Out
 }

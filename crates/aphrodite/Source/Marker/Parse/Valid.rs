@@ -13,11 +13,11 @@
 /// of the inline prefix are named explicitly instead of being a side effect of
 /// that copy - `I:` is accepted because lowercasing used to accept it, and it is
 /// written down here so the accepted set is visible rather than incidental.
+///
+/// There is no length pre-gate: an `i:`/`I:` prefix leaves at most `len - 2`
+/// hex characters, so anything under 8 characters already fails the 6-character
+/// floor, and the bare-hash arm already demands 24.
 pub fn IsValidCCRHash(h:&str) -> bool {
-	if h.len() < 8 {
-		return false;
-	}
-
 	match h.strip_prefix("i:").or_else(|| h.strip_prefix("I:")) {
 		Some(Stripped) => Stripped.len() >= 6 && Stripped.chars().all(|c| c.is_ascii_hexdigit()),
 		None => h.len() >= 24 && h.chars().all(|c| c.is_ascii_hexdigit()),

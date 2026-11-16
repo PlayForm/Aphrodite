@@ -143,7 +143,7 @@ fn TestTableSortsByTurnAndCapsTwenty() {
 			Preview:format!("[text] entry {}", i),
 			// The last marker (i == 24) is the one carrying the OLDEST turn, so a
 			// reverse-insertion-order table would wrongly put it in the newest window.
-			Turn:Some(1).filter(|_| i == 24).unwrap_or(i),
+			Turn:(i == 24).then_some(1).unwrap_or(i),
 			Center:None,
 			meta:None,
 		});

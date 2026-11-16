@@ -10,7 +10,7 @@ use crate::Setup::{Run::Context::Struct as SetupContext, Write::BinaryName};
 #[cfg(not(target_os = "macos"))]
 use crate::Setup::Write::Permissions::Fn as SecurePerms;
 #[cfg(target_os = "macos")]
-use crate::Setup::MacOS::Fn as InstallMacOSArtifact;
+use crate::Setup::MacOS::Fn::Fn as InstallMacOSArtifact;
 
 /// Install this executable as the runtime's proxy binary.
 ///
@@ -18,7 +18,7 @@ use crate::Setup::MacOS::Fn as InstallMacOSArtifact;
 /// is preserved unless `--force`. A stale binary beside a fresh dylib is a version
 /// handshake failure at plugin start with nothing pointing at the install.
 ///
-/// macOS takes `MacOS::Fn` because `fs::copy` preserves extended attributes (code
+/// macOS takes `MacOS::Fn::Fn` because `fs::copy` preserves extended attributes (code
 /// signature, quarantine) from the build directory, and Gatekeeper kills the copied
 /// binary at the install path. See that function's doc comment (03-F6/F7/F9) for why
 /// this is not just `ditto` plus `let _ =`.

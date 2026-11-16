@@ -129,9 +129,11 @@ impl Struct {
 				let Configured = cfg.Timeout.unwrap_or(300);
 				let Clamped = Configured.min(600);
 
-				if Clamped != Configured {
-					tracing::warn!("timeout {}s exceeds maximum 600s, clamping", Configured);
-				}
+				// The clamp is the gate: only a value it changed is worth reporting.
+				(Clamped != Configured)
+					.then_some(Configured)
+					.into_iter()
+					.for_each(|Excess| tracing::warn!("timeout {}s exceeds maximum 600s, clamping", Excess));
 
 				Clamped
 			},

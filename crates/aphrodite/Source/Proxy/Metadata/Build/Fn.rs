@@ -2,13 +2,17 @@
 
 use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
 
+/// The markers that make a build log a failure.
+const FailureMarkers:[&str; 2] = ["error", "aborting"];
+
 /// Status first, then how much was built, then the error that stopped it.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	let Content = Analysis.Content();
-	let Status = if Content.contains("error") || Content.contains("aborting") {
-		"FAIL"
-	} else {
-		"OK"
+	// A table of failure markers rather than a chain of tests: the first marker
+	// the content carries names the status, and no marker means it was OK.
+	let Status = match FailureMarkers.iter().find(|Marker| Content.contains(**Marker)) {
+		Some(_) => "FAIL",
+		None => "OK",
 	};
 	let Files = Content
 		.lines()

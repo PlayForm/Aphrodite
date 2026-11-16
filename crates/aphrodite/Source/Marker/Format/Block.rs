@@ -53,7 +53,7 @@ pub(super) fn RenderMarkerBlock(
 		}
 	});
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::TemplateRenders);
-	if let Some(T0) = T0 {
+	T0.into_iter().for_each(|T0| {
 		crate::Debug::Log::Verbose::Fn::Fn(
 			"marker_render",
 			&[
@@ -63,6 +63,6 @@ pub(super) fn RenderMarkerBlock(
 				("elapsed_us", T0.elapsed().as_micros().to_string()),
 			],
 		);
-	}
+	});
 	Out
 }

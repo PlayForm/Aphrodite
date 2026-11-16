@@ -5,6 +5,7 @@
 //! about without the others - and the order lives in the plan, not in the order of
 //! statements in a function.
 
+pub mod Apply;
 pub mod Binary;
 pub mod Configuration;
 pub mod Directory;

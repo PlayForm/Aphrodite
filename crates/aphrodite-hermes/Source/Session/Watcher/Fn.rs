@@ -84,9 +84,7 @@ pub(crate) fn spawn_config_watcher() -> Start::Enum::Enum {
 			// A second spawn replaces the first: two threads on one config file
 			// would apply every change twice, and the replaced thread would be
 			// unreachable - running this image's code with no way to join it.
-			if let Some(Old) = Previous {
-				Old.stop();
-			}
+			Previous.into_iter().for_each(|Old| Old.stop());
 
 			Start::Enum::Enum::Running
 		},

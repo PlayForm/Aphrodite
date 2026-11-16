@@ -13,6 +13,8 @@
 #![allow(non_snake_case)]
 // Constants and statics are PascalCase house-wide; see `Library.rs`.
 #![allow(non_upper_case_globals)]
+// A two-branch decision is a value, not a branch; see `Library.rs`.
+#![allow(clippy::obfuscated_if_else)]
 
 mod Boot;
 mod Guard;

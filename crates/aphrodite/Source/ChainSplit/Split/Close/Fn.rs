@@ -13,7 +13,7 @@ pub(crate) fn Fn(Segments:&mut Vec<Segment>, Current:&mut String, Index:usize) -
 	let Text = Current.trim().to_string();
 	Current.clear();
 
-	let _ = (!Text.is_empty()).then(|| Segments.push(Segment { Index, command:Text }));
+	Segments.extend((!Text.is_empty()).then_some(Segment { Index, command:Text }));
 
 	Index + 1
 }

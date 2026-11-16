@@ -37,9 +37,9 @@ pub(crate) fn Fn(Payload:Box<dyn Any + Send>, Message:&'static str) -> anyhow::E
 
 	std::mem::forget(Payload);
 
-	if let Some(Detail) = Detail {
-		tracing::error!(detail = %Detail, "{Message}");
-	}
+	Detail
+		.into_iter()
+		.for_each(|Detail| tracing::error!(detail = %Detail, "{Message}"));
 
 	anyhow::anyhow!("{Message}")
 }

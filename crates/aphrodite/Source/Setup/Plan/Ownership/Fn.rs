@@ -31,18 +31,24 @@ pub(crate) fn Fn(PluginDirectory:&Path, HermesHome:&Path) -> Enum {
 		},
 	};
 
-	if Metadata.file_type().is_symlink() {
-		return Enum::DevStaleSymlink;
-	}
+	// A link is answered before anything is resolved, because a link is never a
+	// catalog install: it is removed so the loader lands as real files, never through
+	// it. The ownership of the real path is the fallback the link case skips.
+	Metadata
+		.file_type()
+		.is_symlink()
+		.then_some(Enum::DevStaleSymlink)
+		.unwrap_or_else(|| Canonical(PluginDirectory, HermesHome))
+}
 
+/// Who owns a real directory: one that resolves inside the Hermes home is the plugin's
+/// own install dir; one that resolves anywhere else is setup's to take.
+///
+/// Both canonicalisations have to succeed, so a failure on either is reported rather
+/// than read as "not a catalog install".
+fn Canonical(PluginDirectory:&Path, HermesHome:&Path) -> Enum {
 	match (std::fs::canonicalize(PluginDirectory), std::fs::canonicalize(HermesHome)) {
-		(Ok(Resolved), Ok(Home)) => {
-			if Resolved.starts_with(&Home) {
-				Enum::Catalog
-			} else {
-				Enum::Dev
-			}
-		},
+		(Ok(Resolved), Ok(Home)) => Resolved.starts_with(&Home).then_some(Enum::Catalog).unwrap_or(Enum::Dev),
 		(Err(e), _) => Enum::Uninspectable { Cause:format!("resolve {}: {e}", PluginDirectory.display()) },
 		(_, Err(e)) => Enum::Uninspectable { Cause:format!("resolve the Hermes home {}: {e}", HermesHome.display()) },
 	}

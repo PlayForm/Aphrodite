@@ -4,6 +4,8 @@ use std::{path::PathBuf, sync::mpsc::Sender};
 
 use notify::Watcher;
 
+use crate::Session::Watcher::Select;
+
 /// Build the notifier, wire its filter, and watch every directory in `Paths`.
 ///
 /// Returns the notifier, which the CALLER must keep alive: dropping it stops
@@ -26,12 +28,12 @@ use notify::Watcher;
 /// the loop must not wake for.
 pub(crate) fn Fn(Wake:Sender<()>, Paths:&[PathBuf]) -> Result<notify::RecommendedWatcher, String> {
 	let mut Notifier = notify::recommended_watcher(move |Result:Result<notify::Event, notify::Error>| {
-		let Wanted = Result.is_ok_and(|Event| {
-			matches!(Event.kind, notify::EventKind::Modify(_))
-				&& Event.paths.iter().any(|Path| Path.to_string_lossy().contains("aphrodite.toml"))
-		});
-
-		let _ = Wanted.then(|| Wake.send(()));
+		Result
+			.ok()
+			.filter(Select::Fn::Fn)
+			.map(|_| Wake.send(()))
+			.into_iter()
+			.for_each(drop);
 	})
 	.map_err(|e| format!("config auto-reload watcher failed to start: {e}"))?;
 

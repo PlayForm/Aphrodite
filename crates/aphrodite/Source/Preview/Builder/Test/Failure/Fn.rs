@@ -17,7 +17,7 @@ pub(crate) fn Fn(Content:&str) -> Option<String> {
 
 			Trimmed
 				.strip_prefix(Shapes[0])
-				.or_else(|| Trimmed.strip_prefix(Shapes[1]).filter(|_| Trimmed.ends_with("FAILED")))
+				.or_else(|| Trimmed.ends_with("FAILED").then(|| Trimmed.strip_prefix(Shapes[1])).flatten())
 				.or_else(|| Trimmed.strip_prefix(Shapes[2]))
 				.map(|Rest| Rest.split_whitespace().next().unwrap_or("").to_string())
 		})

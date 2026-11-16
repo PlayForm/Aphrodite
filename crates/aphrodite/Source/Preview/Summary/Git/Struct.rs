@@ -50,9 +50,9 @@ impl Struct {
 		*self.Codes.entry(Record.Code).or_insert(0) += 1;
 		self.Total += 1;
 
-		if self.Paths.len() < PathsShown && !Record.Path.is_empty() {
-			self.Paths.push(Record.Path);
-		}
+		let Retain = self.Paths.len() < PathsShown && !Record.Path.is_empty();
+
+		self.Paths.extend(Retain.then_some(Record.Path));
 	}
 
 	/// The tally in the canonical code order, as `(label, count)` pairs.

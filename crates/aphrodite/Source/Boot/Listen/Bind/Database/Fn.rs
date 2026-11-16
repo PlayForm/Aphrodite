@@ -30,14 +30,15 @@ pub(crate) fn Fn(CLI:&mut CLI) -> anyhow::Result<()> {
 	// executable-directory lookup at all.
 	let NeedsResolution = !Configured.as_os_str().is_empty() && !Configured.is_absolute();
 
-	if NeedsResolution {
-		let ExeDirectory = std::env::current_exe()
-			.ok()
-			.and_then(|ExePath| ExePath.parent().map(std::path::Path::to_path_buf));
-
-		if let Some(ExeDirectory) = ExeDirectory {
-			let Resolved = ExeDirectory.join(&Configured);
-
+	// Resolution is one value: the predicate and the executable-directory lookup are
+	// both gates on the same `Option`, so a "no" from either leaves it empty and the
+	// path untouched. The write is the effect that a `Some` carries.
+	NeedsResolution
+		.then(ExeDirectory)
+		.flatten()
+		.map(|ExeDirectory| ExeDirectory.join(&Configured))
+		.into_iter()
+		.for_each(|Resolved| {
 			tracing::info!(
 				"resolved relative ccr_db_path from {} to {}",
 				Configured.display(),
@@ -45,16 +46,21 @@ pub(crate) fn Fn(CLI:&mut CLI) -> anyhow::Result<()> {
 			);
 
 			CLI.CCRDatabasePath = Some(Resolved);
-		}
-	}
+		});
 
 	// The parent of whatever path is now in force, when there is one. Named in the error
 	// because "create the database directory" without a path leaves the operator to guess
 	// which of the two paths (configured or resolved) was wrong.
-	if let Some(Parent) = CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()) {
-		std::fs::create_dir_all(Parent)
-			.with_context(|| format!("create the database directory {}", Parent.display()))?;
-	}
+	CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()).map_or(Ok(()), |Parent| {
+		std::fs::create_dir_all(Parent).with_context(|| format!("create the database directory {}", Parent.display()))
+	})?;
 
 	Ok(())
+}
+
+/// The directory this binary lives in, when the OS reports one.
+fn ExeDirectory() -> Option<std::path::PathBuf> {
+	std::env::current_exe()
+		.ok()
+		.and_then(|ExePath| ExePath.parent().map(std::path::Path::to_path_buf))
 }
