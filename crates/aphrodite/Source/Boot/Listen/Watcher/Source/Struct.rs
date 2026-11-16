@@ -1,25 +1,30 @@
-//! One live directory watch: the event channel and the platform watcher behind
-//! it.
+//! One live directory watch: the event channel and the platform watcher behind it.
 
 use tokio::sync::mpsc::Receiver;
 
+use crate::Boot::Listen::Watcher::Target;
+
 /// A running watch on one directory.
 ///
-/// `Rx` yields one `()` per candidate event; the payload is deliberately
-/// discarded at the source, because every event means the same thing ("the file
-/// may have changed") and a burst is collapsed downstream.
+/// `Rx` yields the resolved target per candidate event. It used to yield `()`, which
+/// threw away the one fact the applier needs - which file changed - and forced the
+/// path to be threaded alongside the channel as a second, parallel argument that
+/// nothing kept in step with the events. The payload is the target, so the applier
+/// reads what changed from the event itself.
 ///
 /// `_Watcher` is held for one reason: a `notify` watcher that is dropped stops
-/// delivering events. It carries no state anyone reads, so it is a private field
-/// with a leading underscore rather than a named part of the value - a caller
-/// that could reach it would have nothing to do with it.
+/// delivering events. It carries no state anyone reads, so it is a private field with
+/// a leading underscore rather than a named part of the value - a caller that could
+/// reach it would have nothing to do with it.
 pub(crate) struct Struct {
-	/// One `()` per candidate event, in arrival order.
-	pub(crate) Rx:Receiver<()>,
+	/// One resolved target per candidate event, in arrival order.
+	pub(crate) Rx:Receiver<Target::Struct::Struct>,
 	_Watcher:notify::RecommendedWatcher,
 }
 
 impl Struct {
 	/// Wrap a receiver together with the watcher that feeds it.
-	pub(crate) fn new(Rx:Receiver<()>, Watcher:notify::RecommendedWatcher) -> Self { Self { Rx, _Watcher:Watcher } }
+	pub(crate) fn new(Rx:Receiver<Target::Struct::Struct>, Watcher:notify::RecommendedWatcher) -> Self {
+		Self { Rx, _Watcher:Watcher }
+	}
 }

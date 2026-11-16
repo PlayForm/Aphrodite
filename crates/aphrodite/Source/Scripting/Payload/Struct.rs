@@ -8,6 +8,10 @@
 /// the pre-Rust `OnMarker` scripts (which chain on the preview) behave
 /// identically.
 ///
+/// The SCOPE names are lowercase (`hash`) because they are the names user
+/// scripts already read - a `.rhai` file is a wire contract, not an internal
+/// caller - while the Rust field is `Hash` like every other field here.
+///
 /// Every field is optional because the hook surfaces do not all carry the same
 /// facts: `OnCompress` has no hash, `OnMarker` has no size. A missing field is
 /// seeded as the empty string / zero in the script scope, never as a Rhai error,
@@ -21,7 +25,7 @@ pub struct Struct {
 	/// Byte size of the original content, when the caller knows it.
 	pub Size:Option<usize>,
 	/// The CCR hash, on the hooks that run after a marker exists.
-	pub hash:Option<String>,
+	pub Hash:Option<String>,
 	/// The marker metadata envelope, on the marker hook.
 	pub Metadata:Option<String>,
 	/// The preview text, mirrored into `Content` on the marker hook.

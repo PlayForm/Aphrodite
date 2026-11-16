@@ -5,14 +5,27 @@ use crate::{
 		Insert::Fn::InsertBgTask,
 		Registry::ReadFrom::Fn::Fn as ReadFrom,
 		Select::Eviction::Fn::Fn as Evict,
-		Task::Status::Enum::BgStatus,
+		Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
 	},
-	State::Struct::AphroditeState,
+	State::{
+		Identity::{Command::Struct::CommandID, Content::Struct::ContentHash},
+		Struct::AphroditeState,
+	},
 };
+
+fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 fn Four() -> AphroditeState {
 	let mut State = AphroditeState::default();
-	(0..4).for_each(|i| InsertBgTask(&mut State, format!("t{i}"), "terminal".into(), format!("cmd{i}"), i));
+	(0..4).for_each(|i| {
+		InsertBgTask(
+			&mut State,
+			CommandID::from(format!("t{i}")),
+			"terminal".into(),
+			format!("cmd{i}"),
+			i,
+		)
+	});
 	State
 }
 
@@ -28,7 +41,7 @@ fn TestOldestStaleIsEvictedFirst() {
 #[test]
 fn TestFinishedBeatsRunningAndLosesToStale() {
 	let mut State = Four();
-	State.BgTasks[2].Status = BgStatus::Done { ExitCode:0 };
+	State.BgTasks[2].Status = BgStatus::Done { Output:Finished() };
 	State.BgTasks[3].Status = BgStatus::Stale;
 
 	assert_eq!(Evict(&ReadFrom(&State.BgTasks)), Some(3), "stale outranks finished");

@@ -21,8 +21,16 @@
 //! fails loudly and specifically if it can't find one) or a full source
 //! build (`cargo build --release -p aphrodite-hermes`).
 
+#![allow(non_snake_case)]
+
 fn main() {
-	println!("aphrodite-hermes v{} installed.", env!("CARGO_PKG_VERSION"));
+	// Which build this is, not just which version: the same question the dylib's
+	// health probe answers, and the same reason - two images of one version are
+	// otherwise indistinguishable, so a user cannot tell whether the install they
+	// just ran replaced the dylib they were debugging.
+	let Build = option_env!("APHRODITE_HERMES_GIT_HASH").unwrap_or("version-only (no revision stamped)");
+
+	println!("aphrodite-hermes v{} installed ({Build}).", env!("CARGO_PKG_VERSION"));
 	println!(
 		"`cargo install` does not distribute this crate's dylib (libaphrodite_hermes.*) - only this helper binary."
 	);

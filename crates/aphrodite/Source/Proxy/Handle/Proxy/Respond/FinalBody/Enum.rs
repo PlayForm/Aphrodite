@@ -14,14 +14,14 @@
 
 use bytes::Bytes;
 
-use crate::Proxy::Measurement::Wire::Struct::Struct as WireAccounting;
+use crate::Proxy::Measurement::Content::Struct::Struct as ContentAccounting;
 
 /// The bytes selected for the client.
 pub(crate) enum Enum {
 	/// The upstream body, untouched.
 	Original(Bytes),
 	/// The rewritten body, with what the rewrite saved.
-	Transformed { Bytes:Bytes, Accounting:WireAccounting },
+	Transformed { Bytes:Bytes, Accounting:ContentAccounting },
 }
 
 impl Enum {

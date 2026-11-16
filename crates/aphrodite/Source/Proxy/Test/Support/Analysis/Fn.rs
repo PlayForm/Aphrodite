@@ -8,6 +8,4 @@
 use crate::Proxy::Analysis::Struct::Struct as ContentAnalysis;
 
 /// An analysis of `Content` under the given content type.
-pub(crate) fn Fn<'a>(Content:&'a str, Ct:&'static str) -> ContentAnalysis<'a> {
-	ContentAnalysis { Content, Ct, Lines:Content.lines().count() }
-}
+pub(crate) fn Fn<'a>(Content:&'a str, Ct:&'static str) -> ContentAnalysis<'a> { ContentAnalysis::New(Content, Ct) }

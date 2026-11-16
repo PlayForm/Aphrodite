@@ -18,7 +18,7 @@ proptest! {
 	#[test]
 	fn PropClassifierAndMetadataNeverPanic(s in ".*") {
 		let Detected = AnalyseContent(&s);
-		let Named = NamedAnalysis(&s, Detected.Ct);
+		let Named = NamedAnalysis(&s, Detected.Ct());
 
 		let Metas:Vec<String> = [&Detected, &Named].into_iter().map(GenerateMetadata).collect();
 		let Violations:Vec<&String> = Metas

@@ -45,12 +45,12 @@ pub(crate) fn Fn(State:&AphroditeState, Items:&VecDeque<MarkerEntry>) -> String 
 		Lines.push(format!("| {} | {} | {} | {} |", hash, Marker.CCRType, Size, Preview));
 	});
 
-	let _ = (Items.len() > 20).then(|| {
+	if Items.len() > 20 {
 		Lines.push(format!(
 			"{} more entries - use the aphrodite_catalog tool to list them all.",
 			Items.len() - 20
 		));
-	});
+	}
 
 	Lines.join("\n")
 }

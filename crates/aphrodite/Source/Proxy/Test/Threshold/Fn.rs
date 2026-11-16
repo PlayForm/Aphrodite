@@ -1,15 +1,9 @@
 //! Compression thresholds: the env > TOML > default precedence, and the
 //! `/reload` path that re-applies them to a live `AppState`.
 
-use std::{
-	collections::VecDeque,
-	num::NonZeroUsize,
-	sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-};
+use std::sync::atomic::Ordering;
 
 use axum::{extract::State, response::IntoResponse};
-use reqwest::Client as HttpClient;
-use tokio_util::task::TaskTracker;
 
 use crate::{
 	Configuration::Proxy::{Compression::Struct::Struct as CompressionConfiguration, Mode::Enum::Enum as ProxyMode},
@@ -19,14 +13,7 @@ use crate::{
 		State::Struct::Struct as AppState,
 		Test::Support::{Lock::Const::ReloadTestLock, State::Fn::TestState},
 		Threshold::{
-			Const::{
-				AutoExpandLimitDefault,
-				CacheCompressThreshold,
-				InitialFillPct,
-				InitialRatioEma,
-				InlineCCRThreshold,
-				TokenCompressThreshold,
-			},
+			Const::{AutoExpandLimitDefault, CacheCompressThreshold, InlineCCRThreshold, TokenCompressThreshold},
 			Resolve::Fn::Fn as ResolveThresholds,
 		},
 	},
@@ -34,70 +21,11 @@ use crate::{
 
 #[test]
 fn TestCompressThresholdCache() {
-	use std::{collections::HashMap, sync::Mutex};
-	let state = AppState {
-		Client:HttpClient::new(),
-		StreamClient:HttpClient::new(),
-		APIURL:"https://upstream-openai.com".into(),
-		Model:"test".into(),
-		APIKey:"test".into(),
-		ccr:None,
-		AddMarkers:false,
-		Mode:ProxyMode::Cache,
-		ToolRelay:false,
-		NotifyURL:None,
-		NotifyKey:None,
-		Dev:false,
-		RequestsTotal:AtomicU64::new(0),
-		RequestsCompressed:AtomicU64::new(0),
-		TokensSaved:AtomicU64::new(0),
-		CCRHits:AtomicU64::new(0),
-		CCRMisses:AtomicU64::new(0),
-		CCRCreated:AtomicU64::new(0),
-		ToolRelayCalls:AtomicU64::new(0),
-		CompressionRatioEma:AtomicU64::new(InitialRatioEma),
-		RequestHistory:Mutex::new(VecDeque::new()),
-		InlineCCR:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
-		LatencyBuckets:[
-			AtomicU64::new(0),
-			AtomicU64::new(0),
-			AtomicU64::new(0),
-			AtomicU64::new(0),
-			AtomicU64::new(0),
-		],
-		TotalLatencyMicros:AtomicU64::new(0),
-		LastErrors:Mutex::new(VecDeque::new()),
-		CompressionsByType:Mutex::new(HashMap::new()),
-		ResponseCache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
-		ResponseCacheTtl:std::time::Duration::from_secs(3600),
-		CacheHits:AtomicU64::new(0),
-		CacheMisses:AtomicU64::new(0),
-		FillPct:AtomicU64::new(InitialFillPct()),
-		TaskTracker:TaskTracker::new(),
-		InlineCCRHits:AtomicU64::new(0),
-		InlineCCRMisses:AtomicU64::new(0),
-		ToolRelaySuccess:AtomicU64::new(0),
-		ToolRelayFailure:AtomicU64::new(0),
-		NotifySuccess:AtomicU64::new(0),
-		NotifyFailure:AtomicU64::new(0),
-		UpstreamErrors4xx:AtomicU64::new(0),
-		UpstreamErrors5xx:AtomicU64::new(0),
-		UpstreamTimeouts:AtomicU64::new(0),
-		UpstreamConnectErrors:AtomicU64::new(0),
-		UpstreamOtherErrors:AtomicU64::new(0),
-		SSEStreamErrors:AtomicU64::new(0),
-		RequestBodyBytes:AtomicU64::new(0),
-		ResponseBodyBytes:AtomicU64::new(0),
-		UpstreamLatencyMicros:AtomicU64::new(0),
-		UpstreamHealthCache:std::sync::Mutex::new(None),
-		CacheCompressThreshold:AtomicUsize::new(CacheCompressThreshold),
-		TokenCompressThreshold:AtomicUsize::new(TokenCompressThreshold),
-		InlineCCRThreshold:AtomicUsize::new(InlineCCRThreshold),
-		CodeMultiplierX100:AtomicU64::new(300),
-		AutoExpand:AtomicBool::new(false),
-		AutoExpandLimit:AtomicUsize::new(AutoExpandLimitDefault),
-		MaximumRequestBodySize:None,
-	};
+	// The fixture, not a second `AppState` literal: a hand-copied field set in a
+	// test silently stops matching the real one (this copy had already drifted),
+	// and every new field meant editing it twice.
+	let state = AppState { Mode:ProxyMode::Cache, ..TestState() };
+
 	assert_eq!(state.CompressThreshold(), CacheCompressThreshold);
 }
 

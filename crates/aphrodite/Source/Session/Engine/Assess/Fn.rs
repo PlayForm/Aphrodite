@@ -4,7 +4,7 @@ use crate::{
 	Session::{
 		Engine::{
 			Assess::Enum::Enum as Assessment,
-			Gate::{Enum::Enum as Gate, Resolve::Fn::Fn as ResolveGate},
+			Gate::Resolve::Fn::Fn as ResolveGate,
 			Plan::Build::Fn::Fn as BuildPlan,
 		},
 		Turn::Const::ConvIndexCap,
@@ -33,9 +33,10 @@ pub(crate) fn Fn(State:&AphroditeState) -> Assessment {
 
 	match ResolveGate(State, Total, FillPct, MiddleN) {
 		Some(Reason) => Assessment::Skip(Reason),
-		None => {
-			BuildPlan(State, Total, HeadN, TailN, MiddleN)
-				.map_or(Assessment::Skip(Gate::Unpackable), Assessment::Archive)
-		},
+		// The plan's own refusal is reported as the reason it named, not folded into
+		// a generic "unpackable": the two failures (`MiddleOutOfRange` from a bad
+		// protect-bound pair, `Unpackable` from a packing failure) need different
+		// fixes, and the `engine_skip` line is what an investigation reads.
+		None => BuildPlan(State, Total, HeadN, TailN, MiddleN).map_or_else(Assessment::Skip, Assessment::Archive),
 	}
 }

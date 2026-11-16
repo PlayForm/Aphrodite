@@ -6,7 +6,7 @@
 //! `ApplyCompression` tests mutate them concurrently under `cargo test`.
 
 use crate::Marker::{
-	Format::{Const::MarkerTemplatesTestGuard, Entry::CCRMarker},
+	Format::{Entry::CCRMarker, Registration::Guard::Fn::Fn as MarkerTemplatesTestGuard},
 	Parse::{Extract::ExtractHashes, Preview::ParsePreview},
 };
 

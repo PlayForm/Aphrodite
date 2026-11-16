@@ -8,7 +8,7 @@ use crate::{Health::Proxy::Fn::proxy_health, Tool::Dispatch::Fn::ToolHandler};
 /// the operator needs and lets the standalone proxy / dev loop do the rebuild. The
 /// `hint` string is the contract: it names the exact command to run.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_rebuild", |_args| {
+	("aphrodite_rebuild", |_Args| {
 		serde_json::json!({
 			"status": "ok",
 			"version": env!("CARGO_PKG_VERSION"),

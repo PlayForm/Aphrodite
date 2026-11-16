@@ -8,8 +8,6 @@
 //! `arrived()` is the normal constructor; `EtaEstimate` keeps the chunked
 //! model available and honest for partial records.
 
-use crate::Prefetch::Clock::Fn::UnixNow;
-
 /// Live-container arrival record (pre-Rust `_hooks/live.py` container
 /// semantics): one per prefetched entry, only surfaced when
 /// `state.live_container` is on. `bytes_arrived == size` with `eta_s == 0.0`
@@ -31,8 +29,14 @@ impl LiveArrival {
 	/// Fully-arrived record for content that landed synchronously (the
 	/// Rust port's prefetch read is synchronous, so every loaded entry
 	/// arrives in one chunk at insert time).
-	pub fn Arrived(Size:u64) -> LiveArrival {
-		LiveArrival { ArrivedAtUnix:UnixNow(), BytesArrived:Size, Size, EtaS:0.0 }
+	///
+	/// The timestamp is an argument, not a clock read: one batch stamps every entry
+	/// it loads from one `UnixNow()`, so a reader comparing two entries of the same
+	/// prefetch cannot see them arrive in different seconds because the loop took
+	/// that long. It also makes the record a function of its inputs, which is what a
+	/// test can pin.
+	pub fn Arrived(Size:u64, ArrivedAtUnix:u64) -> LiveArrival {
+		LiveArrival { ArrivedAtUnix, BytesArrived:Size, Size, EtaS:0.0 }
 	}
 
 	/// Chunked-arrival ETA estimate for a partial record: scale the elapsed time

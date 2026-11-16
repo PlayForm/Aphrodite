@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, Handle::Fn::Fn as HandleID, Run::Fn::Fn as Run},
-	Guard::Cstr::Fn::Fn as Cstr,
+	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 	Handle::Lookup::WithState,
 	Route::{Decode::Fn::Fn as Decode, Prepare::Fn::Fn as Prepare, Run::Fn::Fn as RunRoute},
 };
@@ -30,18 +30,25 @@ use crate::ABI::{
 /// before the lock) and `Route::Run` (under the lock), in that order, and that
 /// order is the error precedence: a bad handle wins over bad args, bad args win
 /// over oversize content, and an oversize payload never reaches the filesystem.
+/// # Safety
+/// `Handle`, `HookName` and `ArgsJSON` must each be null or point to a valid,
+/// NUL-terminated C string that stays readable and unmoved for the duration of
+/// this call. The returned pointer is owned by the caller and must be released
+/// with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeDispatch(
+pub unsafe extern "C" fn AphroditeDispatch(
 	Handle:*const c_char,
 	HookName:*const c_char,
 	ArgsJSON:*const c_char,
 ) -> *mut c_char {
 	let Hid = unsafe { HandleID(Handle) };
-	let Name = unsafe { Cstr(HookName) }.unwrap_or_default();
-	let ArgsStr = unsafe { Cstr(ArgsJSON) }.unwrap_or_default();
+	let Name = unsafe { Cstr(HookName) };
+	let ArgsStr = unsafe { Cstr(ArgsJSON) };
 
 	Run(move || {
 		let Hid = Hid.ok_or_else(|| anyhow::anyhow!("invalid handle"))?;
+		let Name = Optional(Name)?;
+		let ArgsStr = Optional(ArgsStr)?;
 
 		let Args:serde_json::Value =
 			serde_json::from_str(&ArgsStr).map_err(|Error| anyhow::anyhow!("invalid args: {}", Error))?;

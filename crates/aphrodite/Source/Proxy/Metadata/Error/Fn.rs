@@ -9,7 +9,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// Where it happened, what it said, and how many of them there are.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Trace = Content.lines().find_map(|Line| {
 		let Trimmed = Line.trim();
 		let Position = Trimmed

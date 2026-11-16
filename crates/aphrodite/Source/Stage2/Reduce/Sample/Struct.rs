@@ -19,13 +19,20 @@ impl<T, const N: usize> Struct<T, N> {
 
 	/// Count one item and retain it while there is room.
 	///
+	/// The item is BUILT only when there is room, because the caller hands over a closure rather
+	/// than a value. That is the difference between bounding the retention and bounding the work:
+	/// a reducer that formatted every match and then dropped all but the first `N` still paid the
+	/// allocation, the truncation and the lowercase scan for a log of a million lines.
+	///
 	/// The count moves for every item; the sample moves only for the first `N`. It is not a
 	/// filter: an item beyond the cap is still counted, which is the whole reason this type
 	/// exists instead of `take`.
-	pub(crate) fn Push(&mut self, Item:T) {
+	pub(crate) fn Push(&mut self, Item:impl FnOnce() -> T) {
 		self.Total += 1;
 
-		let _ = (self.Sample.len() < N).then(|| self.Sample.push(Item));
+		if self.Sample.len() < N {
+			self.Sample.push(Item());
+		}
 	}
 
 	/// How many items were offered, including the ones not retained.

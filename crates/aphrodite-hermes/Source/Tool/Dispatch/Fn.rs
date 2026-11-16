@@ -30,35 +30,37 @@ pub type ToolHandler = fn(args:&serde_json::Value) -> Value;
 /// the current turn's (`Debug::Session::Last`) - the same resolution
 /// `Session::With::Fn::with_shared` uses, hoisted here so a tool call and the
 /// state it touches are attributed to one session in the log.
-pub fn Fn(name:&str, args_json:&str) -> Value {
+pub fn Fn(Name:&str, ArgsJSON:&str) -> Value {
 	// First real body a tool call runs through: install the subscriber here as
 	// well as on the hook path, because a host may call a tool before any hook
 	// fires (`Debug::Init` is a no-op on the second call).
 	crate::Debug::Init::Fn::Fn();
 
 	let Session = crate::Debug::Session::Last::Fn::Fn();
-	let Span = tracing::info_span!("tool_dispatch", tool = name, session = %Session);
+	let Span = tracing::info_span!("tool_dispatch", tool = Name, session = %Session);
 	let _Entered = Span.enter();
 
-	let registry = Registry::Fn::Fn();
-	match registry.get(name) {
-		Some(handler) => {
-			let args:Value = match serde_json::from_str(args_json) {
-				Ok(v) => v,
+	let Handlers = Registry::Fn::Fn();
+
+	match Handlers.get(Name) {
+		Some(Handler) => {
+			let Args:Value = match serde_json::from_str(ArgsJSON) {
+				Ok(Args) => Args,
 				Err(e) => {
 					// The message names the failure, never the payload: args can
 					// carry a whole file body.
-					tracing::warn!(target: crate::Debug::Init::Const::TARGET, tool = name, "unparseable tool args");
+					tracing::warn!(target: crate::Debug::Init::Const::TARGET, tool = Name, "unparseable tool args");
 
-					return serde_json::json!({"error": format!("invalid args: {}", e)});
+					return serde_json::json!({ "error": format!("invalid args: {}", e) });
 				},
 			};
-			handler(&args)
+
+			Handler(&Args)
 		},
 		None => {
-			tracing::warn!(target: crate::Debug::Init::Const::TARGET, tool = name, "unknown tool");
+			tracing::warn!(target: crate::Debug::Init::Const::TARGET, tool = Name, "unknown tool");
 
-			serde_json::json!({"error": format!("unknown tool: {}", name)})
+			serde_json::json!({ "error": format!("unknown tool: {}", Name) })
 		},
 	}
 }

@@ -6,6 +6,7 @@
 //! bare unified diff) names its files from the `---`/`+++` pairs instead.
 
 use crate::Preview::Input::Struct::Struct as Input;
+use super::More::Fn::Fn as More;
 
 /// Files the preview names: three.
 const FilesShown:usize = 3;
@@ -36,7 +37,7 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.take(FilesShown)
 		.collect();
 
-	let _ = Named.is_empty().then(|| {
+	if Named.is_empty() {
 		// Unified `diff -u` / `git diff` without --git headers: name files from the
 		// `--- a/path` / `+++ b/path` header pairs so the preview is never `0F` with no
 		// file context.
@@ -50,13 +51,9 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 			.filter(|Path| !Path.is_empty() && Seen.insert(Path.to_string()))
 			.take(FilesShown)
 			.for_each(|Path| Named.push(Path.to_string()));
-	});
+	}
 
-	let More = Files
-		.checked_sub(Named.len())
-		.filter(|More| *More > 0)
-		.map(|More| format!(" +{More} more"))
-		.unwrap_or_default();
+	let More = More(Files, Named.len());
 	let Tail = match Named.as_slice() {
 		[] => String::new(),
 		_ => format!(" | {}{More}", Named.join(" ")),

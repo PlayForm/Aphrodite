@@ -504,17 +504,17 @@ and what each forbids changing.
 
 **No `if` statement and no `for` loop** in code you write or touch. Each is a signal that a decision or a sequence has not been given a type yet.
 
-| Instead of | Write |
-| --- | --- |
-| `if cond { a } else { b }` | a domain enum matched structurally, or `Option`/`Result` with `map_or` / `and_then` |
-| `if let Some(x) = ...` | `match`, or `map` / `filter_map` / `and_then` |
-| `if cond { push }` where the collection decides | push a **variant** - the condition is a value that selects it |
-| `for x in xs { ... }` | `xs.iter().for_each(...)`, `.try_for_each(...)`, `.map(...)`, `.filter_map(...)`, `.fold(...)` |
-| `for x in xs { if p(x) { ... } }` | `.filter(p)` then the adapter - and if the predicate needs two branches, the element needs a variant |
-| a loop with an accumulator | `.fold(Initial, Step)` where `Step` is a named function, not a closure body |
-| a loop with an early exit | `ControlFlow` with `.try_for_each` |
-| `while let Some(x) = it.next()` | `it.by_ref().take_while(...)`, `.scan(...)`, or an iterator that terminates itself |
-| `if` selecting one of two computations | `then` / `unwrap_or_else` - with **no side effect inside the closure** |
+| Instead of                                      | Write                                                                                                |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `if cond { a } else { b }`                      | a domain enum matched structurally, or `Option`/`Result` with `map_or` / `and_then`                  |
+| `if let Some(x) = ...`                          | `match`, or `map` / `filter_map` / `and_then`                                                        |
+| `if cond { push }` where the collection decides | push a **variant** - the condition is a value that selects it                                        |
+| `for x in xs { ... }`                           | `xs.iter().for_each(...)`, `.try_for_each(...)`, `.map(...)`, `.filter_map(...)`, `.fold(...)`       |
+| `for x in xs { if p(x) { ... } }`               | `.filter(p)` then the adapter - and if the predicate needs two branches, the element needs a variant |
+| a loop with an accumulator                      | `.fold(Initial, Step)` where `Step` is a named function, not a closure body                          |
+| a loop with an early exit                       | `ControlFlow` with `.try_for_each`                                                                   |
+| `while let Some(x) = it.next()`                 | `it.by_ref().take_while(...)`, `.scan(...)`, or an iterator that terminates itself                   |
+| `if` selecting one of two computations          | `then` / `unwrap_or_else` - with **no side effect inside the closure**                               |
 
 ### Composition is the point
 
@@ -591,14 +591,14 @@ Rendering::Builder::Struct::New()
 
 ### Semantics belong in the type
 
-| Instead of | Use |
-| --- | --- |
-| a `bool` field | a two-variant enum - `Enable` is a variant, not a flag |
-| a `String` that is one of four values | an enum |
-| `usize` where `0` means unlimited | `Option<NonZeroUsize>` |
-| a `String` identifier that must match a format | a newtype with a private constructor |
-| two values that must travel together | one struct |
-| a value only valid after a step | a distinct type that step produces |
+| Instead of                                     | Use                                                    |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| a `bool` field                                 | a two-variant enum - `Enable` is a variant, not a flag |
+| a `String` that is one of four values          | an enum                                                |
+| `usize` where `0` means unlimited              | `Option<NonZeroUsize>`                                 |
+| a `String` identifier that must match a format | a newtype with a private constructor                   |
+| two values that must travel together           | one struct                                             |
+| a value only valid after a step                | a distinct type that step produces                     |
 
 ### Algorithms, not procedures
 

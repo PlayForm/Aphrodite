@@ -3,10 +3,12 @@
 //! One entry point (`Fn.rs`) over three leaves that can each answer on their
 //! own - `Detect/` asks the content detector, `Hinted/` recognises the terminal
 //! shape, `Refine/` upgrades a generic answer. `Source/` is the vocabulary they
-//! report in and `Struct.rs` the value they pass.
+//! report in, `Hint/` the path they were asked for, and `Struct.rs` the value
+//! they pass.
 
 pub mod Detect;
 pub mod Fn;
+pub mod Hint;
 pub mod Hinted;
 pub mod Refine;
 pub mod Source;

@@ -10,7 +10,7 @@ use std::{path::PathBuf, time::SystemTime};
 /// again when the file changed or a hook actually runs.
 pub(crate) struct Struct {
 	/// Where the script was loaded from (the identity in every warn line).
-	pub(crate) path:PathBuf,
+	pub(crate) Path:PathBuf,
 	/// Last-modified time at load, the reload trigger.
 	pub(crate) Mtime:SystemTime,
 	/// The script text, compiled per call.

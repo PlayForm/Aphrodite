@@ -17,14 +17,20 @@
 //! worker; it blocks with poison recovery like any plain static mutex.
 //!
 //! Leaves: `Registry/` owns the map and its get-or-create, `Lock/` the
-//! bounded acquisition every caller routes through, `With/` the two
-//! run-under-lock entry points, `Broadcast/` the apply-to-every-session sweep
-//! the config watcher needs, `Watcher/` the opt-in reload thread, and
-//! `Guard/` the test serialiser that keeps the process-global state
-//! deterministic across parallel test threads.
+//! bounded acquisition every caller routes through (and the named `Outcome` it
+//! answers with), `With/` the two run-under-lock entry points, `Broadcast/` the
+//! apply-to-every-session sweep the config watcher needs (with the `Report` that
+//! says what the sweep actually reached), `Watcher/` the opt-in reload thread
+//! and its lifecycle - readiness, stop flag, joined handle - and `Guard/` the
+//! test serialiser that keeps the process-global state deterministic across
+//! parallel test threads.
 //!
 //! Nothing here may widen a lock scope or make a caller wait unboundedly: the
 //! bounded lock IS the fix for the gateway wedge (see `Maintain/SECURITY.md`).
+//! The corollary runs the other way too - no process-global lock may be held
+//! across a call that can block. The registry lock is therefore released before
+//! any session's state mutex is taken, and the seed a new session is built from
+//! (a TOML load, and the watcher's thread spawn) is built OUTSIDE it.
 
 pub mod Broadcast;
 pub mod Guard;

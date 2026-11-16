@@ -21,9 +21,11 @@
 //! the file that defines an item is the only place it is defined.
 //!
 //! The request path reads top to bottom: `Request::Semantics` interprets the
-//! inbound body once, `Cache::Lookup` answers it from the response cache when
-//! it may, `Handle::Proxy::Forward` sends it, and `Handle::Proxy::Respond`
-//! renders what came back.
+//! inbound body once - route, kind, delivery mode and cache identity - and then
+//! drops the parsed tree; `Cache::Lookup` answers the request from the response
+//! cache when it may; `Handle::Proxy::Forward` sends it; and
+//! `Handle::Proxy::Respond` renders what came back. `Compress::Chat` is the only
+//! stage that rewrites an answer, and it consumes its own plan into the body.
 
 pub mod Analysis;
 pub mod Body;

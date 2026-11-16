@@ -2,9 +2,15 @@
 //! live-container line's on/off contract.
 
 use crate::{
-	PollWorker::{Insert::Fn::InsertBgTask, Status::Fn::RenderBgTaskStatus, Task::Status::Enum::BgStatus},
-	State::Struct::AphroditeState,
+	PollWorker::{
+		Insert::Fn::InsertBgTask,
+		Status::Fn::RenderBgTaskStatus,
+		Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+	},
+	State::{Identity::Content::Struct::ContentHash, Struct::AphroditeState},
 };
+
+fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 #[test]
 fn TestRenderBgTaskStatusHonoursTheFeatureFlag() {
@@ -41,7 +47,7 @@ fn TestRenderBgTaskStatusWithMixedStates() {
 	InsertBgTask(&mut State, "r1".into(), "terminal".into(), "running1".into(), 1);
 	InsertBgTask(&mut State, "r2".into(), "terminal".into(), "running2".into(), 2);
 	// Mark one as done.
-	State.BgTasks[1].Status = BgStatus::Done { ExitCode:0 };
+	State.BgTasks[1].Status = BgStatus::Done { Output:Finished() };
 	InsertBgTask(&mut State, "r3".into(), "terminal".into(), "running3".into(), 3);
 
 	let Rendered = RenderBgTaskStatus(&State);

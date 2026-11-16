@@ -21,7 +21,7 @@ impl Struct {
 			.unwrap_or_else(|Error| Error.into_inner())
 			.iter()
 			.any(|Script| {
-				std::fs::metadata(&Script.path)
+				std::fs::metadata(&Script.Path)
 					.ok()
 					.and_then(|Metadata| Metadata.modified().ok())
 					.map(|Modified| Modified > Script.Mtime)

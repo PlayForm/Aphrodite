@@ -6,7 +6,7 @@ use std::os::raw::c_char;
 use crate::{
 	ABI::{
 		Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
-		Guard::Cstr::Fn::Fn as Cstr,
+		Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 	},
 	State::Struct::AphroditeState,
 };
@@ -21,17 +21,24 @@ use crate::{
 /// The handle is the only way back to this session; there is no lookup by
 /// configuration or by process, so a caller that loses the string leaks the
 /// session until the process exits.
+/// # Safety
+/// `ConfigurationPath` must be null or point to a valid, NUL-terminated C string
+/// that stays readable and unmoved for the duration of this call. The returned
+/// pointer is owned by the caller and must be released with
+/// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char {
 	// Install the process-wide tracing subscriber before anything can log: the
 	// dylib is the plugin's only chance to own the stack, and a host that
 	// already installed one is handled inside `Logging::Fn` (it answers `Ok`
 	// and keeps the host's). A failure here must not fail the session - a
 	// process without a subscriber still compresses; it just says less.
 	let _ = crate::Logging::Fn::Fn(false, None);
-	let Path = unsafe { Cstr(ConfigurationPath) }.unwrap_or_default();
+	let Path = unsafe { Cstr(ConfigurationPath) };
 
 	Run(move || {
+		let Path = Optional(Path)?;
+
 		let mut State = AphroditeState::default();
 
 		// 01-F4/F9: delegate to `ConfigurationLoader::Configuration::Struct::Struct` instead of hand-parsing
@@ -39,8 +46,16 @@ pub extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char 
 		// drifted from `ApplyCompression`'s own key names (e.g. `ToolThreshold`
 		// vs `ToolThresholdToken`) and never honored env var overrides, unlike
 		// every other init path in the crate.
+		//
+		// The globals are a second, separate act: `ApplyCompression` writes the session's
+		// state and nothing else, so the preview cap, the marker grammar and the template
+		// pair are published here. They are process-wide, so an init that skipped them
+		// left every render point on the previous document's values.
 		(!Path.is_empty()).then(|| {
-			crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&Path).ApplyCompression(&mut State);
+			let Configuration = crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&Path);
+
+			Configuration.ApplyCompression(&mut State);
+			Configuration.ApplyGlobals();
 		});
 
 		Ok(Answer::Text(

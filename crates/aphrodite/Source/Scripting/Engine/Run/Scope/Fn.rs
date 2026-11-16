@@ -27,7 +27,7 @@ pub(crate) fn Fn(Payload:&HookPayload, Hook:&str, Content:&str) -> Scope<'static
 	let _ = Scope.push("hook", Hook.to_string());
 	let _ = Scope.push("content_type", Payload.ContentType.clone().unwrap_or_default());
 	let _ = Scope.push("size", Payload.Size.map(|Size| Size as i64).unwrap_or(0));
-	let _ = Scope.push("hash", Payload.hash.clone().unwrap_or_default());
+	let _ = Scope.push("hash", Payload.Hash.clone().unwrap_or_default());
 	let _ = Scope.push("metadata", Payload.Metadata.clone().unwrap_or_default());
 	let _ = Scope.push("preview", Content.to_string());
 

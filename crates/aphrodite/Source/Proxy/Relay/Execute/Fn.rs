@@ -84,8 +84,9 @@ async fn Compress(State:&AppState, Params:&serde_json::Value) -> anyhow::Result<
 	let hash = compute_key(Content.as_bytes());
 	let Size = Content.len();
 	// The caller asked for a marker under a synthetic type name, not a detected
-	// one - `compress` is the vocabulary this verb publishes.
-	let Analysis = ContentAnalysis { Content, Ct:"compress", Lines:Content.lines().count() };
+	// one - `compress` is the vocabulary this verb publishes. The line count is
+	// still counted from this content, which is what `New` guarantees.
+	let Analysis = ContentAnalysis::New(Content, "compress");
 
 	match ClassifyTarget(Size, State.InlineCCRThreshold()) {
 		StorageTarget::Inline => {

@@ -22,8 +22,8 @@ pub(crate) fn Fn(State:&AphroditeState, Mode:&Mode::Enum::Enum, Result:&mut serd
 		Mode::Enum::Enum::TOC => Recommendation::Fn::Fn(State),
 	};
 
-	let _ = Recommendations.inspect(|Recommendations| {
+	if let Some(Recommendations) = Recommendations {
 		Result["recommendations"] = serde_json::json!(Recommendations);
 		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
-	});
+	}
 }

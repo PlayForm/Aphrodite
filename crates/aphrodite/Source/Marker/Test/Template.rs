@@ -6,8 +6,8 @@
 //! a test that leaves one registered changes what every later test sees.
 
 use crate::Marker::Format::{
-	Const::{MarkerTemplatesTestGuard, SetMarkerTemplates},
 	Entry::CCRMarker,
+	Registration::{Guard::Fn::Fn as MarkerTemplatesTestGuard, Set::Fn::Fn as SetMarkerTemplates},
 	Vars::SubstituteVars,
 };
 
@@ -25,7 +25,7 @@ fn TestMarkerFormatConfiguredRendersTomlTemplate() {
 		1234,
 		"[code_rust:3fns 42L]",
 		None,
-		Some(&std::collections::HashMap::from([("err".to_string(), "2".to_string())])),
+		Some(&std::collections::BTreeMap::from([("err".to_string(), "2".to_string())])),
 		Some("mid"),
 	);
 	assert_eq!(

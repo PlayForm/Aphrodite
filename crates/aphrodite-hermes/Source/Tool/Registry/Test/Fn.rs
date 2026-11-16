@@ -2,7 +2,7 @@
 
 use crate::{
 	Health::Proxy::Fn::proxy_health,
-	Tool::{Arg, Compress, Dispatch::Fn::ToolHandler},
+	Tool::{Compress, Dispatch::Fn::ToolHandler, Registry::Test::Mode},
 };
 
 /// The `aphrodite_test` handler.
@@ -15,56 +15,46 @@ use crate::{
 /// a test call adds catalogue rows. That is deliberate: it exercises the same path
 /// a real compression takes.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_test", |args| {
-		let mode = {
-			let m = Arg::Fn::Fn(args, "mode");
+	("aphrodite_test", |Args| {
+		let Resolved = Mode::Resolve::Fn::Fn(Args);
+		let Samples = Resolved.Samples();
 
-			match m.is_empty() {
-				true => "quick",
-				false => m,
-			}
-		};
-		let samples:&[(&str, &str)] = match mode {
-			"quick" => &[("fn main() { println!(\"hi\"); }\n", "source_code")],
-			_ => {
-				&[
-					("fn main() { println!(\"hi\"); }\n", "source_code"),
-					("error[E0382]: borrow of moved value\nwarning: unused\n", "build"),
-					("{\"a\":1,\"b\":2,\"c\":3}\n", "json_array"),
-				]
-			},
-		};
-		let mut checks = Vec::new();
-		let mut passed = 0usize;
-		crate::Session::With::Fn::with_shared(|state| {
-			samples.iter().for_each(|(content, hint)| {
-				let info = Compress::Fn::Fn(state, content, hint, None);
-				let hash = info["hash"].as_str().unwrap_or("");
-				let round = aphrodite::Resolve::Expand::Fn(state, hash);
-				let ok = round.as_deref() == Some(*content);
+		let mut Checks = Vec::new();
+		let mut Passed = 0usize;
+
+		crate::Session::With::Fn::with_shared(|State| {
+			Samples.iter().for_each(|(Content, Hint)| {
+				let Info = Compress::Fn::Fn(State, Content, Hint, None);
+				let Hash = Info["hash"].as_str().unwrap_or("");
+				let Round = aphrodite::Resolve::Expand::Fn(State, Hash);
+				let Matched = Round.as_deref() == Some(*Content);
 
 				// A round trip that matched is one more pass: the count is a
 				// value, not a branch.
-				passed += usize::from(ok);
+				Passed += usize::from(Matched);
 
-				checks.push(serde_json::json!({
-					"type": hint, "hash": hash,
-					"roundtrip": ok,
+				Checks.push(serde_json::json!({
+					"type": Hint, "hash": Hash,
+					"roundtrip": Matched,
 				}));
 			});
 		});
 
-		let status = match passed == checks.len() {
+		let Status = match Passed == Checks.len() {
 			true => "ok",
 			false => "fail",
 		};
+		let ModeName = match Resolved {
+			Mode::Enum::Enum::Quick => "quick",
+			Mode::Enum::Enum::Full => "full",
+		};
 
 		serde_json::json!({
-			"mode": mode,
-			"status": status,
-			"passed": passed,
-			"total": checks.len(),
-			"checks": checks,
+			"mode": ModeName,
+			"status": Status,
+			"passed": Passed,
+			"total": Checks.len(),
+			"checks": Checks,
 			"proxies": proxy_health(),
 		})
 	})

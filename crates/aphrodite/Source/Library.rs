@@ -14,16 +14,6 @@
 //! one symbol per file, because the symbol name is the contract that cbindgen,
 //! the generated `_bindings.py` and `Maintain/check_ffi_contract.py` assert.
 
-// Every `pub extern "C" fn` here takes a raw pointer without being marked
-// `unsafe fn` itself (the null/UTF-8 checks happen inside `cstr()`, not at
-// the signature level), which is exactly what this lint flags. Fixing it
-// properly means marking each function `unsafe extern "C" fn` and auditing
-// every caller across this crate, `aphrodite-hermes`, and the Python ctypes
-// bindings for the safety-contract change - that's the FFI/C-ABI boundary
-// report's job (.plans/03-ffi-c-abi.md), not a side effect of wiring up a
-// CI clippy gate. Scoped here so the gate is honest today; remove this once
-// report 03 lands.
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
 // House style: module directories and item names are PascalCase
 // (`Source/Preview/Detector/mod.rs`, `Struct`, `Fn`). The convention is the
 // contract, so the snake_case module lint is switched off crate-wide rather
@@ -86,6 +76,7 @@ pub mod Scripting;
 
 // ── Preview builder ──────────────────────────────────────────────────
 //
-// Moved to `crate::Preview` (report 01-T11); re-exported here so
-// `aphrodite-hermes`'s `use aphrodite::{build_preview, detect_type}` stays
-// source-compatible.
+// The builder lives at `crate::Preview` (report 01-T11). There is no
+// compatibility alias: a consumer names the leaf path
+// (`crate::Preview::Builder::Entry::Fn`) directly, which is the same rule every
+// other module in this crate follows.

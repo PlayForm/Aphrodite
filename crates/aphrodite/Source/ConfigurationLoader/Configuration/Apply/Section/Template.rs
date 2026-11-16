@@ -1,17 +1,16 @@
-//! `[templates]` plus the marker grammar and first-turn session injection.
+//! `[templates]` plus the first-turn session injection.
 
 use super::super::super::Struct::Struct;
 use crate::State::Struct::AphroditeState;
 
-/// Write the loaded template model into state and register the marker grammar
-/// process-globally.
+/// Write the loaded template model into state and resolve the session injection.
 ///
-/// The marker builder runs on paths without an `AphroditeState` (hooks, the
-/// dylib, the poll worker), so the `[templates.marker]` strings and the
-/// `[prompts] ccr_marker_hint` switch must reach it through the global. An
-/// absent `[templates]` section RESETS that global to the canonical fallback
-/// grammar - a hot-reload that removes the templates must never leave a stale
-/// format in force.
+/// This applier writes STATE only. The marker grammar the templates describe is a
+/// process global, and it is registered by `Apply::Global::Publish` alongside the
+/// preview cap and the template table - one publication point for one document,
+/// rather than one here and one there. A section applier that reached for a global
+/// was the reason a load could register the marker grammar but not the templates, or
+/// vice versa, depending on which caller ran which.
 ///
 /// Session injection has a four-step chain, in this order: override → env →
 /// `[templates.prompts] session_inject` (canonical) → `[prompts]
@@ -23,21 +22,6 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// block, prompt templates, reverse key map ──
 	let Templates = Configuration.GetTemplates();
 	State.Templates = Templates.clone();
-
-	// ── TOML-driven marker block templates (pre-Rust port) ──
-	// Register the `[templates.marker]` format/hint strings and the
-	// `[prompts] ccr_marker_hint` knob process-globally (mirroring
-	// `SetPreviewMaximumChars`): the marker builder runs on paths without an
-	// `AphroditeState` (hooks, dylib, poll worker), so the config must reach
-	// it through the global. An absent `[templates]` section resets to the
-	// canonical fallback grammar so a hot-reload that removes the templates
-	// never leaves a stale format in force.
-	let CCRMarkerHint = Configuration.GetBool("APHRODITE_CCR_MARKER_HINT", "prompts", "ccr_marker_hint", false);
-	crate::Marker::Format::Const::SetMarkerTemplates(
-		Templates.as_ref().and_then(|t| t.Marker.get("format")).map(String::as_str),
-		Templates.as_ref().and_then(|t| t.Marker.get("hint")).map(String::as_str),
-		CCRMarkerHint,
-	);
 
 	// ── First-turn session injection (templates.prompts.session_inject) ──
 	// Priority (pre-Rust port): override/env → `[templates.prompts]

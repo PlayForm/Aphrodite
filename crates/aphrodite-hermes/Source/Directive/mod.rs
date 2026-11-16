@@ -18,11 +18,12 @@
 //! directive name from the file stem).
 //!
 //! Layout: `Resolve/` decides WHERE the set lands, `Builtin/` decides WHAT
-//! the set is, `Materialize/` writes it, `Into/` joins the three for the C
-//! ABI export. Each leaf owns one item named by its kind; this facade only
-//! declares children and re-exports the item the FFI export calls.
+//! the set is (as `Entry/` values), `Materialize/` writes it and reports what
+//! happened to each file, `Into/` joins the three for the C ABI export. Each leaf
+//! owns one item named by its kind; this facade only declares children.
 
 mod Builtin;
+mod Entry;
 pub(crate) mod Into;
 mod Materialize;
 mod Resolve;

@@ -36,6 +36,37 @@ fn TestSplitEventRingIsBounded() {
 }
 
 #[test]
+fn TestEvictedSplitEventsTakeTheirHashesOutOfTheSegmentMap() {
+	// The ring is capped and the segment map used to be unbounded: an unretrieved
+	// segment hash stayed addressable forever. Eviction has to remove exactly the
+	// hashes of the events it drops - no more (a live event must stay attributable)
+	// and no fewer (the map would grow again).
+	let mut s = AphroditeState::default();
+	let Recorded:usize = SplitEventCap * 2;
+
+	(0..Recorded).for_each(|i| {
+		s.RecordChainSplit(vec![format!("segment-{i}")]);
+	});
+
+	assert_eq!(s.SplitEvents.len(), SplitEventCap);
+	assert_eq!(
+		s.SplitSegmentMap.len(),
+		SplitEventCap,
+		"the map holds one hash per live event, not one per split ever recorded"
+	);
+
+	// The newest events stay attributable...
+	let Newest = Recorded - 1;
+	assert_eq!(
+		s.NoteSplitRetrieval(&format!("segment-{Newest}")),
+		Some(Recorded),
+		"the newest event is still live and still attributes"
+	);
+	// ...and an evicted one no longer is.
+	assert_eq!(s.NoteSplitRetrieval("segment-0"), None, "an evicted event cannot be attributed");
+}
+
+#[test]
 fn TestAdaptRaisesThresholdWhenSegmentsIgnored() {
 	let mut s = AphroditeState {
 		ChainSplitMinimumSegments:2,

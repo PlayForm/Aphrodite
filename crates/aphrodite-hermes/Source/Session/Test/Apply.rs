@@ -5,7 +5,10 @@
 //! and loaded the config itself, so proving it meant writing the repo's real
 //! `aphrodite.toml`. It takes the configuration as an argument now.
 
-use crate::Session::{Registry::Struct::session_state, Watcher::Apply::Fn::Fn as apply};
+use crate::Session::{
+	Registry::Struct::session_state,
+	Watcher::{Apply::Fn::Fn as apply, Continue::Fn::Fn as keep_watching, Outcome},
+};
 
 const PROBE_SESSION:&str = "probe-apply";
 
@@ -38,7 +41,29 @@ fn probe_apply_reaches_the_registered_session() {
 	let Configuration = config_from("[compression]\nterminal_threshold = 2048\n");
 	assert!(Configuration.ParseFailure.is_none(), "the probe config must parse");
 
-	apply(&Configuration);
+	let Pass = apply(&Configuration);
+
+	match &Pass {
+		Outcome::Enum::Enum::Applied(Report) => {
+			// The registry is process-global and every probe in this binary
+			// leaves its session in it, so the sweep's reach is "at least the
+			// probe's session", never a fixed count.
+			assert!(
+				Report.Applied >= 1,
+				"the sweep must reach the probe's session, reported {} applied",
+				Report.Applied
+			);
+			// `auto_reload` itself is not this probe's subject (it is
+			// env-overridable, so asserting a value here would be flaky); what
+			// matters is that the report cannot claim more reload-wanting
+			// sessions than it reached.
+			assert!(
+				Report.WantsReload <= Report.Applied,
+				"the reload count must be a subset of the sessions the sweep reached"
+			);
+		},
+		Outcome::Enum::Enum::Failed(_) => panic!("a config that parses must be an Applied pass"),
+	}
 
 	let Applied = State
 		.lock()
@@ -64,11 +89,15 @@ fn probe_apply_reports_a_parse_failure_and_keeps_watching() {
 	let Broken = config_from("[compression\nterminal_threshold = 2048\n");
 	assert!(Broken.ParseFailure.is_some(), "the probe config must fail to parse");
 
-	let Watching = apply(&Broken);
+	let Pass = apply(&Broken);
 
 	let Guard = State.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	assert!(
-		Watching,
+		matches!(&Pass, Outcome::Enum::Enum::Failed(_)),
+		"a parse failure must be a Failed pass, never an Applied one that applied nothing"
+	);
+	assert!(
+		keep_watching(&Pass),
 		"a parse failure must keep watching: the next successful write clears it"
 	);
 	assert_eq!(Guard.TerminalThreshold, 1024, "a broken file must keep the previous values");

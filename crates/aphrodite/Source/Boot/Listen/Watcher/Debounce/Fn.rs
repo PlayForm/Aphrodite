@@ -1,19 +1,58 @@
-//! Collapsing a burst of events into one tick.
+//! Waiting for a burst of writes to settle.
 
-/// Wait for writes to settle, then discard everything that arrived during the
-/// wait.
-///
-/// The 500 ms window is the contract: an editor that writes a file in three
-/// passes, or a tool that truncates then fills it, produces three events that
-/// describe one change. Draining afterwards is what makes the caller's reload
-/// run once per burst rather than once per event, and it is the reason this
-/// window is not a "wait for quiet" loop - a directory that never goes quiet
-/// would then never reload.
-///
-/// `try_recv` is not called one extra time: `from_fn` stops calling the closure
-/// after it returns `None`, so the channel is left exactly where the burst ended.
-pub(crate) async fn Fn(Rx:&mut tokio::sync::mpsc::Receiver<()>) {
-	tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+use std::time::Duration;
 
-	std::iter::from_fn(|| Rx.try_recv().ok()).for_each(drop);
+use crate::Boot::Listen::Watcher::Target;
+use super::Outcome;
+
+/// How long the file has to stay quiet before a burst counts as finished.
+const Quiet:Duration = Duration::from_millis(500);
+
+/// The longest a burst may hold a reload back, measured from its first event.
+///
+/// A pure quiet-period debounce starves on a file that is written continuously:
+/// every new event restarts the window, so the reload never happens. The ceiling is
+/// what bounds that - the reload runs at 2 s even if the writes never stop.
+const Ceiling:Duration = Duration::from_secs(2);
+
+/// Wait for the burst to settle, then report how it ended.
+///
+/// **The contract is a trailing-edge quiet period, capped.** A reload runs after
+/// 500 ms in which no further event arrived, or at 2 s from the first event,
+/// whichever comes first. The earlier shape slept a fixed 500 ms from the first
+/// event and then discarded whatever had arrived meanwhile: an editor that writes a
+/// file in three passes spread over more than half a second produced a reload against
+/// a half-written file, and a directory with steady churn reloaded in the middle of
+/// it rather than after it.
+///
+/// A quiet period is the contract a reload actually needs, because what it wants is
+/// the *finished* file rather than the first byte of it. The ceiling is what keeps
+/// "wait for quiet" from becoming "wait forever on a busy directory".
+///
+/// Events consumed while waiting are dropped deliberately: each one only means "the
+/// file may have changed", and the reload that follows reads the file as it is now,
+/// so N events describe one outcome.
+pub(crate) async fn Fn(Rx:&mut tokio::sync::mpsc::Receiver<Target::Struct::Struct>) -> Outcome::Enum::Enum {
+	let First = tokio::time::Instant::now();
+
+	loop {
+		let Remaining = Ceiling.saturating_sub(First.elapsed());
+
+		// The ceiling has already expired: the reload is overdue, and waiting any
+		// longer would let a directory that never goes quiet starve it.
+		if Remaining.is_zero() {
+			return Outcome::Enum::Enum::Settled;
+		}
+
+		match tokio::time::timeout(Quiet.min(Remaining), Rx.recv()).await {
+			// Another write landed inside the window: the file is still being
+			// written, so the quiet window restarts from now.
+			Ok(Some(_)) => continue,
+			// The source closed mid-burst: this is the last burst, and the caller
+			// still has a pending change to apply.
+			Ok(None) => return Outcome::Enum::Enum::Closed,
+			// Quiet for the full window - or the ceiling cut the window short.
+			Err(_) => return Outcome::Enum::Enum::Settled,
+		}
+	}
 }

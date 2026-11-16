@@ -5,6 +5,7 @@
 //! table's data previews as its shape.
 
 use crate::Preview::Input::Struct::Struct as Input;
+use super::More::Fn::Fn as More;
 
 /// Header cells the preview shows: five.
 const CellsShown:usize = 5;
@@ -30,13 +31,16 @@ fn Separator(Line:&str) -> bool {
 /// sample: rows are counted as non-empty lines minus separator rows, so a table with
 /// wrapped cells reports more rows than it has.
 pub(crate) fn Fn(Inp:&Input<'_>) -> String {
-	let Rows:Vec<&str> = Inp
+	// Counted as the header is taken: a table is counted with one pass and no row vector, where
+	// the previous version collected every row only to read its length and its first element.
+	let mut Rows = Inp
 		.raw
 		.lines()
 		.map(|Line| Line.trim())
-		.filter(|Line| !Line.is_empty() && !Separator(Line))
-		.collect();
-	let Header = Rows.first().unwrap_or(&"").trim_matches('|');
+		.filter(|Line| !Line.is_empty() && !Separator(Line));
+	let First = Rows.next();
+	let Total = Rows.count() + usize::from(First.is_some());
+	let Header = First.unwrap_or("").trim_matches('|');
 	let Cells:Vec<&str> = Header
 		.split('|')
 		.map(|Cell| Cell.trim())
@@ -44,11 +48,10 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.collect();
 	let Columns = Cells.len();
 	let Shown:Vec<&str> = Cells.iter().take(CellsShown).copied().collect();
-	let More = Columns
-		.checked_sub(Shown.len())
-		.filter(|More| *More > 0)
-		.map(|More| format!(" +{More} more"))
-		.unwrap_or_default();
 
-	format!("[table:{Columns} cols {} rows | {}{More}]", Rows.len(), Shown.join(", "))
+	format!(
+		"[table:{Columns} cols {Total} rows | {}{}]",
+		Shown.join(", "),
+		More(Columns, Shown.len())
+	)
 }

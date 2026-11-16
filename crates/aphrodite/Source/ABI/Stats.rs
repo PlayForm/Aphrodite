@@ -12,8 +12,12 @@ use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as 
 /// present exactly when an `aphrodite.toml` was found but failed to parse, so
 /// the caller is reading defaults rather than what it configured. A host that
 /// only logs the counters loses the one signal that explains them.
+/// # Safety
+/// `Handle` must be null or point to a valid, NUL-terminated C string that stays
+/// readable and unmoved for the duration of this call. The returned pointer is
+/// owned by the caller and must be released with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeStats(Handle:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeStats(Handle:*const c_char) -> *mut c_char {
 	Bare(Handle, |s| {
 		Ok(Answer::JSON(serde_json::json!({
 			"version":env!("CARGO_PKG_VERSION"),"inline_entries":s.InlineStore.len(),

@@ -16,7 +16,7 @@ pub struct Struct {
 	/// The loaded scripts, replaced wholesale by `Reload`.
 	pub(crate) Scripts:Mutex<Vec<Script>>,
 	/// Directories scanned by `Reload`, in precedence order.
-	pub(crate) dirs:Vec<PathBuf>,
+	pub(crate) Directories:Vec<PathBuf>,
 }
 
 impl Struct {
@@ -32,7 +32,7 @@ impl Struct {
 		let Home = dirs::home_dir().unwrap_or_default();
 		let Engine = Struct {
 			Scripts:Mutex::new(Vec::new()),
-			dirs:vec![
+			Directories:vec![
 				Home.join(".hermes").join("aphrodite").join("scripts"),
 				PathBuf::from("scripts/aphrodite"),
 			],

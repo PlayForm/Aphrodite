@@ -15,7 +15,7 @@ const Keywords:[&str; 3] = ["const ", "let ", "var "];
 ///
 /// It is not a JS parser: the value is never tracked across lines, so a function expression assigned on
 /// one line and arrowed on the next is missed.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Code = Trimmed.split("//").next().unwrap_or(Trimmed);
 
 	match Code.split_once('=') {
@@ -28,7 +28,7 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 				.unwrap_or("")
 				.trim();
 
-			match Named.then(|| Name.to_string()).filter(|Name| {
+			match Named.then_some(Name).filter(|Name| {
 				!Name.is_empty() && Name.chars().all(|Character| Character.is_alphanumeric() || Character == '_')
 			}) {
 				Some(Name) => Declaration::Declaration { Kind:"=>", Name, Parameters:None, Return:None },

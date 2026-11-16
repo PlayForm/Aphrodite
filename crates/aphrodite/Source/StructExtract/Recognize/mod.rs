@@ -8,3 +8,4 @@ pub mod Go;
 pub mod JS;
 pub mod Python;
 pub mod Rust;
+pub mod Type;

@@ -2,7 +2,7 @@
 
 use crate::{
 	PollWorker::{Insert::Fn::InsertBgTask, Registry::Capacity::Struct::Capacity, Task::Const::MaximumBgTasks},
-	State::Struct::AphroditeState,
+	State::{Identity::Command::Struct::CommandID, Struct::AphroditeState},
 };
 
 #[test]
@@ -15,7 +15,13 @@ fn TestCapacityIsThePolicyBoundAndNonZero() {
 fn TestAdmissionNeverExceedsCapacity() {
 	let mut State = AphroditeState::default();
 	(0..MaximumBgTasks + 3).for_each(|i| {
-		InsertBgTask(&mut State, format!("task{i}"), "terminal".into(), format!("cmd{i}"), i);
+		InsertBgTask(
+			&mut State,
+			CommandID::from(format!("task{i}")),
+			"terminal".into(),
+			format!("cmd{i}"),
+			i,
+		);
 	});
 
 	assert_eq!(State.BgTasks.len(), MaximumBgTasks);

@@ -4,28 +4,28 @@ use std::sync::atomic::Ordering;
 
 use crate::{
 	Proxy::State::{CCR::Get::Fn::Fn as CCRGet, Struct::Struct as AppState},
-	Retrieve::Handle::Failure,
+	Retrieve::Handle::{Failure, Served},
 };
 
-/// Resolve `hash` to its content, or name the failure.
+/// Resolve `hash` to its content and the store that served it, or name the failure.
 ///
-/// Two stores, one order, and the order is the contract: the inline store holds
-/// this session's own entries and is checked first, so a resolve never pays a
-/// backend round trip for content the process already has. Both a hit and a miss
-/// are counted per store, which is what makes the hit-rate observable.
+/// Two stores, one order, and the order is the contract: the inline store holds this
+/// session's own entries and is checked first, so a resolve never pays a backend round trip
+/// for content the process already has. Both a hit and a miss are counted per store, which is
+/// what makes the hit-rate observable - and the answer now says WHICH store answered, so the
+/// counters and the response's `source` field describe the same event.
 ///
-/// The mutex guard is taken in its own block and dropped before the backend call.
-/// That is not tidiness: a `MutexGuard` held across an `.await` is a lock held
-/// across a suspension point, which is a deadlock risk in any runtime. The
-/// poisoned case is a failure value rather than a cache miss - the old
-/// `.lock().ok().and_then(...)` turned a broken process into a 404, so every
-/// request fell through to the backend and callers went looking for entries that
-/// were never missing (Fix 20).
+/// The mutex guard is taken in its own block and dropped before the backend call. That is not
+/// tidiness: a `MutexGuard` held across an `.await` is a lock held across a suspension point,
+/// which is a deadlock risk in any runtime. The poisoned case is a failure value rather than a
+/// cache miss - the old `.lock().ok().and_then(...)` turned a broken process into a 404, so
+/// every request fell through to the backend and callers went looking for entries that were
+/// never missing (Fix 20).
 ///
-/// The two closures of `map_or_else` are what keep the counters honest: the miss
-/// counter runs only when the backend answered nothing, and the hit counter only
-/// when it answered. Neither is a boolean the caller has to interpret.
-pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<String, Failure::Enum::Enum> {
+/// The two closures of `map_or_else` are what keep the counters honest: the miss counter runs
+/// only when the backend answered nothing, and the hit counter only when it answered. Neither
+/// is a boolean the caller has to interpret.
+pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<(String, Served::Enum::Enum), Failure::Enum::Enum> {
 	let InlineHit = {
 		let mut Map = State.InlineCCR.lock().map_err(|_| Failure::Enum::Enum::LockPoisoned)?;
 
@@ -38,7 +38,7 @@ pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<String, Failure::En
 			State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
 			State.CCRHits.fetch_add(1, Ordering::Relaxed);
 
-			Ok(Cached)
+			Ok((Cached, Served::Enum::Enum::Inline))
 		},
 		None => {
 			State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
@@ -58,7 +58,7 @@ pub(crate) async fn Fn(State:&AppState, hash:&str) -> Result<String, Failure::En
 				|Content| {
 					State.CCRHits.fetch_add(1, Ordering::Relaxed);
 
-					Ok(Content)
+					Ok((Content, Served::Enum::Enum::Backend))
 				},
 			)
 		},

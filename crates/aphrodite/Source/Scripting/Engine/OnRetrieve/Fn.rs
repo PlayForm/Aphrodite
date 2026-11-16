@@ -14,9 +14,9 @@ impl Struct {
 		let Payload = HookPayload {
 			Content:Some(Content.to_string()),
 			ContentType:Some(Ct.to_string()),
-			hash:Some(hash.to_string()),
+			Hash:Some(hash.to_string()),
 			..Default::default()
 		};
-		self.run("on_retrieve", &Payload).unwrap_or_else(|| Content.to_string())
+		self.Run("on_retrieve", &Payload).unwrap_or_else(|| Content.to_string())
 	}
 }

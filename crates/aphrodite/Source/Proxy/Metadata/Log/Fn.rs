@@ -8,7 +8,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// The worst level in view, the last line, then the line count.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Level = Content.lines().find_map(|Line| {
 		["ERROR", "WARN", "WARNING", "INFO", "DEBUG", "TRACE", "FATAL", "PANIC"]
 			.iter()
@@ -20,7 +20,7 @@ pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	[
 		Level.map(|Level| MetadataField::New("level", Level)),
 		(!LastLine.is_empty()).then(|| MetadataField::New("last", LastLine.replace('|', "/"))),
-		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+		Some(MetadataField::New("ln", Analysis.Lines().to_string())),
 	]
 	.into_iter()
 	.flatten()

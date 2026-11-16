@@ -18,6 +18,10 @@ use crate::Debug::{Chain, Flag};
 /// file only applies to calls with no session context, e.g. a non-Hermes
 /// host or tests). This keeps the toggle strictly per session tree.
 ///
+/// One stat per chain member, and no separate `exists()`: the read itself
+/// answers "absent", so the walk cannot race a delete between the check and the
+/// read, and it cannot pay for the same stat twice.
+///
 /// It reads the filesystem on every call (through the mtime cache), so it is
 /// not free - callers that need it repeatedly should hoist it, as
 /// `effective_level` does.
@@ -25,7 +29,7 @@ pub(crate) fn Fn(session:&str) -> bool {
 	match session.is_empty() {
 		// No session context: the plain `debug` flag applies (non-Hermes
 		// hosts, standalone tool paths, tests without a session).
-		true => Flag::Read::Fn::Fn(&Flag::Global::Fn::Fn()),
+		true => matches!(Flag::Read::Fn::Fn(&Flag::Global::Fn::Fn()), Flag::State::Enum::Enum::On),
 		// Root-most first: the top-level session's scoped flag governs the
 		// whole tree. Walk root -> leaf and take the first scoped flag that
 		// EXISTS (its value decides; absence falls through to OFF).
@@ -33,9 +37,9 @@ pub(crate) fn Fn(session:&str) -> bool {
 			Chain::Fn::Fn(session)
 				.iter()
 				.rev()
-				.map(|sid| Flag::Scoped::Fn::Fn(sid))
-				.find(|p| p.exists())
-				.is_some_and(|p| Flag::Read::Fn::Fn(&p))
+				.map(|Session| Flag::Read::Fn::Fn(&Flag::Scoped::Fn::Fn(Session)))
+				.find(|State| !matches!(State, Flag::State::Enum::Enum::Absent))
+				.is_some_and(|State| matches!(State, Flag::State::Enum::Enum::On))
 		},
 	}
 }

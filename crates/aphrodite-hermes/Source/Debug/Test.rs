@@ -1,77 +1,149 @@
-//! The logging pass: one subscriber, one emission path, one always-visible warn.
+//! The logging pass: one subscriber, one recorded ownership, one emission
+//! decision, and a warning that lands either way.
+//!
+//! None of these probes touches the process environment. The one that used to
+//! (`unsafe { std::env::set_var("APHRODITE_DEBUG_HOME", ...) }` to point the core
+//! sink at a scratch directory) was unsafe for a reason a test mutex cannot fix:
+//! `setenv` races `getenv` in every OTHER thread of the harness, not just in the
+//! tests that hold the same lock. The bridge's decision is now a function of a
+//! supplied sink, so the destination never has to be redirected at all.
 
-// The install is idempotent by contract, so calling it three times is the
-// assertion: a second init must be a no-op, never a panic and never a second
-// subscriber. `try_init` is what makes that true when a host got there first.
+use crate::Debug::{
+	Flag::{Read::Fn::Fn as read, State as FlagState},
+	Init::{Fn::Fn as install, Ownership},
+	Log::Bridge::At::Fn::Fn as bridge_at,
+	Warn::Fn::Fn as warn,
+};
+
+/// A scratch flag file with a unique name, so the mtime cache cannot confuse one
+/// probe with another.
+fn scratch(Tag:&str, Text:&str) -> std::path::PathBuf {
+	let Stamp = std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap()
+		.as_nanos();
+	let Path = std::env::temp_dir().join(format!("aphrodite-flag-{Tag}-{Stamp}"));
+	std::fs::write(&Path, Text).unwrap();
+
+	Path
+}
+
+// ── The install is idempotent by contract, so calling it repeatedly is the
+// assertion: a second init must be a no-op, never a panic, never a second
+// subscriber, and it must return the SAME recorded decision rather than make a
+// new one. `try_init` is what makes that true when a host got there first. ──
 #[test]
-fn test_subscriber_install_is_idempotent() {
-	crate::Debug::Init::Fn::Fn();
-	crate::Debug::Init::Fn::Fn();
-	crate::Debug::Init::Fn::Fn();
+fn probe_subscriber_install_is_idempotent() {
+	install();
+	let First = install();
 
 	assert!(
-		tracing::dispatcher::has_been_set(),
-		"the dylib must own a dispatcher after its own install in a bare process"
+		Ownership::Fn::Fn().is_some(),
+		"the install must record who owns the dispatcher, not merely perform it"
+	);
+	assert!(
+		std::ptr::eq(First, install()),
+		"a second install must return the recorded decision, not compute a new one"
 	);
 }
 
-// The always-visible warn has to survive BOTH dispatcher states: one where the
-// dylib installed its subscriber and one where it did not. Neither may panic,
-// and neither may print twice (the stderr fallback is gated on
-// `has_been_set`).
+// ── The always-visible warn has to survive both dispatcher states: before this
+// crate has installed anything (nothing is known to be listening, so the stderr
+// fallback fires) and after it owns the dispatcher (the fmt layer carries it).
+// Neither may panic. ──
 #[test]
-fn test_warn_survives_either_dispatcher_state() {
-	crate::Debug::Warn::Fn::Fn("logging-pass probe: no subscriber was installed here");
-	crate::Debug::Init::Fn::Fn();
-	crate::Debug::Warn::Fn::Fn("logging-pass probe: this crate installed the subscriber");
+fn probe_warn_survives_before_and_after_the_install() {
+	warn("logging-pass probe: before any install");
+	install();
+	warn("logging-pass probe: after the install");
 }
 
-// The per-session debug file is the artifact the flag toggle is read from, and
-// it is written by the bridge - NOT by a subscriber layer, precisely so it
-// keeps working when the install above loses to a host. This proves the
-// bridge still produces it, and that the file keeps its first-line flag
-// semantics after a bridge event lands in it.
+// ── The bridge's decision, asserted at the seam that makes it a decision: an
+// enabled level reaches the sink exactly once, with the effective level, the
+// event name and the caller's fields in the caller's order. ──
 #[test]
-fn test_bridge_event_still_writes_the_session_file() {
-	let _g = crate::Session::Guard::Fn::test_guard();
+fn probe_bridge_hands_the_record_to_its_sink() {
+	let mut State = crate::Configuration::Template::Fn::config_template().clone();
+	// A non-zero level wins over the flag file, so this probe reads no
+	// filesystem and depends on no session.
+	State.DebugLevel = 1;
 
-	const HOME_KEY:&str = "APHRODITE_DEBUG_HOME";
-	let scratch = std::env::temp_dir().join("aphrodite-bridge-log-home");
-	let _ = std::fs::create_dir_all(&scratch);
-	let backup = std::env::var(HOME_KEY).ok();
-	unsafe { std::env::set_var(HOME_KEY, &scratch) };
+	let Captured = std::cell::RefCell::new(Vec::new());
 
-	let root = "bridge-log-probe";
-	let path = aphrodite::Debug::Path::ForRoot::Fn::Fn(root);
-	let _ = std::fs::remove_file(&path);
-
-	// Flag file ON, then one bridge event through the tracing emission point.
-	std::fs::write(&path, "on\n").unwrap();
-	// The core sink targets `debug.<ROOT>` from the process-global root that
-	// `pre_llm_call` publishes (`Debug::Session::Record`), so the test publishes
-	// it exactly as a real turn would - without this the sink has no path and
-	// degrades to silence by design.
-	aphrodite::Debug::Root::Note::Fn::Fn(root);
-	let state = crate::Configuration::Template::Fn::config_template();
-	crate::Debug::Log::Bridge::Fn::Fn(state, root, "bridge_probe", &[("k", "v".to_string())]);
-
-	let content = std::fs::read_to_string(&path).unwrap_or_default();
-	assert!(
-		content.contains("event=bridge_probe") && content.contains("k=v"),
-		"the bridge must still append its fields to debug.<root>, got: {content:?}"
-	);
-	assert!(
-		crate::Debug::Flag::Resolve::Fn::Fn(root),
-		"the toggle must stay readable after a bridge event lands in the same file"
+	bridge_at(
+		&State,
+		"probe-root",
+		"bridge_probe",
+		&[("k", "v".to_string())],
+		|Level, Event, Kv| {
+			Captured.borrow_mut().push((
+				Level,
+				Event.to_string(),
+				Kv.iter()
+					.map(|(Key, Value)| ((*Key).to_string(), Value.clone()))
+					.collect::<Vec<_>>(),
+			));
+		},
 	);
 
-	let _ = std::fs::remove_file(&path);
-	match backup {
-		Some(v) => {
-			unsafe { std::env::set_var(HOME_KEY, v) };
-		},
-		None => {
-			unsafe { std::env::remove_var(HOME_KEY) };
-		},
-	}
+	let Captured = Captured.into_inner();
+	assert_eq!(Captured.len(), 1, "an enabled level must reach the sink exactly once");
+	assert_eq!(Captured[0].0, 1, "the sink must receive the effective level");
+	assert_eq!(Captured[0].1, "bridge_probe", "the sink must receive the event name");
+	assert_eq!(
+		Captured[0].2,
+		vec![("k".to_string(), "v".to_string())],
+		"the sink must receive the caller's fields, in the caller's order"
+	);
+}
+
+// ── The quiet path: level 0 AND no flag file for the session means the sink is
+// never called, so the cost of a disabled debug channel is one level read. ──
+#[test]
+fn probe_bridge_stays_silent_at_level_zero() {
+	let mut State = crate::Configuration::Template::Fn::config_template().clone();
+	State.DebugLevel = 0;
+
+	let mut Called = false;
+	bridge_at(&State, "probe-quiet-no-flag-file", "quiet", &[], |_, _, _| Called = true);
+
+	assert!(!Called, "level 0 with no flag file for the session must not reach the sink");
+}
+
+// ── The flag reader has to tolerate the logger: the core debug logger appends
+// to the same `debug.<root>` file, and a legacy toggle writes its value with no
+// trailing newline, so the first log line can be fused onto the flag value. ──
+#[test]
+fn probe_flag_read_tolerates_a_fused_log_line() {
+	let Path = scratch("fused", "on[2026-01-01T00:00:00.000000Z] [aphrodite-debug] lvl=1 event=x\n");
+
+	assert!(
+		matches!(read(&Path), FlagState::Enum::Enum::On),
+		"a flag fused with the first log line must still read as on"
+	);
+
+	let _ = std::fs::remove_file(&Path);
+}
+
+// ── A file that exists and says off is OFF; a file that does not exist is
+// ABSENT. The two are different answers, which is why the reader stopped
+// returning a `bool`. ──
+#[test]
+fn probe_flag_read_distinguishes_off_from_absent() {
+	let Off = scratch("off", "off\n");
+
+	assert!(
+		matches!(read(&Off), FlagState::Enum::Enum::Off),
+		"an explicit off must read as off"
+	);
+
+	let _ = std::fs::remove_file(&Off);
+
+	let Absent = std::env::temp_dir().join("aphrodite-flag-absent-probe");
+	let _ = std::fs::remove_file(&Absent);
+
+	assert!(
+		matches!(read(&Absent), FlagState::Enum::Enum::Absent),
+		"a missing flag file must read as absent, never as an explicit off"
+	);
 }

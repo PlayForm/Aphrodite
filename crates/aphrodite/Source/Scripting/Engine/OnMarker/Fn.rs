@@ -16,11 +16,11 @@ impl Struct {
 		let Payload = HookPayload {
 			Content:Some(Preview.to_string()),
 			ContentType:Some(Ct.to_string()),
-			hash:Some(hash.to_string()),
+			Hash:Some(hash.to_string()),
 			Metadata:Some(meta.to_string()),
 			Preview:Some(Preview.to_string()),
 			..Default::default()
 		};
-		self.run("on_marker", &Payload).unwrap_or_else(|| Preview.to_string())
+		self.Run("on_marker", &Payload).unwrap_or_else(|| Preview.to_string())
 	}
 }

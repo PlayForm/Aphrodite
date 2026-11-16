@@ -35,6 +35,35 @@ fn TestSessionStartResetsChainSplitThreshold() {
 }
 
 #[test]
+fn TestSessionStartClearsTheChainSplitLedger() {
+	// The ledger the threshold adapts FROM is per-conversation too: a carried-over
+	// ledger would immediately move the threshold that was just reset to its floor.
+	let mut s = AphroditeState::default();
+	s.RecordChainSplit(vec!["a".into(), "b".into()]);
+	assert_eq!(s.SplitEvents.len(), 1);
+	assert_eq!(s.SplitSegmentMap.len(), 2);
+
+	OnSessionStart(&mut s);
+
+	assert!(s.SplitEvents.is_empty(), "the consequence ledger is per-session");
+	assert!(s.SplitSegmentMap.is_empty(), "no segment stays attributable across sessions");
+	assert_eq!(s.SplitNextEventID, 0, "event ids restart with the session");
+}
+
+#[test]
+fn TestSessionStartKeepsBackgroundTasks() {
+	// A backgrounded process outlives the session boundary, and its task record is
+	// the poll worker's only handle on it - clearing it would strand a running
+	// command. The expiry pass bounds the set instead.
+	let mut s = AphroditeState::default();
+	crate::PollWorker::Insert::Fn::InsertBgTask(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
+
+	OnSessionStart(&mut s);
+
+	assert_eq!(s.BgTasks.len(), 1, "a live background task must survive session start");
+}
+
+#[test]
 fn TestCatalogSummaryResetOnSessionStart() {
 	let mut s = AphroditeState::default();
 	s.LastEmittedMarkerCount = 10;

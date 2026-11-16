@@ -15,7 +15,11 @@ use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State}
 /// error: nothing is corrupted, but the turn view the model has already been
 /// shown is discarded. The state is process-global and outlives a session, so a
 /// field this hook forgets to clear leaks one conversation into the next.
+/// # Safety
+/// `Handle` must be null or point to a valid, NUL-terminated C string that stays
+/// readable and unmoved for the duration of this call. The returned pointer is
+/// owned by the caller and must be released with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
 	State(Handle, |s| Ok(Answer::JSON(crate::Session::Start::Fn::OnSessionStart(s))))
 }

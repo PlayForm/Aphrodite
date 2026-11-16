@@ -6,6 +6,7 @@
 //! where the response is rendered.
 
 /// The proxy route.
+#[derive(Clone, Copy)]
 pub(crate) enum Enum {
 	/// `POST /v1/chat/completions` - the response is a completion envelope the
 	/// compression pass understands.

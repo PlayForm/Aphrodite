@@ -7,4 +7,4 @@ use crate::Hook::{Reason::Enum::Enum as Reason, Terminal::Plan::Enum::Enum as Pl
 /// First because there is nothing to observe, nothing to split and nothing to
 /// store: every later gate would be answering a question about content that does
 /// not exist.
-pub(crate) fn Fn(Content:&str) -> Option<Plan> { Content.is_empty().then_some(Plan::Passthrough(Reason::Empty)) }
+pub(crate) fn Fn(Content:&str) -> Option<Plan<'_>> { Content.is_empty().then_some(Plan::Passthrough(Reason::Empty)) }

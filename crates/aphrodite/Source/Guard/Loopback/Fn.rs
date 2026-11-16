@@ -32,7 +32,7 @@ pub fn CheckLoopbackRequest(Addr:SocketAddr, HostHeader:&str) -> anyhow::Result<
 	// mandates Host, and every real caller here (curl, the Hermes plugin)
 	// sends it, so there's no legitimate case to exempt (02-F6).
 	let Hostname = HostHeaderToHostname(HostHeader);
-	if !AllowedLoopbackHosts.contains(&Hostname.as_str()) {
+	if !AllowedLoopbackHosts.contains(&Hostname.as_ref()) {
 		anyhow::bail!("Host header does not name a loopback address");
 	}
 	Ok(())

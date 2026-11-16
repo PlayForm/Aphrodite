@@ -2,9 +2,9 @@
 
 use anyhow::Context;
 
-use crate::{Hook::Call::Input::Struct::HookInput, Session::Registry::Struct::DEFAULT_SESSION};
+use crate::{Hook::Call::Input::Struct::Struct, Session::Registry::Struct::DEFAULT_SESSION};
 
-/// Parse the hook kwargs into a [`HookInput`].
+/// Parse the hook kwargs into the call's [`Struct`].
 ///
 /// The parse error is wrapped with the kwargs' byte length, so the caller's
 /// historical `invalid args: {e}` message still names the same fact while the
@@ -14,21 +14,27 @@ use crate::{Hook::Call::Input::Struct::HookInput, Session::Registry::Struct::DEF
 /// `on_session_start`); `transform_terminal_output` does NOT, so it falls back
 /// to `Debug::Session::Last::Fn::Fn()` like before. Empty resolves to the default
 /// session key.
-pub(crate) fn decode(args:&str) -> anyhow::Result<HookInput> {
-	let parsed:serde_json::Value =
-		serde_json::from_str(args).with_context(|| format!("parse the hook kwargs ({} bytes)", args.len()))?;
-	let session_id = parsed
+///
+/// It is not a validator: a kwargs object with no `session_id` is a legitimate
+/// call, and a caller that must know whether Hermes threaded one reads
+/// `Parsed` - which is why the resolved `Session` and the raw `Parsed` are
+/// separate fields rather than one being inferred from the other.
+pub(crate) fn Fn(Args:&str) -> anyhow::Result<Struct> {
+	let Parsed:serde_json::Value =
+		serde_json::from_str(Args).with_context(|| format!("parse the hook kwargs ({} bytes)", Args.len()))?;
+	let Session = Parsed
 		.get("session_id")
 		.and_then(|v| v.as_str())
-		.filter(|s| !s.is_empty())
+		.filter(|Session| !Session.is_empty())
 		.map(str::to_string)
 		.unwrap_or_else(|| {
-			let last = crate::Debug::Session::Last::Fn::Fn();
+			let Last = crate::Debug::Session::Last::Fn::Fn();
 
-			match last.is_empty() {
+			match Last.is_empty() {
 				true => DEFAULT_SESSION.to_string(),
-				false => last,
+				false => Last,
 			}
 		});
-	Ok(HookInput { parsed, session_id, args_len:args.len() })
+
+	Ok(Struct { Parsed, Session, ArgsLength:Args.len() })
 }

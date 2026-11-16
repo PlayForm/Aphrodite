@@ -6,7 +6,7 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 ///
 /// It is not a Rust parser: a trait's supertraits and generic parameters are cut away, so
 /// `trait Foo: Bar` reports `Foo`.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Lower = Trimmed.to_lowercase();
 	let Declares = Lower.starts_with("trait ") || Lower.starts_with("pub trait ");
 
@@ -18,7 +18,7 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			.next()
 			.unwrap_or("");
 
-		match (!Name.is_empty()).then(|| Name.to_string()) {
+		match (!Name.is_empty()).then_some(Name) {
 			Some(Name) => Declaration::Declaration { Kind:"trait", Name, Parameters:None, Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}

@@ -4,7 +4,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// How many files complained, the first complaint, then the line count.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let FilesLinted = Content
 		.lines()
 		.filter(|Line| {
@@ -20,7 +20,7 @@ pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	[
 		(FilesLinted > 0).then(|| MetadataField::New("files", FilesLinted.to_string())),
 		FirstError.map(|Error| MetadataField::New("first_err", Error)),
-		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+		Some(MetadataField::New("ln", Analysis.Lines().to_string())),
 	]
 	.into_iter()
 	.flatten()

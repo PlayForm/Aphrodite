@@ -82,7 +82,7 @@ unsafe fn Take(Ptr:*mut c_char) -> String {
 	let s = unsafe { CStr::from_ptr(Ptr) }.to_string_lossy().into_owned();
 	// SAFETY: `Ptr` was allocated by the C ABI, which owns the
 	// corresponding `AphroditeFreeString` deallocation routine.
-	AphroditeFreeString(Ptr);
+	unsafe { AphroditeFreeString(Ptr) };
 	s
 }
 
@@ -128,7 +128,7 @@ fn WithStateDoesNotSerializeAcrossDifferentHandles() {
 fn InitWithNullConfigurationYieldsParseableHandle() {
 	let h = unsafe { Take(AphroditeInit(std::ptr::null())) };
 	assert!(h.parse::<usize>().is_ok(), "handle {:?} should parse as usize", h);
-	AphroditeDestroy(Cs(&h).as_ptr());
+	unsafe { AphroditeDestroy(Cs(&h).as_ptr()) };
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn CompressRetrieveDestroyRoundtrip() {
 	let Retrieved = unsafe { Take(AphroditeRetrieve(Handle.as_ptr(), Cs(&hash).as_ptr())) };
 	assert_eq!(Retrieved, "fn main() {}");
 
-	AphroditeDestroy(Handle.as_ptr());
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 	// Handle is gone: any further stateful call reports invalid handle, no crash.
 	let After = unsafe { Take(AphroditeStats(Handle.as_ptr())) };
 	assert!(After.contains("invalid handle"));
@@ -163,7 +163,7 @@ fn RetrieveUnknownHashReturnsErrorJSON() {
 	let Out = unsafe { Take(AphroditeRetrieve(Handle.as_ptr(), Cs("deadbeef00000000").as_ptr())) };
 	let v:serde_json::Value = serde_json::from_str(&Out).unwrap();
 	assert!(v["error"].as_str().unwrap().contains("hash not found"));
-	AphroditeDestroy(Handle.as_ptr());
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn InvalidHandlesAreRejectedWithoutCrashing() {
 			);
 		});
 		// Must not panic even though the handle is bogus.
-		AphroditeDestroy(Handle.as_ptr());
+		unsafe { AphroditeDestroy(Handle.as_ptr()) };
 	});
 }
 
@@ -224,11 +224,14 @@ fn DispatchKnownAndUnknownHooks() {
 	let v:serde_json::Value = serde_json::from_str(&Unknown).unwrap();
 	assert!(v["error"].as_str().unwrap().contains("unknown hook"));
 
-	AphroditeDestroy(Handle.as_ptr());
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 }
 
 #[test]
-fn FreeStringNullIsANoOp() { AphroditeFreeString(std::ptr::null_mut()); }
+fn FreeStringNullIsANoOp() {
+	// SAFETY: null is the documented no-op case for the deallocator.
+	unsafe { AphroditeFreeString(std::ptr::null_mut()) };
+}
 
 #[test]
 fn OversizeContentIsRejected() {
@@ -238,7 +241,7 @@ fn OversizeContentIsRejected() {
 	let Out = unsafe { Take(AphroditeCompress(Handle.as_ptr(), Cs(&Big).as_ptr(), Cs("text").as_ptr())) };
 	let v:serde_json::Value = serde_json::from_str(&Out).unwrap();
 	assert!(v["error"].as_str().unwrap().contains("16MB"));
-	AphroditeDestroy(Handle.as_ptr());
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 }
 
 // ── T3 (F5): the seven previously-unguarded extern fns must survive a
@@ -284,7 +287,7 @@ fn RetrieveToleratesInteriorNulInDispatchedContent() {
 	// Must not panic even though the stored content contains a NUL byte.
 	let Retrieved = unsafe { Take(AphroditeRetrieve(Handle.as_ptr(), Cs(&hash).as_ptr())) };
 	assert_eq!(Retrieved, "xy"); // NUL stripped, not left dangling
-	AphroditeDestroy(Handle.as_ptr());
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 }
 
 // ── Issue #38 class: `AphroditeReload` on a found-but-broken TOML
@@ -319,16 +322,5 @@ fn TestAphroditeReloadBrokenTomlRecordsConfigurationError() {
 		Sv["config_error"].as_str().unwrap().contains(Broken.to_str().unwrap()),
 		"stats must surface the reload parse failure: {Stats}"
 	);
-	AphroditeDestroy(Handle.as_ptr());
-}
-
-// ── Scripting gate (pre-Rust scripting.rs port): the module must not
-// exist in a feature-off build. This test compiles and passes ONLY when
-// the `scripting` feature is off - `pub mod Scripting` is declared behind
-// `#[cfg(feature = "scripting")]`, so the default build has no scripting
-// module at all. ──
-#[cfg(not(feature = "scripting"))]
-#[test]
-fn ScriptingModuleAbsentWithoutFeature() {
-	assert!(!cfg!(feature = "scripting"));
+	unsafe { AphroditeDestroy(Handle.as_ptr()) };
 }

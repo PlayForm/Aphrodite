@@ -6,6 +6,8 @@
 //! ellipsis position: the budget is fixed, so two callers sampling the same line get the same
 //! string.
 
+use std::num::NonZeroUsize;
+
 /// Longest line that is shown as a plain head: one hundred characters.
 const LongLineMaximum:usize = 100;
 
@@ -30,9 +32,11 @@ const ShortLineMaximum:usize = 60;
 pub(crate) fn Fn(Line:&str) -> String {
 	let Total = Line.chars().count();
 
-	// `checked_sub` makes "it is a long line" a `None` rather than a boolean to branch on;
-	// the `+ 1` is what keeps the 100-character boundary on the short side.
-	match Total.checked_sub(LongLineMaximum + 1) {
+	// `NonZeroUsize` makes "it is a long line" a value instead of a boolean, and the subtraction
+	// states the boundary directly: a line of exactly `LongLineMaximum` characters is short, one
+	// character more is long. The previous `checked_sub(LongLineMaximum + 1)` spelled the same
+	// boundary with a `+ 1` that read like an off-by-one.
+	match NonZeroUsize::new(Total.saturating_sub(LongLineMaximum)) {
 		Some(_) => {
 			let Head:String = Line.chars().take(HeadTailLength).collect();
 			let Tail:String = Line.chars().skip(Total - HeadTailLength).collect();

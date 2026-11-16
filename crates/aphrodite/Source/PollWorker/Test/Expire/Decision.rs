@@ -1,9 +1,18 @@
 //! One retention decision per task, at the boundaries the old two-pass rule used.
 
-use crate::PollWorker::{
-	Expire::{Const::FinishedLifetime, Decide::Fn::Fn as Decide, Decision::Enum::RetentionDecision},
-	Task::{Const::StaleTurnAge, New::Fn::Fn as New, Status::Enum::BgStatus},
+use crate::{
+	PollWorker::{
+		Expire::{Const::FinishedLifetime, Decide::Fn::Fn as Decide, Decision::Enum::RetentionDecision},
+		Task::{
+			Const::StaleTurnAge,
+			New::Fn::Fn as New,
+			Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+		},
+	},
+	State::Identity::Content::Struct::ContentHash,
 };
+
+fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 fn Running(StartedTurn:usize, LastPollTurn:usize) -> crate::PollWorker::Task::Struct::BgTask {
 	let mut Task = New("t".into(), "terminal".into(), "cargo build".into(), StartedTurn, 0);
@@ -68,7 +77,7 @@ fn TestOldRunningTaskIsNeverRemoved() {
 #[test]
 fn TestFinishedTaskKeepsItsStatusUntilTheLifetimeRunsOut() {
 	let mut Task = Running(0, 0);
-	Task.Status = BgStatus::Done { ExitCode:0 };
+	Task.Status = BgStatus::Done { Output:Finished() };
 
 	assert_eq!(Decide(&Task, FinishedLifetime), RetentionDecision::Keep);
 	assert_eq!(Decide(&Task, FinishedLifetime + 1), RetentionDecision::Remove);

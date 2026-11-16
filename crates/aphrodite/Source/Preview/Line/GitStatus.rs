@@ -25,5 +25,5 @@ pub(crate) fn Fn(Line:&str) -> Option<&str> {
 		&& Separator == b' '
 		&& !Line.get(3..).unwrap_or("").trim().is_empty();
 
-	Shaped.then_some(Line.get(..2)).flatten()
+	Shaped.then(|| Line.get(..2)).flatten()
 }

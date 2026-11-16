@@ -24,7 +24,7 @@ pub(crate) fn Fn(Meta:&HashMap<String, String>) -> Vec<(&'static str, Value)> {
 		.get("live_eta_s")
 		.and_then(|Value| Value.parse::<f32>().ok())
 		.unwrap_or(0.0);
-	let Live = Meta.get("live").map(|Value| Value == "1").unwrap_or(false);
+	let Live = Meta.get("live").is_some_and(|Value| Value == "1");
 
 	vec![
 		("live", serde_json::json!(Live)),

@@ -30,11 +30,11 @@ pub fn Fn(TypeStr:&str, Content:&str) -> String {
 	let Rendered = crate::Template::Render::Fn::Fn(TypeStr, Content).filter(|Rendered| !Rendered.is_empty());
 
 	if let Some(Rendered) = Rendered {
-		return Render::Cap::Fn::Fn(&Rendered, &Limit).into_owned();
+		return Render::Cap::Fn::Fn(Rendered, &Limit);
 	}
 
 	let Inp = Input::Struct::Struct::new(Content).unwrap_or_else(|| Input::Struct::Struct::Empty(Content));
 	let Effective = Type::Fn::Fn(TypeStr, &Inp);
 
-	Render::Cap::Fn::Fn(&Dispatch::Fn(Effective.as_ref(), &Inp), &Limit).into_owned()
+	Render::Cap::Fn::Fn(Dispatch::Fn(Effective.as_ref(), &Inp), &Limit)
 }

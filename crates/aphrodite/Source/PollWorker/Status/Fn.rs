@@ -29,7 +29,7 @@ pub fn RenderBgTaskStatus(State:&AphroditeState) -> String {
 		.first()
 		.map(|_| format!("[poll workers] {} active task(s):", Active.len()))
 		.into_iter()
-		.chain(Active.iter().take(3).flat_map(|Task| Detail(State, Task)))
+		.chain(Active.iter().take(3).flat_map(|Task| Detail(State.LiveContainer, Task)))
 		.collect::<Vec<String>>()
 		.join("\n")
 }

@@ -83,8 +83,13 @@ pub(crate) async fn Fn(
 		// A miss names the key it looked under; a bypass has no key to name.
 		// Both take the upstream road - the difference is already recorded by the
 		// lookup itself.
-		CacheLookup::Miss { Key } => {
-			DevLog(state.Dev, || tracing::info!(ID = %ID, CacheKey = Key, "<<< CACHE MISS"));
+		CacheLookup::Miss { Identity } => {
+			// The digest is the identity's index - a short, stable handle for one
+			// request, which is exactly what a dev log wants.
+			DevLog(
+				state.Dev,
+				|| tracing::info!(ID = %ID, CacheKey = Identity.Key(), "<<< CACHE MISS"),
+			);
 
 			SendUpstream(&Context, &path, body).await
 		},

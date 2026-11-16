@@ -8,20 +8,28 @@ use crate::Guard::{Host::Fn::HostHeaderToHostname, Loopback::Fn::AllowedLoopback
 // cannot help - the TCP connection genuinely is loopback in that attack. ──
 #[test]
 fn TestHostHeaderToHostnameStripsPort() {
-	assert_eq!(HostHeaderToHostname("127.0.0.1:9797"), "127.0.0.1");
-	assert_eq!(HostHeaderToHostname("localhost:9798"), "localhost");
+	assert_eq!(&*HostHeaderToHostname("127.0.0.1:9797"), "127.0.0.1");
+	assert_eq!(&*HostHeaderToHostname("localhost:9798"), "localhost");
 }
 
 #[test]
 fn TestHostHeaderToHostnameNoPort() {
-	assert_eq!(HostHeaderToHostname("127.0.0.1"), "127.0.0.1");
-	assert_eq!(HostHeaderToHostname("localhost"), "localhost");
+	assert_eq!(&*HostHeaderToHostname("127.0.0.1"), "127.0.0.1");
+	assert_eq!(&*HostHeaderToHostname("localhost"), "localhost");
 }
 
 #[test]
 fn TestHostHeaderToHostnameIpv6Bracketed() {
-	assert_eq!(HostHeaderToHostname("[::1]:9797"), "[::1]");
-	assert_eq!(HostHeaderToHostname("[::1]"), "[::1]");
+	assert_eq!(&*HostHeaderToHostname("[::1]:9797"), "[::1]");
+	assert_eq!(&*HostHeaderToHostname("[::1]"), "[::1]");
+}
+
+#[test]
+fn TestHostHeaderToHostnameRepairsUnclosedBracket() {
+	// The one path that owns: a bracketed value with no closing `]` is answered
+	// with the repaired form, which is what the `String`-returning version
+	// produced for every input.
+	assert_eq!(&*HostHeaderToHostname("[::1"), "[::1]");
 }
 
 #[test]
@@ -39,5 +47,5 @@ fn TestAllowedLoopbackHostsRejectsDnsRebindingHostname() {
 	// loopback (passes the IP check), but the Host header carries the
 	// attacker's own domain, not a loopback name.
 	let Hostname = HostHeaderToHostname("attacker.example:9797");
-	assert!(!AllowedLoopbackHosts.contains(&Hostname.as_str()));
+	assert!(!AllowedLoopbackHosts.contains(&Hostname.as_ref()));
 }

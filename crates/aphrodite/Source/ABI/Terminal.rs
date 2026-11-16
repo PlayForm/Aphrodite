@@ -12,6 +12,12 @@ stateful!(
 	/// and previews differently (exit codes and error lines are the signal, not
 	/// file structure), and because `TransformTerminalOutput` has no tool name
 	/// to key on.
+	///
+	/// # Safety
+	/// `Content` must be null or point to a valid, NUL-terminated C string that
+	/// stays readable and unmoved for the duration of this call. The returned
+	/// pointer is owned by the caller and must be released with
+	/// `AphroditeFreeString`.
 	AphroditeTerminal,
 	|s, Content:*const c_char| {
 		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {

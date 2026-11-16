@@ -2,7 +2,11 @@
 //! across polls, and the 256KB accumulation cap.
 
 use crate::{
-	PollWorker::{Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus, Update::Fn::UpdateFromPoll},
+	PollWorker::{
+		Insert::Fn::InsertBgTask,
+		Task::Status::{Enum::BgStatus, Stored::Fn::Fn as Stored},
+		Update::Fn::UpdateFromPoll,
+	},
 	State::Struct::AphroditeState,
 };
 
@@ -12,7 +16,7 @@ fn TestUpdateFromPollExitCodeZero() {
 	State.TurnCounter = 5;
 	InsertBgTask(
 		&mut State,
-		headroom_core::ccr::compute_key(b"cargo build"),
+		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
 		"cargo build".into(),
 		1,
@@ -26,9 +30,11 @@ fn TestUpdateFromPollExitCodeZero() {
 
 	let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
 	assert!(Consumed, "poll result should be consumed");
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
-	assert!(State.BgTasks[0].OutputHash.is_some());
-	assert!(State.BgTasks[0].OutputPreview.is_some());
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
+	assert!(
+		Stored(&State.BgTasks[0].Status).is_some(),
+		"the completion records its stored output"
+	);
 }
 
 #[test]
@@ -37,7 +43,7 @@ fn TestUpdateFromPollExitCodeNonzero() {
 	State.TurnCounter = 5;
 	InsertBgTask(
 		&mut State,
-		headroom_core::ccr::compute_key(b"cargo build"),
+		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
 		"cargo build".into(),
 		1,
@@ -51,7 +57,7 @@ fn TestUpdateFromPollExitCodeNonzero() {
 
 	let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
 	assert!(Consumed);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode:1 });
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 1));
 }
 
 #[test]
@@ -60,7 +66,7 @@ fn TestUpdateFromPollNoExitCodeStillRunning() {
 	State.TurnCounter = 5;
 	InsertBgTask(
 		&mut State,
-		headroom_core::ccr::compute_key(b"cargo build"),
+		headroom_core::ccr::compute_key(b"cargo build").into(),
 		"terminal".into(),
 		"cargo build".into(),
 		1,
@@ -126,8 +132,8 @@ fn TestPollWithExitCodeCompletesTask() {
 	})
 	.to_string();
 	UpdateFromPoll(&mut State, "process", &PollDone);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
-	assert!(State.BgTasks[0].OutputHash.is_some());
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
+	assert!(Stored(&State.BgTasks[0].Status).is_some());
 }
 
 #[test]
@@ -139,7 +145,7 @@ fn TestPollWithTextExitCodeCompletesTask() {
 	// No JSON wrapper - just raw output with "exit code: 2" in text.
 	let Consumed = UpdateFromPoll(&mut State, "process", "building...\nfailed!\nexit code: 2\n");
 	assert!(Consumed);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode:2 });
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 2));
 }
 
 #[test]

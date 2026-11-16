@@ -15,47 +15,55 @@ use super::{Cap::MaximumCombinedChars::Const::Const as MaximumCombinedChars, Mod
 ///   - ...
 /// ```
 ///
-/// Returns the empty string when no directive is active - not a header with no bodies
-/// under it, which would spend context saying nothing.
+/// Returns the empty string when no directive is active - not a header with no bodies under it,
+/// which would spend context saying nothing.
 ///
 /// 01-F5: this used to inject only each directive's first line (a markdown title, e.g.
-/// `# focus - stay targeted, minimal tool usage`), so the bullets carrying the actual
-/// behavioural instructions never travelled. It now injects the full (per-file-capped)
-/// body, stripped of leading `#` markers, under a combined-output cap so several active
-/// directives cannot blow past the context budget this feature exists to respect.
+/// `# focus - stay targeted, minimal tool usage`), so the bullets carrying the actual behavioural
+/// instructions never travelled. It now injects the full (per-file-capped) body, stripped of
+/// leading `#` markers, under a combined-output cap so several active directives cannot blow past
+/// the context budget this feature exists to respect.
 ///
-/// The active list is the ORDER: directives render in the order they were activated, and
-/// an active name with no loaded directive contributes nothing rather than a placeholder
-/// header. That is a `filter_map`, not a lookup that has to be tested afterwards.
+/// The active list is the ORDER: directives render in the order they were activated, and an
+/// active name with no loaded directive contributes nothing rather than a placeholder header.
+///
+/// The heading is the map KEY, not the entry's own `name` copy. They are the same string by
+/// construction - the loader and the built-in set build one from the other - but a `HashMap` can
+/// be edited into a state where they disagree, and a directive rendered under another directive's
+/// heading would be injected as the wrong instruction. The key is what `aphrodite_directive`
+/// addresses, so it is what the model must see.
 pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
-	// `then` rather than a pre-built vector: with no active directive there is no name
-	// list to build and no header to render.
+	// `then` rather than a pre-built vector: with no active directive there is no name list to
+	// build and no header to render.
 	let Some(Names) = (!Active.is_empty()).then(|| Active.iter().map(String::as_str).collect::<Vec<_>>()) else {
 		return String::new();
 	};
 
 	let mut Out = format!("[directives: {}]\n", Names.join(", "));
 
-	Active.iter().filter_map(|name| all.get(name)).for_each(|Directive| {
-		Out.push_str(&Directive.name);
-		Out.push_str(":\n");
+	Active
+		.iter()
+		.filter_map(|name| all.get(name).map(|Directive| (name, Directive)))
+		.for_each(|(name, Directive)| {
+			Out.push_str(name);
+			Out.push_str(":\n");
 
-		Directive.Content.lines().for_each(|Line| {
-			let Line = Line.trim_start_matches('#').trim();
+			Directive.Content.lines().for_each(|Line| {
+				let Line = Line.trim_start_matches('#').trim();
 
-			// A blank line contributes nothing; `then` is the gate and nothing follows
-			// it, so the accepted path allocates no fallback.
-			let _ = (!Line.is_empty()).then(|| {
-				Out.push_str("  ");
-				Out.push_str(Line);
-				Out.push('\n');
+				// A blank line contributes nothing; `then` is the gate and nothing follows it, so
+				// the accepted path allocates no fallback.
+				let _ = (!Line.is_empty()).then(|| {
+					Out.push_str("  ");
+					Out.push_str(Line);
+					Out.push('\n');
+				});
 			});
 		});
-	});
 
-	// T19: the cap is compared as a CHARACTER count. `Out.len()` is a byte length, so
-	// multibyte content (em-dashes etc.) tripped the truncation on text that never
-	// exceeded the char budget, silently cutting directives that fit.
+	// T19: the cap is compared as a CHARACTER count. `Out.len()` is a byte length, so multibyte
+	// content (em-dashes etc.) tripped the truncation on text that never exceeded the char
+	// budget, silently cutting directives that fit.
 	match Out.char_indices().nth(MaximumCombinedChars) {
 		Some((Offset, _Char)) => format!("{}...\n", &Out[..Offset]),
 		None => Out,

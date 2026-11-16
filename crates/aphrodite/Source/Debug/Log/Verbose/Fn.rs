@@ -9,4 +9,8 @@ use crate::Debug::{Level::Get::Fn::Fn as Level, Log::At::Fn::Fn as LogAt};
 /// and the append are all skipped. That is what keeps a level-1 session paying
 /// one atomic load per verbose call site instead of a line per call - which is
 /// what `then` preserves: the append is a closure the gate never calls.
-pub fn Fn(Event:&str, Kv:&[(&str, String)]) { let _ = (Level() >= 2).then(|| LogAt(2, Event, Kv)); }
+pub fn Fn(Event:&str, Kv:&[(&str, String)]) {
+	if Level() >= 2 {
+		LogAt(2, Event, Kv);
+	}
+}

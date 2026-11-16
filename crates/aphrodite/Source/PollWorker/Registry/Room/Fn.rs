@@ -8,18 +8,21 @@
 
 use std::cmp::Ordering;
 
-use crate::PollWorker::{
-	Registry::{Capacity::Struct::Capacity, Reader::Struct::Reader, Room::Enum::Room},
-	Select::Eviction::Fn::Fn as Eviction,
-	Task::Status::Enum::BgStatus,
+use crate::{
+	PollWorker::{
+		Registry::{Capacity::Struct::Capacity, Reader::Struct::Reader, Room::Enum::Room},
+		Select::Eviction::Fn::Fn as Eviction,
+		Task::Status::Enum::BgStatus,
+	},
+	State::Identity::Command::Struct::CommandID,
 };
 
 /// What admitting a task with `Identity` finds.
-pub(crate) fn Fn(This:&Reader, Identity:&str, Bound:Capacity) -> Room {
+pub(crate) fn Fn(This:&Reader, Identity:&CommandID, Bound:Capacity) -> Room {
 	match This
 		.Tasks
 		.iter()
-		.position(|Task| Task.ID == Identity && Task.Status == BgStatus::Running)
+		.position(|Task| &Task.ID == Identity && Task.Status == BgStatus::Running)
 	{
 		Some(_) => Room::Duplicate,
 		None => {

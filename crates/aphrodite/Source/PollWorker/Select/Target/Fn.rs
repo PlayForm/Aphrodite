@@ -7,6 +7,10 @@
 //! task the first time a poll names it, which is what makes a second poll of the
 //! same process land on the same task.
 //!
+//! The two are compared as the types they are: a command LINE against a command line,
+//! an `ExecutionID` against an `ExecutionID`. They used to be two `String`s, which is
+//! how a comparison can silently cross the two identities.
+//!
 //! A poll that names a command no tracked task is running is *not* attributed to
 //! an unrelated task: it is a poll for a process this session does not track, so
 //! the answer is `None` and the result passes through as ordinary output. Only a
@@ -20,17 +24,17 @@ use crate::PollWorker::{
 };
 
 /// The one task this poll applies to.
-pub(crate) fn Fn(This:&Reader, Event:&PollEvent) -> Option<usize> {
+pub(crate) fn Fn(This:&Reader, Event:&PollEvent<'_>) -> Option<usize> {
 	let Running = |Task:&BgTask| Task.Status == BgStatus::Running;
 
 	let ByCommand = Event
 		.Command
 		.as_deref()
 		.and_then(|Named| This.Tasks.iter().position(|Task| Running(Task) && Task.command == Named));
-	let ByExecution = Event.ExecutionID.as_deref().and_then(|Named| {
+	let ByExecution = Event.ExecutionID.as_ref().and_then(|Named| {
 		This.Tasks
 			.iter()
-			.position(|Task| Running(Task) && Task.ExecutionID.as_deref() == Some(Named))
+			.position(|Task| Running(Task) && Task.ExecutionID.as_ref() == Some(Named))
 	});
 	let Oldest = This.Tasks.iter().position(Running);
 

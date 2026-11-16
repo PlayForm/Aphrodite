@@ -4,7 +4,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// Language, the definitions, then the line count.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Fns:Vec<&str> = Content
 		.lines()
 		.filter(|Line| {
@@ -62,7 +62,7 @@ pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 		(!Classes.is_empty()).then(|| MetadataField::New("classes", Classes.join(","))),
 		(!Imports.is_empty()).then(|| MetadataField::New("imports", Imports.join(","))),
 		(!Decorators.is_empty()).then(|| MetadataField::New("decorators", Decorators.join(","))),
-		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+		Some(MetadataField::New("ln", Analysis.Lines().to_string())),
 	]
 	.into_iter()
 	.flatten()

@@ -8,7 +8,7 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 /// reader, and losing that would silently drop every capitalised-`Def` file from the preview. It is not
 /// a Python parser: indentation is never looked at, so a nested method is recorded exactly like a
 /// module-level function and a `def` inside a string is recorded as real.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Lower = Trimmed.to_lowercase();
 	let Declares = (Lower.starts_with("def ") || Lower.starts_with("async def ")) && Trimmed.contains('(');
 
@@ -27,10 +27,8 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			false => "",
 		};
 
-		match (!Name.is_empty()).then(|| Name.to_string()) {
-			Some(Name) => {
-				Declaration::Declaration { Kind:"def", Name, Parameters:Some(Parameters.to_string()), Return:None }
-			},
+		match (!Name.is_empty()).then_some(Name) {
+			Some(Name) => Declaration::Declaration { Kind:"def", Name, Parameters:Some(Parameters), Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {

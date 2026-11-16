@@ -4,13 +4,16 @@
 //! and the accumulator bound are set once instead of being restated by every
 //! caller that admits a task.
 
-use crate::PollWorker::{
-	Output::Struct::Accumulator,
-	Task::{Status::Enum::BgStatus, Struct::BgTask},
+use crate::{
+	PollWorker::{
+		Output::Struct::Accumulator,
+		Task::{Status::Enum::BgStatus, Struct::BgTask},
+	},
+	State::Identity::Command::Struct::CommandID,
 };
 
 /// A running task, started at `Turn`, first observed at `ObservedAtUnix`.
-pub(crate) fn Fn(TaskID:String, Tool:String, command:String, Turn:usize, ObservedAtUnix:u64) -> BgTask {
+pub(crate) fn Fn(TaskID:CommandID, Tool:String, command:String, Turn:usize, ObservedAtUnix:u64) -> BgTask {
 	BgTask {
 		ID:TaskID,
 		Tool,
@@ -19,8 +22,6 @@ pub(crate) fn Fn(TaskID:String, Tool:String, command:String, Turn:usize, Observe
 		LastPollTurn:Turn,
 		ExecutionID:None,
 		Status:BgStatus::Running,
-		OutputHash:None,
-		OutputPreview:None,
 		PollCount:0,
 		AccumulatedOutput:Accumulator::New(),
 		LiveBytesArrived:0,

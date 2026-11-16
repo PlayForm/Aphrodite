@@ -20,7 +20,7 @@ pub(crate) fn Fn(hash:&str, Analysis:&ContentAnalysis<'_>, Center:Option<&str>) 
 	// 1.5.0 (REFACTOR-PLAN §7): ALL types route through the single core builder
 	// (`crate::Preview::Builder::Entry`), the same one the Hermes hook/FFI path
 	// uses, so proxy and hook previews can never drift.
-	let Preview = crate::Preview::Builder::Entry::Fn(Analysis.Ct, Analysis.Content);
+	let Preview = crate::Preview::Builder::Entry::Fn(Analysis.Ct(), Analysis.Content());
 
-	ProxyFormatCCROutput(&Preview, Analysis.Ct, &Metadata, Center, hash, Analysis.Content.len())
+	ProxyFormatCCROutput(&Preview, Analysis.Ct(), &Metadata, Center, hash, Analysis.Size())
 }

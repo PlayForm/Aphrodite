@@ -6,16 +6,21 @@
 //! apart is what makes "which grammar did this marker use?" answerable by
 //! looking at one file.
 //!
-//! - `Const.rs` - the process-global template registration and its hint knob.
+//! - `Registration/` - the process-global registration and its hint, published
+//!   as one value.
+//! - `Grammar/` - which of the two grammars is in force.
+//! - `Budget/` - the headroom budget's percentage as a truncation.
 //! - `Entry.rs` - `CCRMarker`, the public entry point.
 //! - `Block.rs` - configured-template vs fallback dispatch.
 //! - `Fallback.rs` - the canonical `<<<CCR:...>>>` grammar.
 //! - `Bracket.rs` - "is this preview already self-describing?".
 //! - `Vars.rs` - `{name}` substitution for TOML templates.
 
-pub mod Bracket;
 pub mod Block;
-pub mod Const;
+pub mod Bracket;
+pub mod Budget;
 pub mod Entry;
 pub mod Fallback;
+pub mod Grammar;
+pub mod Registration;
 pub mod Vars;

@@ -12,6 +12,12 @@ stateful!(
 	/// hook by name. Oversize content is rejected before the hook sees it, so a
 	/// host that pipes a runaway output here gets an error rather than a session
 	/// whose store is full of something unretrievable.
+	///
+	/// # Safety
+	/// `Content` and `Tool` must each be null or point to a valid,
+	/// NUL-terminated C string that stays readable and unmoved for the duration
+	/// of this call. The returned pointer is owned by the caller and must be
+	/// released with `AphroditeFreeString`.
 	AphroditeTransform,
 	|s, Content:*const c_char, Tool:*const c_char| {
 		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {

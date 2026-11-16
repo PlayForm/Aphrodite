@@ -12,8 +12,19 @@ use std::{ffi::CString, os::raw::c_char};
 ///
 /// A null pointer is a no-op, which makes the caller's cleanup path
 /// unconditional.
+///
+/// # Safety
+/// `s` must be either null or the exact pointer this ABI returned, still
+/// unmodified: same allocation, same starting address, same terminator position.
+/// `CString::from_raw` recomputes the allocation's length from the terminator, so
+/// writing an earlier NUL into the buffer or removing the final one makes the
+/// reconstruction describe a different block than the one that was allocated.
+///
+/// The two rules that follow are the whole contract: treat a returned string as
+/// read-only, and hand the pointer back to this function exactly once - never to
+/// `free`, never to a second call.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeFreeString(s:*mut c_char) {
+pub unsafe extern "C" fn AphroditeFreeString(s:*mut c_char) {
 	// `NonNull` turns "the caller may pass null" into a value, so the `unsafe`
 	// block below has one reason to exist and one contract to state.
 	let Some(s) = std::ptr::NonNull::new(s) else { return };

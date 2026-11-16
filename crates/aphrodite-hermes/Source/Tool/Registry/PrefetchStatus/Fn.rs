@@ -10,7 +10,7 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_prefetch_status` handler.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_prefetch_status", |_args| {
-		crate::Session::With::Fn::with_shared(|state| aphrodite::Prefetch::Status::Fn::PrefetchStatus(state))
+	("aphrodite_prefetch_status", |_Args| {
+		crate::Session::With::Fn::with_shared(|State| aphrodite::Prefetch::Status::Fn::PrefetchStatus(State))
 	})
 }

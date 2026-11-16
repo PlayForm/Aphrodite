@@ -4,3 +4,4 @@
 pub mod Enum;
 pub mod Exit;
 pub mod Rank;
+pub mod Stored;

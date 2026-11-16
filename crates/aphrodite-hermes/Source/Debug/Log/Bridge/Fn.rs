@@ -12,25 +12,25 @@
 //! from - the toggle would keep flipping and nothing would ever be written. The
 //! two surfaces also answer different questions: the process log belongs to the
 //! operator, the file belongs to the session tree.
+//!
+//! This leaf only supplies the SINK; the decision lives in `At::Fn::Fn`, which is
+//! what a probe can drive. Note that the core sink emits the record on its own
+//! target (`aphrodite::debug`) as well as appending it, so a process that
+//! enables both this crate's target and the core's sees the same record twice -
+//! once structured, once as the formatted line. That is deliberate: the two
+//! targets are the two audiences (this crate's bridge, and the engine), and
+//! neither filter is guaranteed to be on.
 
-use crate::Debug::{Init::Const::TARGET, Log::Level};
+use crate::Debug::{Init::Const::TARGET, Log::Bridge::At};
 
 /// Bridge-side event: env level OR the session flag toggle.
 ///
-/// `kv` is an ordered slice, not a map: the appended line keeps the caller's
-/// field order, which is what makes two runs of the same event diffable. It
-/// does not filter or truncate - a caller that logs a 40 KB value gets a 40 KB
+/// It does not filter or truncate - a caller that logs a 40 KB value gets a 40 KB
 /// line, so callers pass sizes and hashes rather than payloads, and no caller
 /// here ever passes a secret or a content body.
 pub(crate) fn Fn(state:&aphrodite::State::Struct::AphroditeState, session:&str, event:&str, kv:&[(&str, String)]) {
-	let lvl = Level::Fn::Fn(state, session);
-
-	match lvl {
-		// Quiet path: no event, no file append, no formatting.
-		0 => {},
-		lvl => {
-			tracing::debug!(target: TARGET, session, event, level = lvl, fields = ?kv);
-			aphrodite::Debug::Log::At::Fn::Fn(lvl, event, kv);
-		},
-	}
+	At::Fn::Fn(state, session, event, kv, |Level, Event, Kv| {
+		tracing::debug!(target: TARGET, session, event = Event, level = Level, fields = ?Kv);
+		aphrodite::Debug::Log::At::Fn::Fn(Level, Event, Kv);
+	});
 }

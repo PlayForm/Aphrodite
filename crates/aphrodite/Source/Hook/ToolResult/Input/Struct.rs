@@ -7,6 +7,11 @@ use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
 /// `Meta` is borrowed for the length of one call - every field points into the
 /// caller's JSON or string slice - so holding it here costs nothing and keeps the
 /// observation and the decision reading the same facts.
+///
+/// `Copy` because every field is a borrowed slice: the plan carries the input by
+/// value, and selection has to read the content and the tool name while building
+/// that plan.
+#[derive(Debug, Clone, Copy)]
 pub struct Struct<'a> {
 	/// The result to transform, exactly as the tool produced it.
 	pub Content:&'a str,

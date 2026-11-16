@@ -1,24 +1,31 @@
 //! Build one context-engine archive with no session mutation.
 
-use crate::{Session::Engine::Plan::Struct::Struct as Plan, State::Struct::AphroditeState};
+use crate::{
+	Session::Engine::{Gate::Enum::Enum as Gate, Plan::Struct::Struct as Plan},
+	State::Struct::AphroditeState,
+};
 
 /// Pack the middle turns into one retrievable payload and render its marker.
 ///
 /// No session access beyond reading: the packed payload, the hash, the preview,
 /// the marker and the prompt are all functions of the index and the templates, so
-/// the whole plan can be built before anything is stored. `None` means the middle
-/// turns could not be packed, and the caller then refuses rather than archiving
-/// half a history.
+/// the whole plan can be built before anything is stored. `Err` names WHY nothing
+/// was built, so the caller reports the refusal it actually met instead of a
+/// generic "unpackable".
+///
+/// The slice is taken through `get` rather than by indexing: the protect bounds come
+/// from configuration, and a bound pair that leaves no middle (`HeadN > End`) is a
+/// refusal, not a panic inside a hook.
 ///
 /// The packed entries are the REAL recorded turns (turn → hash/summary/size),
 /// never fabricated message content: the dylib never sees the message list.
-pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, MiddleN:usize) -> Option<Plan> {
+pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, MiddleN:usize) -> Result<Plan, Gate> {
 	// Sorted turns, oldest first (same ordering as `GetConvIndex`).
 	let mut Turns:Vec<usize> = State.ConvIndex.keys().copied().collect();
 	Turns.sort_unstable();
 
 	let End = Total.saturating_sub(TailN);
-	let MiddleKeys:Vec<usize> = Turns[HeadN..End].to_vec();
+	let MiddleKeys:Vec<usize> = Turns.get(HeadN..End).ok_or(Gate::MiddleOutOfRange)?.to_vec();
 
 	let PackedEntries:Vec<serde_json::Value> = MiddleKeys
 		.iter()
@@ -34,7 +41,7 @@ pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, M
 		Err(Error) => {
 			tracing::warn!(error = %Error, "engine_maybe_archive: packing middle turns failed; skipping");
 
-			return None;
+			return Err(Gate::Unpackable);
 		},
 	};
 
@@ -48,5 +55,5 @@ pub(crate) fn Fn(State:&AphroditeState, Total:usize, HeadN:usize, TailN:usize, M
 	);
 	let Prompt = format!("{Marker}\n{Rendered}");
 
-	Some(Plan { HeadN, TailN, MiddleN, MiddleKeys, Packed, Hash, Preview, Prompt })
+	Ok(Plan { HeadN, TailN, MiddleN, MiddleKeys, Packed, Hash, Preview, Prompt })
 }

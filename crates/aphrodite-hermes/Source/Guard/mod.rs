@@ -9,6 +9,7 @@
 //! `CString::from_raw` pairing are non-negotiable.
 
 pub mod Fn;
+pub mod ToJSON;
 
 #[cfg(test)]
 mod Test;

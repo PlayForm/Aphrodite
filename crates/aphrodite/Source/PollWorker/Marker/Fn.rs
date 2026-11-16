@@ -4,14 +4,17 @@
 //! output: retrieving a `Poll` marker returns stale content, which is exactly
 //! the mistake this marker exists to prevent. The hash it carries is the
 //! task hash, not the output hash - output does not exist yet at creation
-//! time, and the completion nudge supplies the output hash later.
+//! time, and the completion nudge supplies the output hash later. Both are
+//! identities of different kinds, so both are typed.
+
+use crate::State::Identity::Command::Struct::CommandID;
 
 /// Create a "poll worker" CCR marker that replaces the raw tool output.
 /// The agent sees this marker instead of the original content and knows
 /// to poll for progress rather than retrieve (which would return stale
 /// content).
-pub fn CreatePollMarker(TaskID:&str, CommandSummary:&str, Turn:usize) -> String {
+pub fn CreatePollMarker(TaskID:&CommandID, CommandSummary:&str, Turn:usize) -> String {
 	let Preview = format!("[poll:running {} | turn {}]", CommandSummary, Turn);
-	let hash = TaskID;
+	let hash = TaskID.as_str();
 	crate::Marker::Format::Entry::CCRMarker(hash, "poll", 0, &Preview, None, None, None)
 }

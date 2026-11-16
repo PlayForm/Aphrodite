@@ -5,7 +5,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 /// Language, then the signatures found, then the line count.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	let Sigs:Vec<&str> = Analysis
-		.Content
+		.Content()
 		.lines()
 		.filter(|Line| {
 			let Trimmed = Line.trim_start();
@@ -34,7 +34,7 @@ pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	[
 		Some(MetadataField::New("lang", "gen")),
 		(!Sigs.is_empty()).then(|| MetadataField::New("sigs", Sigs.join(","))),
-		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+		Some(MetadataField::New("ln", Analysis.Lines().to_string())),
 	]
 	.into_iter()
 	.flatten()

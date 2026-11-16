@@ -15,18 +15,23 @@ pub struct Struct {
 	/// The resolved payload, or `None` when the lookup failed.
 	#[serde(rename = "content")]
 	pub Content:Option<String>,
-	/// Which backend served it (`InlineCCR`, `ccr`, `none`).
+	/// Which store served it: `"inline_ccr"` when this session's own inline entry
+	/// answered, `"ccr"` when the CCR backend did, `"none"` on a lookup failure.
+	/// Produced by [`crate::Retrieve::Handle::Served::Enum::Enum::Wire`], so it cannot
+	/// disagree with the store that produced the content.
 	#[serde(rename = "source")]
 	pub Source:String,
 	/// Human-readable failure reason; `None` on success.
 	pub error:Option<String>,
-	/// `true` when `Content` is a partial window of a larger stored
-	/// document - because of `Offset`/`Limit`, or because an explicit `Limit`
-	/// hit the 10,000-line server cap (02-F5). `limit: 0` requests the FULL
-	/// document (round-trip contract: retrieval must return the exact original
-	/// bytes so the body hashes to its own marker hash). A `[lines a-b/total]`
-	/// header is also prepended to `Content` in that case; this field lets a
-	/// caller detect truncation without parsing it.
+	/// `true` when `Content` is a partial window of a larger stored document -
+	/// because of `Offset`/`Limit`, or because an explicit `Limit` hit the
+	/// 10,000-line server cap (02-F5). The exact retrieval (wire `offset: 0`,
+	/// `limit: 0`, which `Page::Mode` represents as its own variant rather than a
+	/// sentinel) always returns the FULL document: that is the round-trip contract,
+	/// since retrieval must return the exact original bytes so the body hashes to
+	/// its own marker hash. A `[lines a-b/total]` header is prepended to `Content`
+	/// whenever it IS a window; this field lets a caller detect truncation without
+	/// parsing it.
 	#[serde(rename = "truncated")]
 	pub Truncated:bool,
 	/// Live-container progress; present only when the resolved entry is a

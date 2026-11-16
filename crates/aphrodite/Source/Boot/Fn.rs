@@ -11,6 +11,7 @@
 //! precedence between the four requests lives in `Request::Fn` and nowhere else.
 
 use aphrodite::{Configuration::CLI::Struct::Struct as CLI, Setup};
+use anyhow::Context;
 use clap::Parser;
 
 use crate::Boot::{Request, Worker};
@@ -64,11 +65,15 @@ pub fn Fn() -> anyhow::Result<()> {
 		Request::Enum::Enum::Run => {},
 	}
 
+	// A runtime that cannot be built is a startup failure, not an invariant: the
+	// caller already has a `Result`, so it is reported through it rather than
+	// asserted. An `expect` here would turn "the host refused a thread pool" into a
+	// panic with no context on a path that has a perfectly good error channel.
 	let Runtime = tokio::runtime::Builder::new_multi_thread()
 		.worker_threads(Worker::Count::Fn::Fn())
 		.enable_all()
 		.build()
-		.expect("tokio runtime");
+		.context("build the tokio runtime")?;
 
 	Runtime.block_on(crate::Boot::Run::Run())
 }

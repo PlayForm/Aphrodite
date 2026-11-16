@@ -1,5 +1,7 @@
 //! Render the `git status` tally.
 
+use std::num::NonZeroUsize;
+
 use crate::Preview::Summary::Git::Struct::Struct as Summary;
 
 /// Characters one path may occupy: forty.
@@ -22,10 +24,7 @@ pub(crate) fn Fn(Summary:&Summary, Total:usize) -> String {
 				.iter()
 				.map(|Path| Path.chars().take(PathShown).collect())
 				.collect();
-			let More = Summary
-				.Total()
-				.checked_sub(Summary.Paths().len())
-				.filter(|More| *More > 0)
+			let More = NonZeroUsize::new(Summary.Total().saturating_sub(Summary.Paths().len()))
 				.map(|More| format!(" +{More} more"))
 				.unwrap_or_default();
 

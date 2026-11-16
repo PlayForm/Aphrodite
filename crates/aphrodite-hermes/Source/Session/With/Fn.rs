@@ -5,13 +5,20 @@
 //! against a throwaway template clone instead. A panic inside the closure is
 //! NOT caught here - the guard lives one layer up in `Guard::guarded`, which
 //! every FFI call site routes through.
+//!
+//! Both are deliberately shaped for the caller that has a VALUE to return and
+//! nothing to report: a tool call answers with its result, and a wedged lock is
+//! a fail-open degradation it cannot act on. A caller that must know what
+//! happened - the config sweep, which has to tell "every session is wedged"
+//! from "every session said stop" - uses `Session::Broadcast`, which reports
+//! `Applied` and `Skipped` counts instead of collapsing both into one value.
 
 use aphrodite::State::Struct::AphroditeState;
 
 use crate::{
 	Configuration::Template::Fn::config_template,
 	Session::{
-		Lock::Fn::lock_bounded,
+		Lock::{Fn::lock_bounded, Outcome},
 		Registry::Struct::{DEFAULT_SESSION, session_state},
 	},
 };
@@ -24,18 +31,25 @@ use crate::{
 /// abandoned worker; the caller MUST degrade fail-open (never block).
 pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T) -> Option<T> {
 	let state = session_state(sid);
-	lock_bounded(&state).map(|mut guard| f(&mut guard))
+
+	match lock_bounded(&state) {
+		Outcome::Enum::Enum::Held(mut guard) => Some(f(&mut guard)),
+		Outcome::Enum::Enum::Wedged => None,
+	}
 }
 
 /// Run `f` against the session state under a bounded lock.
 ///
 /// Compatibility shim for tools and tests that lack a `session_id`: resolves
 /// `crate::Debug::Session::Last::Fn::Fn()` (fallback to the [`DEFAULT_SESSION`] key
-/// when empty) and locks ONLY that session with the bounded lock. On `None`
-/// (wedged lock) it runs `f` against a THROWAWAY clone of the config
-/// template so the call still returns quickly - fail-open, never block; the
-/// mutation is discarded (the template itself is never mutated, so future
-/// session seeds stay pristine).
+/// when empty) and locks ONLY that session with the bounded lock. On a wedged
+/// lock it runs `f` against a THROWAWAY clone of the config template so the call
+/// still returns quickly - fail-open, never block; the mutation is discarded
+/// (the template itself is never mutated, so future session seeds stay
+/// pristine). The discard is the price of a tool call that has nothing better
+/// to do than answer; a caller that needs to know whether its write landed uses
+/// `Session::Broadcast` (which counts) or `with_session` (which reports the
+/// wedged lock as `None`) instead.
 ///
 /// Torn-state contract (report 06 F12): `with_shared` itself does not
 /// `catch_unwind` - the panic guard lives one layer up, in `guarded()` at
@@ -55,9 +69,9 @@ pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
 	let state = session_state(&sid);
 
 	match lock_bounded(&state) {
-		Some(mut guard) => f(&mut guard),
+		Outcome::Enum::Enum::Held(mut guard) => f(&mut guard),
 		// Wedged session lock: degrade on a throwaway clone rather than block.
-		None => {
+		Outcome::Enum::Enum::Wedged => {
 			let mut scratch = config_template().clone();
 			f(&mut scratch)
 		},

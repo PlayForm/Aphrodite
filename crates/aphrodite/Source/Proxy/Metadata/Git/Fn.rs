@@ -10,7 +10,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// The branch, when one can be named, then how many commits are in view.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Branch = Content
 		.lines()
 		.map(str::trim)

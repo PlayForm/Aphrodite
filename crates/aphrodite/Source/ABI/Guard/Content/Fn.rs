@@ -16,6 +16,12 @@ use super::Const::MaximumContent;
 /// empty even though it is also under the cap, and a NUL is reported as a NUL
 /// only once the size is known to be servable. Three `?`-composed rejections
 /// keep that order readable and each error is constructed only when it rejects.
+///
+/// The cap arm is the same number `Guard::Cstr` already enforced at ingress for a
+/// pointer-sourced payload, so on that path it cannot fire; it stays because this
+/// function is also reached with content that arrived through
+/// `AphroditeDispatch`'s JSON args, where the ingress is `Route::Decode` and this
+/// validator is the export's own statement of what it will serve.
 pub(crate) fn Fn(Content:&str) -> anyhow::Result<()> {
 	crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty(), || anyhow::anyhow!("empty content"))?;
 	crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {

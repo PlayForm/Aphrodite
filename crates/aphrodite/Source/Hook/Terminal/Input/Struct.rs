@@ -8,6 +8,10 @@
 /// command and the exit code are deliberately absent - they belong to the
 /// observation, not to the decision, and a plan that could read them would be
 /// tempted to branch on them.
+///
+/// `Copy` because it is two borrowed slices: the plan carries the input by value,
+/// and selection has to read the content while building that plan.
+#[derive(Debug, Clone, Copy)]
 pub struct Struct<'a> {
 	/// The output to transform, exactly as the call produced it.
 	pub Content:&'a str,

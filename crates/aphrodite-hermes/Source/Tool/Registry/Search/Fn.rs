@@ -8,30 +8,33 @@ use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
 /// caps at 20 results. Both limits are stated in the schema, because a caller that
 /// reads a miss as "the content is gone" will not fall back to the catalogue.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_search", |args| {
-		let query = Arg::Fn::Fn(args, "query").to_lowercase();
-		let type_filter = args.get("type").and_then(|v| v.as_str());
-		crate::Session::With::Fn::with_shared(|state| {
-			let results:Vec<serde_json::Value> = state
+	("aphrodite_search", |Args| {
+		let Query = Arg::Fn::Fn(Args, "query").to_lowercase();
+		let TypeFilter = Args.get("type").and_then(|v| v.as_str());
+
+		crate::Session::With::Fn::with_shared(|State| {
+			let Results:Vec<serde_json::Value> = State
 				.RecentMarkers
 				.iter()
 				.rev()
-				.filter(|mk| {
-					let q_ok = query.is_empty()
-						|| mk.Preview.to_lowercase().contains(&query)
-						|| mk.CCRType.to_lowercase().contains(&query);
-					let t_ok = type_filter.is_none_or(|t| mk.CCRType == t);
-					q_ok && t_ok
+				.filter(|Marker| {
+					let MatchesQuery = Query.is_empty()
+						|| Marker.Preview.to_lowercase().contains(&Query)
+						|| Marker.CCRType.to_lowercase().contains(&Query);
+					let MatchesType = TypeFilter.is_none_or(|Kind| Marker.CCRType == Kind);
+
+					MatchesQuery && MatchesType
 				})
 				.take(20)
-				.map(|mk| {
+				.map(|Marker| {
 					serde_json::json!({
-						"hash": &mk.hash,
-						"type": mk.CCRType, "size": mk.Size, "preview": mk.Preview,
+						"hash": &Marker.hash,
+						"type": Marker.CCRType, "size": Marker.Size, "preview": Marker.Preview,
 					})
 				})
 				.collect();
-			serde_json::json!({"query": query, "total": results.len(), "results": results})
+
+			serde_json::json!({"query": Query, "total": Results.len(), "results": Results})
 		})
 	})
 }

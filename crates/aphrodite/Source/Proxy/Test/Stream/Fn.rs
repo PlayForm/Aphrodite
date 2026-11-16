@@ -6,7 +6,7 @@ use std::sync::Arc;
 use axum::response::IntoResponse;
 
 use crate::Proxy::{
-	Cache::{Get::Fn::Fn as ResponseCacheGet, Key::Fn::Fn as CacheKeyFromBody},
+	Cache::{Get::Fn::Fn as ResponseCacheGet, Identity::Struct::Struct as CacheIdentity},
 	Handle::Proxy::Fn::Fn as ProxyHandler,
 	Test::Support::{
 		State::Fn::TestState,
@@ -81,16 +81,16 @@ async fn TestSSEResponseIsStreamedWithHeaderAndNotCached() {
 		Some("text/event-stream")
 	);
 
-	// No cache write: an SSE response must never populate the response
-	// cache (F3's whole point - a cached entry is a single buffered JSON
-	// body, nothing like a stream).
-	let CacheKey = CacheKeyFromBody(&serde_json::json!({"model":"x","messages":[]}), State.APIKey.Expose());
-	CacheKey.into_iter().for_each(|Ck| {
-		assert!(
-			ResponseCacheGet(&State, Ck, std::time::Instant::now()).is_none(),
-			"SSE response must not be cached"
-		);
-	});
+	// No cache write: an SSE response must never populate the response cache
+	// (F3's whole point - a cached entry is a single buffered JSON body, nothing
+	// like a stream). The identity is derived the same way the request path
+	// derives it, so this looks under exactly the key a hit would have used.
+	let Identity = CacheIdentity::New(&serde_json::json!({"model":"x","messages":[]}), State.APIKey.Expose());
+
+	assert!(
+		ResponseCacheGet(&State, &Identity, std::time::Instant::now()).is_none(),
+		"SSE response must not be cached"
+	);
 }
 
 #[tokio::test]

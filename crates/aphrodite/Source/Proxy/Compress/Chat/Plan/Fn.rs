@@ -13,10 +13,10 @@
 //! decisions share the store, the counters and the ratio EMA, and running them
 //! in parallel would interleave those effects for no gain.
 
-use std::sync::atomic::Ordering;
+use std::sync::{Arc, atomic::Ordering};
 
 use futures::StreamExt;
-use headroom_core::ccr::compute_key;
+use headroom_core::ccr::{CcrStore, compute_key};
 
 use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
@@ -28,7 +28,7 @@ use crate::{
 			Sizing::{Classify::Fn::Fn as ClassifySizing, Enum::Enum as ContentSizing},
 		},
 		Marker::Fn::Fn as SmartMarker,
-		Measurement::Wire::Struct::Struct as WireAccounting,
+		Measurement::Content::Struct::Struct as ContentAccounting,
 		Request::Context::Struct::Struct as RequestContext,
 		State::Struct::Struct as AppState,
 		Storage::{
@@ -39,15 +39,20 @@ use crate::{
 };
 
 /// One decision per choice, in choice order.
+///
+/// `Choices` is the response's `choices` array, handed in by the caller that owns
+/// the body: the plan reads it and the applier writes it, and neither has to
+/// re-derive where it lives. Taking the array rather than the whole response also
+/// stops the plan from being able to mutate what it is deciding about.
 pub(crate) async fn Fn(
 	Context:&RequestContext<'_>,
-	Response:&serde_json::Value,
+	Choices:&[serde_json::Value],
 	HeadroomBudget:Option<&str>,
 ) -> Option<Vec<ContentRewrite>> {
-	let Choices = Response.get("choices")?.as_array()?;
-
-	// No store, nothing to rewrite against.
-	Context.State.ccr.as_ref()?;
+	// No store, nothing to rewrite against. Taken once here and threaded into the
+	// decision that writes, so no later stage has to re-ask - the old shape gated
+	// at the call site and then decided the same thing again inside `Compress`.
+	let ccr = Context.State.ccr.as_ref()?;
 
 	let BaseThreshold = Context.State.CompressThreshold();
 	// Headroom budget: lower values compress more aggressively. Coding-tuned:
@@ -60,7 +65,7 @@ pub(crate) async fn Fn(
 
 	Some(
 		futures::stream::iter(Choices)
-			.then(|Choice| Decide(Context, Choice, BaseThreshold, BudgetMult))
+			.then(|Choice| Decide(Context, ccr, Choice, BaseThreshold, BudgetMult))
 			.collect::<Vec<ContentRewrite>>()
 			.await,
 	)
@@ -69,6 +74,7 @@ pub(crate) async fn Fn(
 /// Decide one choice.
 async fn Decide(
 	Context:&RequestContext<'_>,
+	ccr:&Arc<dyn CcrStore>,
 	Choice:&serde_json::Value,
 	BaseThreshold:usize,
 	BudgetMult:f64,
@@ -85,10 +91,10 @@ async fn Decide(
 	// One analysis, shared by the threshold lookup and the marker renderer, so
 	// the type that decides the threshold is the type printed in the marker.
 	let Analysis = AnalyseContent(Content);
-	let Threshold = (Context.State.ThresholdFor(Analysis.Ct).max(BaseThreshold) as f64 * BudgetMult) as usize;
+	let Threshold = (Context.State.ThresholdFor(Analysis.Ct()).max(BaseThreshold) as f64 * BudgetMult) as usize;
 
 	match ClassifySizing(Content.len(), Threshold, Context.State.InlineCCRThreshold()) {
-		ContentSizing::Compress => Compress(Context, &Analysis).await,
+		ContentSizing::Compress => Compress(Context, ccr, &Analysis).await,
 		ContentSizing::Inline => Inline(Context, &Analysis),
 		ContentSizing::Skip => ContentRewrite::Unchanged("below_threshold"),
 	}
@@ -96,12 +102,12 @@ async fn Decide(
 
 /// Store the content and replace it with a marker, unless auto-expand asks for
 /// the content to be left inline.
-async fn Compress(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) -> ContentRewrite {
-	let ccr = match Context.State.ccr.as_ref() {
-		Some(ccr) => ccr,
-		None => return ContentRewrite::Unchanged("store_disabled"),
-	};
-	let Content = Analysis.Content;
+async fn Compress(
+	Context:&RequestContext<'_>,
+	ccr:&Arc<dyn CcrStore>,
+	Analysis:&ContentAnalysis<'_>,
+) -> ContentRewrite {
+	let Content = Analysis.Content();
 	let Hash = compute_key(Content.as_bytes());
 
 	// F4: only replace the content with a marker if it is actually retrievable
@@ -144,8 +150,8 @@ async fn Compress(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) ->
 		// content minus the rendered marker that replaces it), not the bare hash
 		// length - the marker is hundreds of chars longer than the 40-char hash,
 		// so subtracting only the hash overstated savings (report 05 F5).
-		let Accounting = WireAccounting { OriginalBytes:Evidence.Size(), EmittedBytes:Marker.len() };
-		Context.State.RecordCompression(Analysis.Ct);
+		let Accounting = ContentAccounting { OriginalBytes:Evidence.Size(), EmittedBytes:Marker.len() };
+		Context.State.RecordCompression(Analysis.Ct());
 		Context.State.UpdateCompressionRatio(Evidence.Size(), Marker.len());
 
 		ContentRewrite::Replaced { Content:Marker, Accounting }
@@ -154,7 +160,7 @@ async fn Compress(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) ->
 
 /// Store tiny content inline so a later retrieval needs no backend round-trip.
 fn Inline(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) -> ContentRewrite {
-	let Hash = compute_key(Analysis.Content.as_bytes());
+	let Hash = compute_key(Analysis.Content().as_bytes());
 	// `put` returns the previous value, which is exactly "was this already
 	// here" - one lock, one answer, no read-then-write window. A hit re-stores
 	// identical content (the hash is the content's own digest), so the counters
@@ -164,7 +170,7 @@ fn Inline(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) -> Content
 		.InlineCCR
 		.lock()
 		.ok()
-		.map(|mut Map| Map.put(Hash, Analysis.Content.to_string()));
+		.map(|mut Map| Map.put(Hash, Analysis.Content().to_string()));
 
 	match Previous {
 		Some(Some(_)) => {
@@ -185,7 +191,12 @@ fn Inline(Context:&RequestContext<'_>, Analysis:&ContentAnalysis<'_>) -> Content
 /// to it: the marker is the model's only handle on that payload, so it describes
 /// what a retrieval will actually return.
 fn RenderMarker(State:&AppState, Evidence:&StoreEvidence, Analysis:&ContentAnalysis<'_>) -> String {
-	let Stored = ContentAnalysis { Content:Evidence.Content(), Ct:Analysis.Ct, Lines:Analysis.Lines };
+	// Re-analysed from the bytes the store returned, under the type the detector
+	// named: the marker is the model's only handle on that payload, so its
+	// preview, metadata and line count all describe what a retrieval will return -
+	// not the copy that was handed to the store. `New` re-counts the lines, which
+	// is the fact that used to be carried over from the other content.
+	let Stored = ContentAnalysis::New(Evidence.Content(), Analysis.Ct());
 
 	match State.Mode {
 		ProxyMode::Cache => CacheMarker(Evidence.Hash(), &Stored, None),

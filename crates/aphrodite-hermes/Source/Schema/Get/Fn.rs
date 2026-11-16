@@ -11,4 +11,4 @@ use crate::Schema::All;
 /// Returns `None` for an unknown name, which the FFI layer turns into
 /// `{"error": "unknown tool: <name>"}`. It is a linear scan on purpose: the
 /// catalogue is small and a duplicate-name bug would be masked by a map.
-pub fn Fn(name:&str) -> Option<serde_json::Value> { All::Fn::Fn().into_iter().find(|s| s["name"] == name) }
+pub fn Fn(Name:&str) -> Option<serde_json::Value> { All::Fn::Fn().into_iter().find(|Schema| Schema["name"] == Name) }

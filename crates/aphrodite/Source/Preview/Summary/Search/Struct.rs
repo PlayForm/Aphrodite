@@ -21,15 +21,15 @@ impl Struct {
 
 	/// Account for one recognised hit.
 	///
-	/// The first hit is cloned because it has to outlive the fold; every later hit
-	/// contributes only its path, which is moved into the set. It is not a sample: the
-	/// location shown is the actual first hit in input order.
+	/// The first hit is cloned because it has to outlive the fold, and `get_or_insert_with`
+	/// keeps that clone to exactly one; every later hit contributes only its path, which is
+	/// moved into the set. It is not a sample: the location shown is the actual first hit in
+	/// input order.
 	pub(crate) fn Push(&mut self, Hit:Record) {
 		self.Hits += 1;
 
-		let First = self.First.take();
-
-		self.First = Some(First.unwrap_or_else(|| Record { Path:Hit.Path.clone(), Line:Hit.Line.clone() }));
+		self.First
+			.get_or_insert_with(|| Record { Path:Hit.Path.clone(), Line:Hit.Line.clone() });
 		self.Files.insert(Hit.Path);
 	}
 

@@ -11,9 +11,12 @@
 //! goes through `StructExtract::Format::Floor::Fn` so a multi-byte character is
 //! never split in half.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-use super::Block::RenderMarkerBlock;
+use super::{
+	Block::RenderMarkerBlock,
+	Budget::{Enum::Enum as Limit, Fn::Fn as Budget},
+};
 
 /// Build a CCR output block.
 ///
@@ -21,57 +24,68 @@ use super::Block::RenderMarkerBlock;
 /// - `CCRType`: content type string (e.g. "code_rust", "build")
 /// - `Size`: original content size in bytes
 /// - `Preview`: the formatted preview string
-/// - `HeadroomBudget`: optional token budget for truncation
+/// - `HeadroomBudget`: the caller's token budget percentage, or `None` for no
+///   truncation at all
 /// - `meta`: optional metadata key-value pairs
 /// - `Center`: optional center annotation
 ///
 /// The rendered block consults the process-global `[templates.marker]`
-/// registration ([`super::Const::set_marker_templates`]): when a `Format`
-/// string is configured it is rendered with `{preview} {type} {meta} {center}
-/// {center_seg} {hash} {size} {hint}` substitution; otherwise the fixed
-/// `<<<CCR:{hash}|{type}|{size}>>>` grammar is the fallback.
+/// registration (`super::Registration::Set::Fn`): a `Template` grammar renders
+/// with `{preview} {type} {meta} {center} {center_seg} {hash} {size} {hint}`
+/// substitution, and `Canonical` is the fixed `<<<CCR:{hash}|{type}|{size}>>>`
+/// grammar.
+///
+/// `meta` is a `BTreeMap` rather than a `HashMap` because its rendering is part
+/// of the marker's bytes: a hash map's iteration order would make the same
+/// entry render differently between runs, and the `[meta:...]` line is read by
+/// the model and by the resolver.
 pub fn CCRMarker(
 	HashValue:&str,
 	CCRType:&str,
 	Size:usize,
 	Preview:&str,
 	HeadroomBudget:Option<u32>,
-	meta:Option<&HashMap<String, String>>,
+	meta:Option<&BTreeMap<String, String>>,
 	Center:Option<&str>,
 ) -> String {
-	// Sanitize preview: newlines → spaces (| is safe - the marker is on its own line).
+	// Sanitize preview in place: newlines → spaces (| is safe - the marker is on
+	// its own line), then the C0 controls and DEL's neighbours go.
 	let mut Safe = Preview.replace(['\n', '\r'], " ").trim().to_string();
-	// Strip control chars
-	Safe = Safe.chars().filter(|c| *c >= ' ').collect();
+	Safe.retain(|c| c >= ' ');
 
-	// Headroom budget truncation
-	if let Some(Budget) = HeadroomBudget {
-		Safe = match Budget {
-			0..=24 => Safe.chars().take(30).collect(),
-			25..=49 => Safe.chars().take(60).collect(),
-			50..=74 => Safe.chars().take(100).collect(),
-			_ => Safe,
-		};
+	// Headroom budget truncation, cut at the byte boundary of the last kept
+	// character: no second allocation, and a multi-byte character is never
+	// split.
+	let Truncate = match Budget(HeadroomBudget) {
+		Limit::Unlimited => None,
+		Limit::At(Characters) => Safe.char_indices().nth(Characters).map(|(Byte, _)| Byte),
+	};
+	if let Some(Byte) = Truncate {
+		Safe.truncate(Byte);
 	}
 
-	// Metadata string
+	// Metadata string. `BTreeMap` order is key order, so the joined line is the
+	// same on every render.
 	let MetaStr = match meta {
 		Some(m) => {
-			let Parts:Vec<String> = m
+			let mut Parts:Vec<String> = m
 				.iter()
-				.filter_map(|(k, v)| {
-					let Sv = v.replace('|', "/").replace('\n', " ").trim().to_string();
+				.filter_map(|(Key, Value)| {
+					let Sv = Value.replace('|', "/").replace('\n', " ").trim().to_string();
 					match Sv.is_empty() {
 						true => None,
-						false => Some(format!("{}={}", k, Sv)),
+						false => Some(format!("{}={}", Key, Sv)),
 					}
 				})
 				.collect();
-			let mut s = Parts.join(";");
-			if s.len() > 300 {
-				s = format!("{}...", crate::StructExtract::Format::Floor::Fn(&s, 297));
+
+			Parts.sort();
+
+			let Joined = Parts.join(";");
+			match Joined.len() > 300 {
+				true => format!("{}...", crate::StructExtract::Format::Floor::Fn(&Joined, 297)),
+				false => Joined,
 			}
-			s
 		},
 		None => String::new(),
 	};

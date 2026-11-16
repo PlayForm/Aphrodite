@@ -45,6 +45,7 @@ pub(crate) fn TestState() -> AppState {
 		RequestsTotal:AtomicU64::new(0),
 		RequestsCompressed:AtomicU64::new(0),
 		TokensSaved:AtomicU64::new(0),
+		BodyBytesSaved:AtomicU64::new(0),
 		CCRHits:AtomicU64::new(0),
 		CCRMisses:AtomicU64::new(0),
 		CCRCreated:AtomicU64::new(0),

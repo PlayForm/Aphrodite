@@ -38,7 +38,7 @@ pub(crate) fn Fn(Chain:Chain, Script:&Script, Hook:&str, Payload:&HookPayload) -
 		Ok(Transformed) => Chain { Content:Transformed, Touched:true },
 		Err(Error) => {
 			tracing::warn!(
-				Script = %Script.path.display(),
+				Script = %Script.Path.display(),
 				Hook,
 				error = %Error,
 				"script hook failed - degraded to previous value"

@@ -3,7 +3,7 @@
 use crate::{
 	Hook::{
 		Live::{
-			Chunk::Fn::Fn as ChunkOnCharBoundaries,
+			Chunk::Policy::Struct::Struct as ChunkPolicy,
 			Const::LiveChunkSize,
 			Key::Fn::{LiveChunkKey, LiveMetaKey},
 		},
@@ -12,6 +12,14 @@ use crate::{
 	},
 	State::Struct::AphroditeState,
 };
+
+/// The chunks a container stores for `Content`, under the shipped target policy.
+fn ChunksOf(Content:&str) -> Vec<&str> {
+	ChunkPolicy::new(LiveChunkSize)
+		.expect("the shipped chunk target is non-zero")
+		.Chunks(Content)
+		.collect()
+}
 
 // Contract 1: `LiveContainer` off (the default) must keep the payload
 // byte-identical to the pre-live shape - same field set, same marker
@@ -78,7 +86,7 @@ fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
 	let Content = (0..40)
 		.map(|i| format!("tool payload line {i:02} with some text\n"))
 		.collect::<String>();
-	let Chunks = ChunkOnCharBoundaries(&Content, LiveChunkSize);
+	let Chunks = ChunksOf(&Content);
 	assert!(Chunks.len() >= 2, "test content must span multiple chunks");
 	let r = TransformToolResult(&mut s, &Content, "terminal");
 	assert_eq!(r["status"], "ok");
@@ -128,10 +136,7 @@ fn TestLiveContainerTerminalOverThresholdInstantMarker() {
 	let r = TransformTerminalOutput(&mut s, &Content);
 	assert_eq!(r["live"], true);
 	assert_eq!(r["type"], "live");
-	assert_eq!(
-		r["chunks"].as_u64().unwrap() as usize,
-		ChunkOnCharBoundaries(&Content, LiveChunkSize).len()
-	);
+	assert_eq!(r["chunks"].as_u64().unwrap() as usize, ChunksOf(&Content).len());
 	let hash = r["hash"].as_str().unwrap();
 	assert!(
 		r["marker"]

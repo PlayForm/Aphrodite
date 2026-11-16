@@ -6,12 +6,12 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 ///
 /// The name is cut at `{` (the body), at a space (an `extends` clause) and at `:` (a TypeScript type
 /// annotation). It is not a JS parser: decorators and members are not read.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	match Trimmed.strip_prefix("class ") {
 		Some(Rest) => {
 			let Name = Rest.split(['{', ' ', ':']).next().unwrap_or("");
 
-			match (!Name.is_empty()).then(|| Name.to_string()) {
+			match (!Name.is_empty()).then_some(Name) {
 				Some(Name) => Declaration::Declaration { Kind:"class", Name, Parameters:None, Return:None },
 				None => Declaration::Malformed { Reason:Reason::NoName },
 			}

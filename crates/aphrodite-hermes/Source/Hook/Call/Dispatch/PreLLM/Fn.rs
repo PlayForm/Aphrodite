@@ -15,58 +15,58 @@ use aphrodite::State::Struct::AphroditeState;
 
 use crate::{
 	Debug,
-	Hook::{Call::Input::Struct::HookInput, Log::Fn::log_session_init},
+	Hook::{Call::Input::Struct::Struct, Log},
 };
 
 /// Build this turn's model-visible context, or `null` when there is none.
-pub(crate) fn pre_llm_call(state:&mut AphroditeState, input:&HookInput) -> serde_json::Value {
-	let parsed = &input.parsed;
-	let args_len = input.args_len;
+pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value {
+	let Parsed = &Input.Parsed;
+	let ArgsLength = Input.ArgsLength;
 
 	// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes actually calls
 	// in production - through the single shared `Flow::build_turn_context`
 	// assembler. This makes the G1 bug class (bridge reimplements the hook
 	// body and forks on every core improvement) unrepresentable.
-	// `args_len` is the request-size proxy for the P9 telemetry line (Hermes
+	// `ArgsLength` is the request-size proxy for the P9 telemetry line (Hermes
 	// serializes conversation_history into the kwargs JSON).
 	//
 	// Per-session debug: pre_llm_call is the ONE hook Hermes threads
 	// `parent_session_id` through, so record session -> parent here to build
 	// the tree the debug flag resolves against.
-	if let (Some(sid), Some(pid)) = (
-		parsed.get("session_id").and_then(|v| v.as_str()),
-		parsed.get("parent_session_id").and_then(|v| v.as_str()),
+	if let (Some(Session), Some(Parent)) = (
+		Parsed.get("session_id").and_then(|v| v.as_str()),
+		Parsed.get("parent_session_id").and_then(|v| v.as_str()),
 	) {
-		Debug::Session::Record::Fn::Fn(sid, pid);
+		Debug::Session::Record::Fn::Fn(Session, Parent);
 	}
 
 	// DEV-ONLY debug logger (crate::Debug): pre-turn bridge line
 	// (turn/session/request-size); the per-section sizes and the cumulative
 	// metrics are logged inside build_turn_context.
-	let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+	let Session = Parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
 
-	match sid {
+	match Session {
 		"" => {},
-		sid => {
+		Session => {
 			crate::Debug::Log::Bridge::Fn::Fn(
-				state,
-				sid,
+				State,
+				Session,
 				"pre_turn",
 				&[
-					("turn", state.TurnCounter.to_string()),
-					("session", sid.to_string()),
-					("est_request_bytes", args_len.to_string()),
-					("pending_markers", state.RecentMarkers.len().to_string()),
+					("turn", State.TurnCounter.to_string()),
+					("session", Session.to_string()),
+					("est_request_bytes", ArgsLength.to_string()),
+					("pending_markers", State.RecentMarkers.len().to_string()),
 				],
 			);
-			log_session_init(state, sid);
+			Log::Fn::Fn(State, Session);
 		},
 	}
 
-	let context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(state, Some(args_len));
+	let Context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(State, Some(ArgsLength));
 
-	match context.is_empty() {
+	match Context.is_empty() {
 		true => serde_json::Value::Null,
-		false => serde_json::json!({ "context": context }),
+		false => serde_json::json!({ "context": Context }),
 	}
 }

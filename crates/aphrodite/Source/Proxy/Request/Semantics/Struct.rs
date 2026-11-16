@@ -5,6 +5,11 @@
 //! `Cacheability`, and the response-compression gate from `Route`. Nothing
 //! downstream re-reads the body to answer any of those - which is what keeps one
 //! request from being classified two ways.
+//!
+//! `Delivery` and `Cacheability` cannot disagree, and that is structural rather
+//! than asserted: `Cacheable` is only ever constructed in the one match arm that
+//! has already established `Delivery::Buffered`, so "streamed and cacheable" has
+//! no value that represents it.
 
 use crate::Proxy::Request::{
 	Body::Enum::Enum as RequestBody,

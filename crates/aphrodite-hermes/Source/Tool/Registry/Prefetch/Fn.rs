@@ -13,17 +13,19 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// prefetch that loaded nothing is a caller mistake, and silence would read as
 /// success.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_prefetch", |args| {
-		let paths:Vec<String> = args
+	("aphrodite_prefetch", |Args| {
+		let Paths:Vec<String> = Args
 			.get("paths")
 			.and_then(|v| v.as_array())
-			.map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+			.map(|Paths| Paths.iter().filter_map(|v| v.as_str().map(String::from)).collect())
 			.unwrap_or_default();
-		let Some(paths) = (!paths.is_empty()).then_some(paths) else {
+
+		let Some(Paths) = (!Paths.is_empty()).then_some(Paths) else {
 			return serde_json::json!({ "error": "paths is required" });
 		};
 
-		let outcomes = aphrodite::Prefetch::Read::Entry::Fn::ReadPaths(&paths);
-		crate::Session::With::Fn::with_shared(|state| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(state, outcomes))
+		let Outcomes = aphrodite::Prefetch::Read::Entry::Fn::ReadPaths(&Paths);
+
+		crate::Session::With::Fn::with_shared(|State| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(State, Outcomes))
 	})
 }

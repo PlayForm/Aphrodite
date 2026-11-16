@@ -40,10 +40,21 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 
 	let mut Stats:Vec<String> = Vec::new();
 
-	let _ = (Headings > 0).then(|| Stats.push(format!("{Headings}h")));
-	let _ = (Links > 0).then(|| Stats.push(format!("{Links}a")));
-	let _ = (Images > 0).then(|| Stats.push(format!("{Images}img")));
-	let _ = (Scripts > 0).then(|| Stats.push(format!("{Scripts}script")));
+	if Headings > 0 {
+		Stats.push(format!("{Headings}h"));
+	}
+
+	if Links > 0 {
+		Stats.push(format!("{Links}a"));
+	}
+
+	if Images > 0 {
+		Stats.push(format!("{Images}img"));
+	}
+
+	if Scripts > 0 {
+		Stats.push(format!("{Scripts}script"));
+	}
 
 	Stats.push(format!("{}L", Inp.Total));
 

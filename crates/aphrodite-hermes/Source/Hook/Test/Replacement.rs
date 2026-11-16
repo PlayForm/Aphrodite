@@ -1,12 +1,10 @@
 //! The replacement mapping: chain split, single marker, auto-expand.
 
-use crate::Hook::Replacement::Fn::replacement_from;
-
 // ── Chain-split invisibility contract: the LLM sees the natural
 // per-segment CCR markers (joined, one per line), never the `summary`
 // string that announces the mechanism. ──
 #[test]
-fn test_replacement_from_chain_split_joins_natural_markers() {
+fn test_replacement_chain_split_joins_natural_markers() {
 	let r = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -32,7 +30,7 @@ fn test_replacement_from_chain_split_joins_natural_markers() {
 			}
 		]
 	});
-	let out = replacement_from(&r, "test-session");
+	let out = crate::Hook::Replacement::Fn::Fn(&r, "test-session");
 	let s = out.as_str().expect("chain_split must yield a string");
 	// Natural markers, one per line.
 	assert!(s.starts_with("<<<CCR:aaaa|terminal|120>>>"));
@@ -46,7 +44,7 @@ fn test_replacement_from_chain_split_joins_natural_markers() {
 }
 
 #[test]
-fn test_replacement_from_non_chain_uses_single_marker() {
+fn test_replacement_non_chain_uses_single_marker() {
 	let r = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -56,14 +54,14 @@ fn test_replacement_from_non_chain_uses_single_marker() {
 		"preview": "[text:42B] hi",
 		"marker": "<<<CCR:cccc|text|42>>>\n[text:42B] hi"
 	});
-	let s = replacement_from(&r, "test-session");
+	let s = crate::Hook::Replacement::Fn::Fn(&r, "test-session");
 	assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
 }
 
 // ── Auto-expand: the hook resolved the stored content inline; the LLM
 // must receive the expanded string, never the marker. ──
 #[test]
-fn test_replacement_from_auto_expanded_returns_expanded() {
+fn test_replacement_auto_expanded_returns_expanded() {
 	let r = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -75,7 +73,7 @@ fn test_replacement_from_auto_expanded_returns_expanded() {
 		"marker": "<<<CCR:dddd|terminal|11>>>",
 		"expanded": "hello world"
 	});
-	let s = replacement_from(&r, "test-session");
+	let s = crate::Hook::Replacement::Fn::Fn(&r, "test-session");
 	assert_eq!(
 		s.as_str().unwrap(),
 		"hello world",
@@ -84,7 +82,7 @@ fn test_replacement_from_auto_expanded_returns_expanded() {
 }
 
 #[test]
-fn test_replacement_from_auto_expanded_without_expanded_falls_back_to_marker() {
+fn test_replacement_auto_expanded_without_expanded_falls_back_to_marker() {
 	// A payload flagging auto_expanded but carrying no usable `expanded`
 	// string must fall through to the normal marker path, never produce
 	// a null replacement that would erase the output.
@@ -98,6 +96,6 @@ fn test_replacement_from_auto_expanded_without_expanded_falls_back_to_marker() {
 		"preview": "[terminal:11B] hi",
 		"marker": "<<<CCR:dddd|terminal|11>>>"
 	});
-	let s = replacement_from(&r, "test-session");
+	let s = crate::Hook::Replacement::Fn::Fn(&r, "test-session");
 	assert_eq!(s.as_str().unwrap(), "<<<CCR:dddd|terminal|11>>>");
 }

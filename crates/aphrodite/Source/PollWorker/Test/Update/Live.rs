@@ -6,10 +6,10 @@ use crate::{
 	PollWorker::{
 		Insert::Fn::InsertBgTask,
 		Marker::Fn::CreatePollMarker,
-		Task::Status::Enum::BgStatus,
+		Task::Status::{Enum::BgStatus, Stored::Fn::Fn as Stored},
 		Update::Fn::UpdateFromPoll,
 	},
-	State::Struct::AphroditeState,
+	State::{Identity::Command::Struct::CommandID, Struct::AphroditeState},
 };
 
 #[test]
@@ -40,10 +40,10 @@ fn TestPollLiveProgressBytesSoFarAndEta() {
 	// Completion zeroes the ETA; the full-content hash arrives later.
 	let Done = serde_json::json!({"output": "done", "exit_code": 0}).to_string();
 	UpdateFromPoll(&mut State, "process", &Done);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
 	assert_eq!(State.BgTasks[0].LiveEtaS, 0.0, "completed task -> zero ETA");
 	assert!(
-		State.BgTasks[0].OutputHash.is_some(),
+		Stored(&State.BgTasks[0].Status).is_some(),
 		"full content hash must exist at completion"
 	);
 }
@@ -52,16 +52,16 @@ fn TestPollLiveProgressBytesSoFarAndEta() {
 fn TestPollInstantMarkerHashAvailableBeforeContent() {
 	// The marker template registry is process-global and the `Marker` template
 	// tests register into it; rendering a marker without this guard races them.
-	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
+	let _G = crate::Marker::Format::Registration::Guard::Fn::Fn();
 	let mut State = AphroditeState::default();
 	State.LiveContainer = true;
 	State.TurnCounter = 3;
-	let TaskID = headroom_core::ccr::compute_key(b"cargo build");
+	let TaskID = CommandID::from(headroom_core::ccr::compute_key(b"cargo build"));
 	InsertBgTask(&mut State, TaskID.clone(), "terminal".into(), "cargo build".into(), 1);
 
 	// Instant marker: the task hash is available immediately, typed poll.
 	let Marker = CreatePollMarker(&TaskID, "cargo build", 3);
-	assert!(Marker.contains(&TaskID), "instant marker must embed the task hash");
+	assert!(Marker.contains(TaskID.as_str()), "instant marker must embed the task hash");
 	assert!(Marker.contains("|poll|"), "instant marker must be typed poll");
 
 	// Progress: partial arrival while still running - no full-content
@@ -69,16 +69,17 @@ fn TestPollInstantMarkerHashAvailableBeforeContent() {
 	let Partial = serde_json::json!({"output": "compiling...", "exit_code": serde_json::Value::Null}).to_string();
 	assert!(UpdateFromPoll(&mut State, "process", &Partial));
 	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
-	assert!(State.BgTasks[0].OutputHash.is_none(), "no full-content hash while running");
+	assert!(Stored(&State.BgTasks[0].Status).is_none(), "no full-content hash while running");
 
 	// Full content arrives later: only at completion does the output
 	// hash appear, and it differs from the instant task hash.
 	let Done = serde_json::json!({"output": "Finished\n", "exit_code": 0}).to_string();
 	assert!(UpdateFromPoll(&mut State, "process", &Done));
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
-	let OutHash = State.BgTasks[0].OutputHash.as_ref().expect("output hash at completion");
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
+	let OutHash = Stored(&State.BgTasks[0].Status).expect("output hash at completion");
 	assert_ne!(
-		OutHash, &TaskID,
+		OutHash.Hash.as_str(),
+		TaskID.as_str(),
 		"full-content hash arrives later and differs from the task hash"
 	);
 	assert_eq!(State.BgTasks[0].LiveEtaS, 0.0);

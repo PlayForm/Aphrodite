@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State},
 	Configuration::{ApplyUpdate::Fn::Fn as ApplyUpdate, ParseUpdate::Fn::Fn as ParseUpdate},
-	Guard::Cstr::Fn::Fn as Cstr,
+	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 };
 
 /// Set one configuration value and answer with `{"status":"ok"}`.
@@ -20,22 +20,32 @@ use crate::ABI::{
 /// typed `Outcome` naming which of the two happened, so a reader of this file
 /// learns the acceptance rules from the type instead of from a `_ => {}` arm.
 /// The envelope stays `ok` in all three cases because it always has.
+/// # Safety
+/// `Handle`, `Key` and `Value` must each be null or point to a valid,
+/// NUL-terminated C string that stays readable and unmoved for the duration of
+/// this call. The returned pointer is owned by the caller and must be released
+/// with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeConfigurationSet(
+pub unsafe extern "C" fn AphroditeConfigurationSet(
 	Handle:*const c_char,
 	Key:*const c_char,
 	Value:*const c_char,
 ) -> *mut c_char {
-	let Key = unsafe { Cstr(Key) }.unwrap_or_default();
-	let Value = unsafe { Cstr(Value) }.unwrap_or_default();
+	let Key = unsafe { Cstr(Key) };
+	let Value = unsafe { Cstr(Value) };
 
-	// Parsed before the lock: an unparseable number and an unknown key are
-	// decided here, so the session lock is held for a field write and nothing
-	// else.
-	let Parsed = ParseUpdate(&Key, &Value);
+	// Resolved and parsed before the lock: an absent or oversize argument and an
+	// unparseable number are all decided here, so the session lock is held for a
+	// field write and nothing else. The refusal is carried to the closure rather
+	// than answered here, because the boundary owns the envelope.
+	let Parsed = match (Optional(Key), Optional(Value)) {
+		(Ok(Key), Ok(Value)) => Ok(ParseUpdate(&Key, &Value)),
+		(Err(Error), _) => Err(Error),
+		(_, Err(Error)) => Err(Error),
+	};
 
 	State(Handle, move |s| {
-		let _Outcome = ApplyUpdate(s, Parsed);
+		let _Outcome = ApplyUpdate(s, Parsed?);
 
 		Ok(Answer::JSON(serde_json::json!({"status":"ok"})))
 	})

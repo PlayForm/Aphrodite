@@ -154,14 +154,19 @@ pub(crate) async fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:
 	);
 
 	let Now = std::time::Instant::now();
-	let CacheKey = match Context.Semantics.Cacheability {
-		RequestCacheability::Cacheable { Key } => Some(Key),
+	// The identity is what gets stored, so a later lookup compares canonical
+	// request bytes instead of trusting a digest match; cloning it is a `Bytes`
+	// refcount bump. The response-side gates stay here rather than moving into
+	// the request interpretation: the request decided it MAY be cached, the
+	// response decides whether this particular answer is worth replaying.
+	let Identity = match &Context.Semantics.Cacheability {
+		RequestCacheability::Cacheable { Identity } => Some(Identity.clone()),
 		RequestCacheability::Uncacheable => None,
 	};
-	CacheKey
+	Identity
 		.filter(|_| Head.Status.is_success() && Payload.len() <= ResponseCacheMaximumBodyBytes)
 		.into_iter()
-		.for_each(|Key| Context.State.CachePut(Key, Payload.clone(), Now));
+		.for_each(|Identity| Context.State.CachePut(Identity, Payload.clone(), Now));
 
 	Builder.body(Body::from(Payload)).unwrap()
 }

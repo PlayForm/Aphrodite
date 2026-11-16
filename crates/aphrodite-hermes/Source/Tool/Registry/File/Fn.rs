@@ -8,14 +8,15 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// a history of discovery rather than a set - the same path seen twice keeps its
 /// original `tool`.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_files", |_args| {
-		crate::Session::With::Fn::with_shared(|state| {
-			let files:Vec<serde_json::Value> = state
+	("aphrodite_files", |_Args| {
+		crate::Session::With::Fn::with_shared(|State| {
+			let Files:Vec<serde_json::Value> = State
 				.ReferencedFiles
 				.iter()
-				.map(|(path, tool)| serde_json::json!({"path": path, "tool": tool}))
+				.map(|(Path, Tool)| serde_json::json!({"path": Path, "tool": Tool}))
 				.collect();
-			serde_json::json!({"total": files.len(), "files": files})
+
+			serde_json::json!({"total": Files.len(), "files": Files})
 		})
 	})
 }

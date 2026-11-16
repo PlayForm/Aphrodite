@@ -36,7 +36,7 @@ pub async fn Fn(State(state):State<Arc<AppState>>) -> impl IntoResponse {
 			// ── TOML-driven marker block templates (pre-Rust port): keep the
 			// process-global marker format/hint + `CCRMarkerHint` knob in
 			// sync on hot-reload, same as the preview cap above.
-			crate::Marker::Format::Const::SetMarkerTemplates(
+			crate::Marker::Format::Registration::Set::Fn::Fn(
 				Configuration
 					.Templates
 					.as_ref()

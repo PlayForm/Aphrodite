@@ -14,11 +14,16 @@
 //! The unknown-body path is preserved exactly: a body that is not JSON, or JSON
 //! of a shape that is not a chat completion, is `Opaque`/`Json`, buffered, and
 //! uncacheable - it is forwarded unchanged.
+//!
+//! The parsed value dies here. It answers three questions - delivery, kind,
+//! identity - and is then dropped: the identity carries the canonical bytes the
+//! cache compares, so nothing downstream needs the tree, and keeping it alive in
+//! `Request::Context` only held the request's JSON for the request's lifetime.
 
 use serde_json::Value;
 
 use crate::Proxy::{
-	Cache::Key::Fn::Fn as CacheKey,
+	Cache::Identity::Struct::Struct as CacheIdentity,
 	Request::{
 		Body::Enum::Enum as RequestBody,
 		Cacheability::Enum::Enum as RequestCacheability,
@@ -28,6 +33,11 @@ use crate::Proxy::{
 	},
 };
 
+/// A Chat Completions request: a string `model` and a `messages` member.
+fn IsChatCompletion(Value:&Value) -> bool {
+	Value.get("model").and_then(|Model| Model.as_str()).is_some() && Value.get("messages").is_some()
+}
+
 /// Interpret `Raw` once: route, body kind, delivery mode and cacheability.
 ///
 /// `Path` participates because cacheability is a route fact as well as a body
@@ -35,28 +45,34 @@ use crate::Proxy::{
 /// putting it here keeps that rule in one place instead of at the call site.
 pub(crate) fn Fn(Path:&str, Raw:&[u8], APIKey:&str) -> RequestSemantics {
 	let Route = ClassifyRoute(Path);
-	let Parsed = serde_json::from_slice::<Value>(Raw).ok();
+	let Parsed:Option<Value> = serde_json::from_slice(Raw).ok();
 	let Delivery = Parsed
 		.as_ref()
 		.and_then(|Value| Value.get("stream"))
 		.and_then(|Stream| Stream.as_bool())
 		.filter(|Streaming| *Streaming)
 		.map_or(RequestDelivery::Buffered, |_| RequestDelivery::Streaming);
-	let Body = match Parsed {
-		None => RequestBody::Opaque,
-		Some(Value) => {
-			match Value.get("model").and_then(|Model| Model.as_str()).is_some() && Value.get("messages").is_some() {
-				true => RequestBody::ChatCompletion { Body:Value },
-				false => RequestBody::Json,
-			}
+	// One shape decision, made once from the parsed value; every arm below reads
+	// it rather than re-testing the body.
+	// `filter`'s predicate sees `&&Value` (the option holds `&Value`), so the
+	// predicate derefs once to hand `IsChatCompletion` the value itself.
+	let Chat = Parsed.as_ref().filter(|Value| IsChatCompletion(Value));
+
+	// The identity is derived inside the arm that uses it, so a streamed request -
+	// the common case for chat - never pays for canonicalising a body it will not
+	// cache.
+	let (Body, Cacheability) = match (Route, Chat, Delivery) {
+		(RequestRoute::ChatCompletions, Some(Value), RequestDelivery::Buffered) => {
+			(
+				RequestBody::ChatCompletion,
+				RequestCacheability::Cacheable { Identity:CacheIdentity::New(Value, APIKey) },
+			)
 		},
-	};
-	let Cacheability = match (&Route, &Body, &Delivery) {
-		(RequestRoute::ChatCompletions, RequestBody::ChatCompletion { Body: Value }, RequestDelivery::Buffered) => {
-			CacheKey(Value, APIKey)
-				.map_or(RequestCacheability::Uncacheable, |Key| RequestCacheability::Cacheable { Key })
+		(RequestRoute::ChatCompletions, Some(_), RequestDelivery::Streaming) => {
+			(RequestBody::ChatCompletion, RequestCacheability::Uncacheable)
 		},
-		_ => RequestCacheability::Uncacheable,
+		(_, Some(_), _) => (RequestBody::Json, RequestCacheability::Uncacheable),
+		(_, None, _) => (RequestBody::Opaque, RequestCacheability::Uncacheable),
 	};
 
 	RequestSemantics { Route, Body, Delivery, Cacheability }

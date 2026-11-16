@@ -2,8 +2,15 @@
 //! poll workers from eating the directive budget.
 
 use crate::{
-	PollWorker::{Check::Fn::CheckBgTasks, Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus},
-	State::Struct::AphroditeState,
+	PollWorker::{
+		Check::Fn::CheckBgTasks,
+		Insert::Fn::InsertBgTask,
+		Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+	},
+	State::{
+		Identity::{Command::Struct::CommandID, Content::Struct::ContentHash},
+		Struct::AphroditeState,
+	},
 };
 
 #[test]
@@ -26,9 +33,9 @@ fn TestCheckBgTasksPushesCompletionNudge() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 6;
 	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
-	State.BgTasks[0].Status = BgStatus::Done { ExitCode:0 };
-	State.BgTasks[0].OutputHash = Some("hash123".into());
-	State.BgTasks[0].OutputPreview = Some("[build:0E 2W 450L]".into());
+	State.BgTasks[0].Status = BgStatus::Done {
+		Output:StoredOutput { Hash:ContentHash::from("hash123"), Preview:"[build:0E 2W 450L]".into(), Size:450 },
+	};
 
 	CheckBgTasks(&mut State);
 	let Nudge = State.EphemeralDirectives.last().unwrap();
@@ -48,7 +55,13 @@ fn TestCheckBgTasksRespects2NudgeCap() {
 	State.TurnCounter = 5;
 	// Insert 4 running tasks - only 2 should get nudges.
 	(0..4).for_each(|i| {
-		InsertBgTask(&mut State, format!("t{}", i), "terminal".into(), format!("cmd{}", i), i);
+		InsertBgTask(
+			&mut State,
+			CommandID::from(format!("t{}", i)),
+			"terminal".into(),
+			format!("cmd{}", i),
+			i,
+		);
 	});
 
 	// Count nudges pushed BEFORE check_bg_tasks.

@@ -10,7 +10,7 @@
 use aphrodite::State::Struct::AphroditeState;
 
 /// Advance the turn counter and archive the turn's marker.
-pub(crate) fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
-	aphrodite::Hook::LLM::Post::Fn::Fn(state);
+pub(crate) fn Fn(State:&mut AphroditeState) -> serde_json::Value {
+	aphrodite::Hook::LLM::Post::Fn::Fn(State);
 	serde_json::Value::Null
 }

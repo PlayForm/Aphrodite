@@ -3,7 +3,9 @@
 //! `Entry/` is the public surface (three signatures over one pipeline), `Inner/`
 //! is the pipeline itself, and the tree is its three steps: `Observation/`
 //! (shared with the terminal path) records the call, `Input/` + `Policy/` +
-//! `Select/` + `Plan/` decide what to do with it, and `Apply/` + `Emit/` do it.
+//! `Select/` + `Plan/` decide what to do with it, and `Apply/` does it - through
+//! the shared `Hook::Emit/` leaf, which both transform paths use so their payload
+//! contract cannot fork.
 //!
 //! The payload shape produced here is what the Hermes bridge hands to the model,
 //! so every field is a contract.
@@ -13,7 +15,6 @@
 //! only place it is defined.
 
 pub mod Apply;
-pub mod Emit;
 pub mod Entry;
 pub mod Inner;
 pub mod Input;

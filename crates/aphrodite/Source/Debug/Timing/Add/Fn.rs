@@ -17,10 +17,10 @@ use crate::Debug::{
 /// `then` keeps the two `fetch_add`s inside a closure the disabled path never
 /// calls, so the gate still costs one relaxed load.
 pub fn Fn(Cat:TimingCat, Us:u64) {
-	let _ = Enabled().then(|| {
+	if Enabled() {
 		let Index = Cat as usize;
 
 		TimingSum[Index].fetch_add(Us, Ordering::Relaxed);
 		TimingN[Index].fetch_add(1, Ordering::Relaxed);
-	});
+	}
 }

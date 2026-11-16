@@ -25,6 +25,12 @@ stateful!(
 	/// NUL is neutralised on the way back out by the boundary's `Transfer`, so
 	/// it is not a reason to refuse the store here, and adding that check would
 	/// reject content this export has always accepted.
+	///
+	/// # Safety
+	/// `Content` and `Hint` must each be null or point to a valid,
+	/// NUL-terminated C string that stays readable and unmoved for the duration
+	/// of this call. The returned pointer is owned by the caller and must be
+	/// released with `AphroditeFreeString`.
 	AphroditeCompress,
 	|s, Content:*const c_char, Hint:*const c_char| {
 		crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty(), || anyhow::anyhow!("empty"))?;
@@ -32,15 +38,20 @@ stateful!(
 			anyhow::anyhow!("content exceeds 16MB limit")
 		})?;
 
-		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
-		// The hint is usable only when the caller actually supplied a label of
-		// its own: an empty hint and the literal "text" both defer to the
-		// detector. `filter` is what turns that predicate into the value the
-		// choice is made on, and `unwrap_or_else` keeps the detector's string -
-		// the allocating arm - off the path where the hint wins.
-		let t = Some(Hint)
-			.filter(|Hint| !Hint.is_empty() && Hint.as_str() != "text")
-			.unwrap_or_else(|| Ct.as_str().to_string());
+		// The hint is usable only when the caller supplied a label of its own: an
+		// empty hint and the literal "text" both defer to the detector. The
+		// detection therefore lives on the arm that needs it, so a caller that
+		// already knows its content type never pays for a classification it
+		// would discard.
+		let t = Some(Hint).filter(|Hint| !Hint.is_empty() && &**Hint != "text").map_or_else(
+			|| {
+				transforms::content_detector::detect_content_type(&Content)
+					.content_type
+					.as_str()
+					.to_string()
+			},
+			|Hint| Hint.into_owned(),
+		);
 		let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 
 		s.InlineStorePut(hash.clone(), Content.to_string());

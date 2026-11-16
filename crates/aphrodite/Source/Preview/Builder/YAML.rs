@@ -5,6 +5,7 @@
 //! resolved, and nested keys are deliberately not reported.
 
 use crate::Preview::{Input::Struct::Struct as Input, Line::YAMLKey};
+use super::More::Fn::Fn as More;
 
 /// Keys the preview names: five.
 const KeysShown:usize = 5;
@@ -22,12 +23,12 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.filter_map(|Line| Line.find(':').map(|Index| &Line[..Index]))
 		.collect();
 	let Shown:Vec<&str> = Keys.iter().take(KeysShown).copied().collect();
-	let More = Keys
-		.len()
-		.checked_sub(Shown.len())
-		.filter(|More| *More > 0)
-		.map(|More| format!(" +{More} more"))
-		.unwrap_or_default();
 
-	format!("[yaml:{} keys {}L | {}{More}]", Keys.len(), Inp.Total, Shown.join(", "))
+	format!(
+		"[yaml:{} keys {}L | {}{}]",
+		Keys.len(),
+		Inp.Total,
+		Shown.join(", "),
+		More(Keys.len(), Shown.len())
+	)
 }

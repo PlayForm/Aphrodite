@@ -6,11 +6,18 @@
 //! protocol would make the model's retrieval vocabulary wrong in one of the two
 //! modes.
 
-use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Format::Fn::Fn as ProxyFormatCCROutput};
+use crate::Proxy::{
+	Analysis::Struct::Struct as ContentAnalysis,
+	Body::Chars::Fn::Fn as CharPrefix,
+	Format::Fn::Fn as ProxyFormatCCROutput,
+};
 
-/// Cache-mode CCR output - a 512-character head plus the marker.
+/// Cache-mode CCR output - a 512-CHARACTER head plus the marker.
 pub(crate) fn Fn(hash:&str, Analysis:&ContentAnalysis<'_>, Center:Option<&str>) -> String {
-	let Preview:String = Analysis.Content.chars().take(512).collect();
+	// Borrowed, not collected: the formatter takes a `&str`, and the budget is in
+	// characters so a CJK preview is not cut to a third of the length an ASCII one
+	// gets.
+	let Preview = CharPrefix(Analysis.Content(), 512);
 
-	ProxyFormatCCROutput(&Preview, Analysis.Ct, "", Center, hash, Analysis.Content.len())
+	ProxyFormatCCROutput(Preview, Analysis.Ct(), "", Center, hash, Analysis.Size())
 }

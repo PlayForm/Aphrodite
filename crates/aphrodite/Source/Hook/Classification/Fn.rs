@@ -2,6 +2,7 @@
 
 use super::{
 	Detect::Fn::Fn as Detect,
+	Hint::Enum::Enum as Hint,
 	Hinted::Fn::Fn as Hinted,
 	Refine::Fn::Fn as Refine,
 	Source::Enum::Enum as Source,
@@ -22,13 +23,14 @@ use super::{
 /// a wrapper this layer cannot see through, and second-guessing it is how the
 /// two paths would fork.
 ///
-/// `TerminalHint` enables the override: the tool path passes `false`, the
-/// terminal path `true`.
-pub(crate) fn Fn<'a>(Content:&'a str, Classify:Option<(&'a str, &'a str)>, TerminalHint:bool) -> Struct<'a> {
+/// `Hint` names the path: the terminal path allows the shell-shape override,
+/// the tool path does not. It is a value rather than a boolean so a call site
+/// reads `Hint::Terminal` instead of a `true` whose meaning lives in the callee.
+pub(crate) fn Fn<'a>(Content:&'a str, Classify:Option<(&'a str, &'a str)>, Hint:Hint) -> Struct<'a> {
 	Classify
 		.map(|(ClassifyContent, Type)| {
 			Struct { Type:Type.to_string(), Content:ClassifyContent, Source:Source::Supplied }
 		})
-		.or_else(|| Hinted(Content, TerminalHint))
+		.or_else(|| Hinted(Content, Hint))
 		.unwrap_or_else(|| Refine(Detect(Content)))
 }

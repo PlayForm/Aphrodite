@@ -7,6 +7,8 @@
 //! Sorting here (rather than at the write site) is what makes the report's
 //! `written`/`skipped` arrays stable across runs.
 
+use crate::Directive::Entry;
+
 /// The set to provision: the core crate's embedded builtins.
 ///
 /// `loaded_builtins()` caps content at `MAX_DIRECTIVE_CHARS` (2000); every
@@ -17,11 +19,13 @@
 /// It is not a loader: nothing is read from disk, so a user-modified file in
 /// the runtime home never appears here (that difference is exactly what
 /// `Materialize` reports as `skipped`).
-pub(crate) fn Fn() -> Vec<(String, String)> {
-	let mut set:Vec<(String, String)> = aphrodite::Directive::Builtin::Fn()
+pub(crate) fn Fn() -> Vec<Entry::Struct::Struct> {
+	let mut Set:Vec<Entry::Struct::Struct> = aphrodite::Directive::Builtin::Fn()
 		.into_iter()
-		.map(|(name, d)| (name, d.Content))
+		.map(|(Name, Directive)| Entry::Struct::Struct { Name, Content:Directive.Content })
 		.collect();
-	set.sort_by(|a, b| a.0.cmp(&b.0));
-	set
+
+	Set.sort_by(|Left, Right| Left.Name.cmp(&Right.Name));
+
+	Set
 }

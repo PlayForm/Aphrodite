@@ -25,22 +25,22 @@ use super::Const::MAX_PATH_READ;
 /// the tool renders the message into its `error` field, and "outside the
 /// workspace" without the root leaves the reader unable to tell a wrong path
 /// from a wrong working directory.
-pub(crate) fn Fn(path:&str) -> anyhow::Result<String> {
-	let root = std::env::current_dir().context("resolve the current workspace directory")?;
-	let root = root.canonicalize().unwrap_or(root);
-	let canon = std::path::Path::new(path)
+pub(crate) fn Fn(Path:&str) -> anyhow::Result<String> {
+	let Root = std::env::current_dir().context("resolve the current workspace directory")?;
+	let Root = Root.canonicalize().unwrap_or(Root);
+	let Canon = std::path::Path::new(Path)
 		.canonicalize()
-		.with_context(|| format!("resolve the path {path}"))?;
+		.with_context(|| format!("resolve the path {Path}"))?;
 
-	let Some(()) = canon.starts_with(&root).then_some(()) else {
-		anyhow::bail!("path is outside the workspace ({}): {path}", root.display());
-	};
+	anyhow::ensure!(
+		Canon.starts_with(&Root),
+		"path is outside the workspace ({}): {Path}",
+		Root.display()
+	);
 
-	let size = std::fs::metadata(&canon).map(|m| m.len()).unwrap_or(0);
+	let Size = std::fs::metadata(&Canon).map(|Metadata| Metadata.len()).unwrap_or(0);
 
-	let Some(()) = (size <= MAX_PATH_READ).then_some(()) else {
-		anyhow::bail!("file exceeds {MAX_PATH_READ}-byte read cap: {path}");
-	};
+	anyhow::ensure!(Size <= MAX_PATH_READ, "file exceeds {MAX_PATH_READ}-byte read cap: {Path}");
 
-	std::fs::read_to_string(&canon).with_context(|| format!("read {path}"))
+	std::fs::read_to_string(&Canon).with_context(|| format!("read {Path}"))
 }

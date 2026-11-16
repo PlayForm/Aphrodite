@@ -51,3 +51,70 @@ fn TestPreviewCapAppliesToBuildArmToo() {
 	assert!(p.ends_with(']'));
 	crate::Preview::State::Set::Fn(Previous);
 }
+
+/// Cap one string directly, bypassing the process-wide atomic and every builder arm.
+fn Capped(Preview:String, Maximum:usize) -> String {
+	crate::Preview::Render::Cap::Fn::Fn(Preview, &crate::Preview::Limit::Resolve::Fn::Fn(Maximum))
+}
+
+/// The boundary table, pinned at the edge where the previous `checked_sub` test misfired.
+///
+/// "Fits" is `count <= Maximum`, so a preview whose length EQUALS the limit comes back
+/// unchanged - a `checked_sub` reads equality as a successful subtraction and cut it to
+/// `[...]`. The unit is the Unicode scalar value: a four-scalar multibyte preview fits a limit
+/// of four and is cut to three scalars at three, never to a byte or grapheme count.
+#[test]
+fn TestPreviewCapFitsUnchangedAtBoundary() {
+	assert_eq!(
+		Capped("[abc]".to_owned(), 5),
+		"[abc]",
+		"exactly at the limit must not be truncated"
+	);
+	assert_eq!(
+		Capped("abc".to_owned(), 3),
+		"abc",
+		"exactly at the limit, no bracket to preserve"
+	);
+	assert_eq!(
+		Capped("[abc]".to_owned(), 4),
+		"...]",
+		"one over the limit keeps the closing bracket"
+	);
+	assert_eq!(Capped("[abc]".to_owned(), 6), "[abc]", "under the limit must not be truncated");
+	assert_eq!(
+		Capped("a\u{00e9}\u{4e2d}\u{1f600}".to_owned(), 4),
+		"a\u{00e9}\u{4e2d}\u{1f600}",
+		"four scalars fit a limit of four"
+	);
+	assert_eq!(
+		Capped("a\u{00e9}\u{4e2d}\u{1f600}".to_owned(), 3),
+		"a\u{00e9}\u{4e2d}",
+		"the cut counts scalars, not bytes"
+	);
+	assert_eq!(Capped(String::new(), 1), "", "an empty preview is always inside its budget");
+}
+
+/// The fits-unchanged property rather than the table: at every limit, every preview at or under
+/// it is returned byte-identical, and every preview over it is capped to at most the limit.
+#[test]
+fn TestPreviewCapIdentityAtAndBelowLimit() {
+	for Maximum in 1..=16usize {
+		for Length in 0..=Maximum {
+			let Bracketed = (Length >= 2).then(|| format!("[{}]", "a".repeat(Length - 2)));
+
+			for Preview in std::iter::once("a".repeat(Length)).chain(Bracketed) {
+				assert_eq!(
+					Capped(Preview.clone(), Maximum),
+					Preview,
+					"{Preview:?} at {Maximum} must be unchanged"
+				);
+			}
+		}
+
+		for Length in Maximum + 1..=Maximum + 8 {
+			let Preview = "a".repeat(Length);
+			let Count = Capped(Preview.clone(), Maximum).chars().count();
+			assert!(Count <= Maximum, "{Preview:?} at {Maximum} must be capped, got {Count}");
+		}
+	}
+}

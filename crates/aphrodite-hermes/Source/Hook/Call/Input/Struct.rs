@@ -8,38 +8,38 @@
 //! `Debug::Session::Last::Fn::Fn()` read.
 
 /// The decoded argument surface of one hook call.
-pub(crate) struct HookInput {
+pub(crate) struct Struct {
 	/// The raw kwargs JSON Hermes passed, parsed once. Arms read optional
 	/// fields (`args`, `status`, `parent_session_id`, `command`, ...) straight
 	/// off it.
-	pub(crate) parsed:serde_json::Value,
+	pub(crate) Parsed:serde_json::Value,
 	/// The session this call belongs to, resolved before any lock was taken.
-	pub(crate) session_id:String,
+	pub(crate) Session:String,
 	/// Byte length of the raw kwargs JSON - the request-size proxy the turn
 	/// telemetry reports (`pre_llm_call`).
-	pub(crate) args_len:usize,
+	pub(crate) ArgsLength:usize,
 }
 
-impl HookInput {
+impl Struct {
 	/// Tool name Hermes reports, `"unknown"` when absent.
-	pub(crate) fn tool(&self) -> &str { self.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown") }
+	pub(crate) fn Tool(&self) -> &str { self.Parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown") }
 
 	/// Tool output: Hermes passes it under `result`; `content` is accepted for
 	/// direct/test callers.
-	pub(crate) fn tool_content(&self) -> &str {
-		self.parsed
+	pub(crate) fn ToolContent(&self) -> &str {
+		self.Parsed
 			.get("result")
-			.or_else(|| self.parsed.get("content"))
+			.or_else(|| self.Parsed.get("content"))
 			.and_then(|v| v.as_str())
 			.unwrap_or("")
 	}
 
 	/// Terminal output: Hermes passes it under `output`; `content` is accepted
 	/// for direct/test callers.
-	pub(crate) fn term_content(&self) -> &str {
-		self.parsed
+	pub(crate) fn TermContent(&self) -> &str {
+		self.Parsed
 			.get("output")
-			.or_else(|| self.parsed.get("content"))
+			.or_else(|| self.Parsed.get("content"))
 			.and_then(|v| v.as_str())
 			.unwrap_or("")
 	}

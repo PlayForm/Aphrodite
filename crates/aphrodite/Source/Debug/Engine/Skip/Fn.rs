@@ -12,5 +12,7 @@ use crate::{Debug::Log::At::Fn::Fn as LogAt, State::Struct::AphroditeState};
 /// The level-0 gate is a fast path in front of `LogAt`'s own gate: a quiet
 /// session formats nothing and touches no path.
 pub fn Fn(State:&AphroditeState, Reason:&str) {
-	let _ = (State.DebugLevel != 0).then(|| LogAt(State.DebugLevel, "engine_skip", &[("reason", Reason.to_string())]));
+	if State.DebugLevel != 0 {
+		LogAt(State.DebugLevel, "engine_skip", &[("reason", Reason.to_string())]);
+	}
 }

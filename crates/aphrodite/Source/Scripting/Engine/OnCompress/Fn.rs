@@ -18,6 +18,6 @@ impl Struct {
 			Size:Some(Size),
 			..Default::default()
 		};
-		self.run("on_compress", &Payload).unwrap_or_else(|| Content.to_string())
+		self.Run("on_compress", &Payload).unwrap_or_else(|| Content.to_string())
 	}
 }

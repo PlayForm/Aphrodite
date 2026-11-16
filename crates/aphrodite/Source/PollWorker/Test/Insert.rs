@@ -3,10 +3,18 @@
 use crate::{
 	PollWorker::{
 		Insert::Fn::InsertBgTask,
-		Task::{Const::MaximumBgTasks, Status::Enum::BgStatus},
+		Task::{
+			Const::MaximumBgTasks,
+			Status::{Enum::BgStatus, Stored::Struct::StoredOutput},
+		},
 	},
-	State::Struct::AphroditeState,
+	State::{
+		Identity::{Command::Struct::CommandID, Content::Struct::ContentHash},
+		Struct::AphroditeState,
+	},
 };
+
+fn Finished() -> StoredOutput { StoredOutput { Hash:ContentHash::from("h"), Preview:"[terminal] out".into(), Size:3 } }
 
 #[test]
 fn TestInsertBgTaskDedup() {
@@ -23,7 +31,13 @@ fn TestInsertBgTaskDedup() {
 fn TestInsertBgTaskEvictionAtCapacity() {
 	let mut State = AphroditeState::default();
 	(0..MaximumBgTasks + 1).for_each(|i| {
-		InsertBgTask(&mut State, format!("task{i}"), "terminal".into(), format!("cmd{i}"), i);
+		InsertBgTask(
+			&mut State,
+			CommandID::from(format!("task{i}")),
+			"terminal".into(),
+			format!("cmd{i}"),
+			i,
+		);
 	});
 	assert_eq!(State.BgTasks.len(), MaximumBgTasks, "must not exceed MAX_BG_TASKS");
 }
@@ -31,7 +45,7 @@ fn TestInsertBgTaskEvictionAtCapacity() {
 #[test]
 fn TestBgTaskDedupPreventsDuplicateRunningTasks() {
 	let mut State = AphroditeState::default();
-	let ID = headroom_core::ccr::compute_key(b"cargo build");
+	let ID = CommandID::from(headroom_core::ccr::compute_key(b"cargo build"));
 
 	InsertBgTask(&mut State, ID.clone(), "terminal".into(), "cargo build".into(), 1);
 	InsertBgTask(&mut State, ID.clone(), "terminal".into(), "cargo build".into(), 2);
@@ -45,7 +59,13 @@ fn TestBgTaskEvictionPrefersStaleThenDoneThenOldestRunning() {
 	let mut State = AphroditeState::default();
 	// Fill to capacity (4) with running tasks.
 	(0..4).for_each(|i| {
-		InsertBgTask(&mut State, format!("t{}", i), "terminal".into(), format!("cmd{}", i), i);
+		InsertBgTask(
+			&mut State,
+			CommandID::from(format!("t{}", i)),
+			"terminal".into(),
+			format!("cmd{}", i),
+			i,
+		);
 	});
 	// Mark t1 as stale.
 	State.BgTasks[1].Status = BgStatus::Stale;
@@ -58,7 +78,7 @@ fn TestBgTaskEvictionPrefersStaleThenDoneThenOldestRunning() {
 	assert!(IDs.contains(&"t5"), "new task t5 must be present");
 
 	// Mark t0 as Done, then insert t6 - evicts t0.
-	State.BgTasks.iter_mut().find(|t| t.ID == "t0").unwrap().Status = BgStatus::Done { ExitCode:0 };
+	State.BgTasks.iter_mut().find(|t| t.ID.as_str() == "t0").unwrap().Status = BgStatus::Done { Output:Finished() };
 	InsertBgTask(&mut State, "t6".into(), "terminal".into(), "cmd6".into(), 6);
 	assert_eq!(State.BgTasks.len(), 4);
 	let IDs:Vec<&str> = State.BgTasks.iter().map(|t| t.ID.as_str()).collect();

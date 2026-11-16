@@ -6,14 +6,18 @@
 //! identification rule, `Registry::Poll` owns the mutation.
 
 use crate::PollWorker::{
-	Apply::Applied::Struct::Applied,
+	Apply::Applied::Enum::Applied,
 	Event::Struct::PollEvent,
 	Registry::{Poll::Fn::Fn as Poll, Read::Fn::Fn as Read, Struct::Registry},
 	Select::Target::Fn::Fn as Target,
 };
 
 /// Apply `Event` to the one task it belongs to, if any.
-pub(crate) fn Fn(This:&mut Registry, Event:&PollEvent, Turn:usize) -> Option<Applied> {
+///
+/// `None` is the answer for a poll that names no tracked running task - a poll for a
+/// process this session is not tracking. It is not "ignored" and not "progressed":
+/// the result is simply not ours, so the caller passes it through as ordinary output.
+pub(crate) fn Fn(This:&mut Registry, Event:&PollEvent<'_>, Turn:usize) -> Option<Applied> {
 	let Index = Target(&Read(This), Event)?;
 
 	Poll(This, Index, Event, Turn)

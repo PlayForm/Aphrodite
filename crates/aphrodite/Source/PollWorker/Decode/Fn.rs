@@ -8,21 +8,29 @@
 
 use serde_json::Value;
 
-use crate::PollWorker::{
-	Decode::{ExitCode::Fn::Fn as Exit, Output::Fn::Fn as Out, Text::Fn::Fn as Field},
-	Event::Struct::PollEvent,
+use crate::{
+	PollWorker::{
+		Decode::{ExitCode::Fn::Fn as Exit, Output::Fn::Fn as Out, Text::Fn::Fn as Field},
+		Event::Struct::PollEvent,
+	},
+	State::Identity::Execution::Struct::ExecutionID,
 };
 
 /// Decode one tool result. `None` when the tool is not `process`.
-pub(crate) fn Fn(ToolName:&str, Content:&str, ObservedAtUnix:u64) -> Option<PollEvent> {
+///
+/// The event borrows the caller's content for its output when the result was never
+/// wrapped, so the returned value carries `Content`'s lifetime.
+pub(crate) fn Fn<'a>(ToolName:&str, Content:&'a str, ObservedAtUnix:u64) -> Option<PollEvent<'a>> {
 	let Content = (ToolName == "process").then_some(Content)?;
-	let Parsed = serde_json::from_str::<Value>(Content).ok();
-	let Output = Out(&Parsed, Content).to_string();
+	let mut Parsed = serde_json::from_str::<Value>(Content).ok();
+	// The envelope's output string is MOVED out of the parsed value here, so the event
+	// owns exactly one allocation and the bare-text path owns none.
+	let Output = Out(&mut Parsed, Content);
 
 	Some(PollEvent {
 		Command:Field(&Parsed, "command"),
-		ExecutionID:Field(&Parsed, "session_id"),
-		ExitCode:Exit(&Parsed, &Output),
+		ExecutionID:Field(&Parsed, "session_id").map(ExecutionID::from),
+		ExitCode:Exit(&Parsed, Output.as_ref()),
 		Output,
 		ObservedAtUnix,
 	})

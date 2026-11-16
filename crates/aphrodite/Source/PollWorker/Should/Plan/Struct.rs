@@ -7,11 +7,13 @@
 //! one is learned from the first poll that names the process and lives on the task
 //! (`Task::Struct::ExecutionID`).
 
+use crate::State::Identity::Command::Struct::CommandID;
+
 /// What a backgrounded command is identified by and shown as.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BackgroundPlan {
 	/// Command identity: CCR hash of the command line.
-	pub Identity:String,
+	pub Identity:CommandID,
 	/// Display label: the first 60 characters of the command line.
 	pub Label:String,
 }

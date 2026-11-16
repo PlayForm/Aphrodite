@@ -72,13 +72,18 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 		.output();
 
 	// `shasum` is the macOS default and `sha256sum` the Linux one; neither is
-	// guaranteed everywhere, so the first that answers `--version` is used. The
-	// probe result is matched, not reduced to a boolean: a spawn failure is the
-	// only thing that sends this to the other tool.
+	// guaranteed everywhere, so the first that answers `--version` is used. The probe
+	// result is matched, not reduced to a boolean: a spawn failure is the only thing
+	// that sends this to the other tool.
+	//
+	// The path is an `OsStr` argument. It used to be `Dest.to_str().unwrap_or("")`,
+	// which on a non-UTF-8 path hashed the EMPTY STRING instead of the file - the
+	// comparison then failed with "checksum mismatch", naming a real artifact as
+	// corrupt.
 	#[cfg(not(windows))]
 	let HashOutput = match Command::new("shasum").arg("--version").output() {
-		Ok(_) => Command::new("shasum").args(["-a", "256", Dest.to_str().unwrap_or("")]).output(),
-		Err(_) => Command::new("sha256sum").arg(Dest.to_str().unwrap_or("")).output(),
+		Ok(_) => Command::new("shasum").args(["-a", "256"]).arg(Dest).output(),
+		Err(_) => Command::new("sha256sum").arg(Dest).output(),
 	};
 
 	let Actual = match HashOutput {

@@ -39,27 +39,29 @@ pub fn ReduceBuild(Content:&str) -> Option<String> {
 		let Retained = || Line.trim().chars().take(LineShown).collect::<String>();
 
 		match Classify(Line) {
-			Class::Error => Errors.Push(Retained()),
-			Class::Warning => Warnings.Push(Retained()),
-			Class::Summary => Summaries.Push(Retained()),
+			Class::Error => Errors.Push(Retained),
+			Class::Warning => Warnings.Push(Retained),
+			Class::Summary => Summaries.Push(Retained),
 			Class::Ignore => {},
 		}
 	});
 
 	let mut Parts:Vec<String> = Vec::new();
 
-	let _ = (!Summaries.IsEmpty()).then(|| {
+	if !Summaries.IsEmpty() {
 		Parts.push("[build summary]".into());
 		Parts.extend(Summaries.IntoSample());
-	});
-	let _ = (!Errors.IsEmpty()).then(|| {
+	}
+
+	if !Errors.IsEmpty() {
 		Parts.push(format!("[{} errors]", Errors.Total()));
 		Parts.extend(Errors.IntoSample());
-	});
-	let _ = (!Warnings.IsEmpty()).then(|| {
+	}
+
+	if !Warnings.IsEmpty() {
 		Parts.push(format!("[{} warnings]", Warnings.Total()));
 		Parts.extend(Warnings.IntoSample());
-	});
+	}
 
 	match Parts.as_slice() {
 		[] => None,

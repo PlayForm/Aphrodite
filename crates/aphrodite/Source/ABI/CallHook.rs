@@ -15,8 +15,13 @@ use crate::ABI::Boundary::Run::Fn::Fn as Run;
 ///
 /// The refusal is an `anyhow::Error` rather than a pre-rendered envelope, so the
 /// message has one spelling and the boundary owns its rendering.
+/// # Safety
+/// Both pointers are never dereferenced - the export answers its deprecation
+/// message without reading either - so any value is acceptable, including null.
+/// The returned pointer is owned by the caller and must be released with
+/// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeCallHook(_Hook:*const c_char, _Args:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeCallHook(_Hook:*const c_char, _Args:*const c_char) -> *mut c_char {
 	Run(|| {
 		Err(anyhow::anyhow!(
 			"aphrodite_call_hook is stateless and deprecated; use aphrodite_init + aphrodite_dispatch"

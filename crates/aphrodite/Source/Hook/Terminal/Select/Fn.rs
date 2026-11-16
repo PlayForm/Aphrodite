@@ -16,9 +16,11 @@ use crate::Hook::Terminal::{
 /// out here as three named steps in that order rather than as a flat table.
 ///
 /// Pure: no `&mut AphroditeState`, no store, no marker. Everything the plan
-/// carries was derived from the content and the snapshotted policy.
-pub(crate) fn Fn(Policy:&Policy, Input:&Input<'_>) -> Plan {
+/// carries was derived from the content and the snapshotted policy - including
+/// the input itself, which moves into the plan so the executor cannot be handed
+/// a different one.
+pub(crate) fn Fn<'a>(Policy:&Policy, Input:Input<'a>) -> Plan<'a> {
 	Empty(Input.Content)
-		.or_else(|| Split(Policy, Input.Content))
-		.unwrap_or_else(|| AfterSplit(Policy, Input.Content))
+		.or_else(|| Split(Policy, Input))
+		.unwrap_or_else(|| AfterSplit(Policy, Input))
 }

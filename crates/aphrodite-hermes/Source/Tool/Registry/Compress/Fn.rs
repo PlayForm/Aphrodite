@@ -8,15 +8,16 @@ use crate::Tool::{Arg, Compress, Dispatch::Fn::ToolHandler};
 /// hash to the same value as every other empty payload and shadow it in the
 /// inline store.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_compress", |args| {
-		let content = Arg::Fn::Fn(args, "content");
+	("aphrodite_compress", |Args| {
+		let Content = Arg::Fn::Fn(Args, "content");
 
-		let Some(content) = (!content.is_empty()).then_some(content) else {
+		let Some(Content) = (!Content.is_empty()).then_some(Content) else {
 			return serde_json::json!({ "error": "content is required" });
 		};
 
-		let hint = Arg::Fn::Fn(args, "type");
-		let center = args.get("_ccr_center").and_then(|v| v.as_str());
-		crate::Session::With::Fn::with_shared(|state| Compress::Fn::Fn(state, content, hint, center))
+		let Hint = Arg::Fn::Fn(Args, "type");
+		let Center = Args.get("_ccr_center").and_then(|v| v.as_str());
+
+		crate::Session::With::Fn::with_shared(|State| Compress::Fn::Fn(State, Content, Hint, Center))
 	})
 }

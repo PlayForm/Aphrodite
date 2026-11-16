@@ -12,14 +12,13 @@ use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
 /// A missing `action` defaults to `list`, which is the only safe default: every
 /// other action mutates the active set.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_directive", |args| {
-		let action = Arg::Fn::Fn(args, "action");
-		let action = match action {
+	("aphrodite_directive", |Args| {
+		let Action = match Arg::Fn::Fn(Args, "action") {
 			"" => "list",
-			action => action,
+			Action => Action,
 		};
+		let Name = Arg::Fn::Fn(Args, "name");
 
-		let name = Arg::Fn::Fn(args, "name");
-		crate::Session::With::Fn::with_shared(|state| aphrodite::Directive::Action::Fn(state, action, name))
+		crate::Session::With::Fn::with_shared(|State| aphrodite::Directive::Action::Fn(State, Action, Name))
 	})
 }

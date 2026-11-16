@@ -8,7 +8,7 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 /// reported name is the type. It is not a Rust parser: a trait impl (`impl Display for Foo`) reports
 /// the trait's name, because the first identifier after the generics is what the previous scanner took
 /// and changing it would move every impl line in the preview.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Lower = Trimmed.to_lowercase();
 	let Declares = Lower.starts_with("impl ") || Lower.starts_with("impl<");
 
@@ -20,7 +20,7 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			.find(|Segment| !Segment.is_empty())
 			.unwrap_or("");
 
-		match (!Name.is_empty()).then(|| Name.to_string()) {
+		match (!Name.is_empty()).then_some(Name) {
 			Some(Name) => Declaration::Declaration { Kind:"impl", Name, Parameters:None, Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}

@@ -12,16 +12,18 @@ use crate::ChainSplit::{
 /// empty. The caller treats it as "fall through to the ordinary gates" rather
 /// than as a failure - a chain of one is not a chain.
 ///
+/// The parser's owned parts are CONSUMED here, not borrowed: each part's text
+/// moves into its segment, so the batch holds the one allocation the parser
+/// made. `Prepared::Assemble` then derives the byte totals from those segments,
+/// which is what keeps a batch's totals and its contents from disagreeing.
+///
 /// Nothing here touches `AphroditeState`: detection, hashing, previewing and
-/// marker rendering are pure functions of the text, which is what makes the
-/// apply phase the only mutating step.
+/// marker rendering are pure functions of the text (and the process-wide
+/// rendering configuration), which is what makes the apply phase the only
+/// mutating step.
 pub(crate) fn Fn(Content:&str) -> Option<Prepared> {
 	let Parts = SplitMarkedOutput(Content);
-	let Parts = (Parts.len() >= 2).then_some(Parts)?;
+	let Segments:Vec<_> = Parts.into_iter().map(|Part| PrepareSegment(Part.Index, Part.Text)).collect();
 
-	let Segments:Vec<_> = Parts.iter().map(|(Index, Text)| PrepareSegment(*Index, Text)).collect();
-	let OriginalBytes = Segments.iter().map(|Segment| Segment.Text.len()).sum();
-	let MarkerBytes = Segments.iter().map(|Segment| Segment.Marker.len()).sum();
-
-	Some(Prepared { Segments, OriginalBytes, MarkerBytes })
+	Prepared::Assemble(Segments)
 }

@@ -20,9 +20,15 @@
 //! Every step of the flow owns one leaf directory, and a caller names the leaf
 //! (`Registry::Admit::Fn::Fn`), so the file that defines an item is the only place
 //! it is defined. The value types are the flow's vocabulary: `Event` (a decoded
-//! poll), `Transition` (what it did), `Output` (the bounded accumulator), `Select`
-//! (the two selections), `Apply`/`Completion` (the applied poll and its stored
-//! form), and `Registry` (the set and the operations allowed to change it).
+//! poll), `Output` (the bounded accumulator), `Select` (the two selections),
+//! `Apply` (the applied poll: `Progressed` or `Completed`, each owning what it
+//! produced), `Completion` (the storeable form) and `Registry` (the set and the
+//! operations allowed to change it).
+//!
+//! There is no `Transition` value: what a poll did to a task is the `Applied` it
+//! produced, and "it applied to no task" is `Apply::Fn`'s `None`. The old three-variant
+//! transition carried an `Ignored` arm that no caller could reach, because only a
+//! running task is ever selected.
 //!
 //! Nothing outside `Registry` pushes, removes or retains: capacity, deduplication
 //! and eviction order used to be re-derived by four modules and are now decisions
@@ -42,7 +48,6 @@ pub mod Select;
 pub mod Should;
 pub mod Status;
 pub mod Task;
-pub mod Transition;
 pub mod Update;
 
 #[cfg(test)]

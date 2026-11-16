@@ -4,7 +4,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// How wide the change is, and in which direction.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Files = Content.lines().filter(|Line| Line.starts_with("diff --git ")).count();
 	let Adds = Content
 		.lines()

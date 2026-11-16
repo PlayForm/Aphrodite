@@ -23,7 +23,7 @@ impl Struct {
 		let mut Scripts = self.Scripts.lock().unwrap_or_else(|Error| Error.into_inner());
 		Scripts.clear();
 
-		self.dirs.iter().for_each(|Directory| {
+		self.Directories.iter().for_each(|Directory| {
 			let Ok(Entries) = std::fs::read_dir(Directory) else {
 				return;
 			};
@@ -48,7 +48,7 @@ impl Struct {
 				match Rhai::new().compile(&Source) {
 					Ok(_Ast) => {
 						tracing::info!(Script = %path.display(), "loaded");
-						Scripts.push(Script { path, Mtime, Source });
+						Scripts.push(Script { Path:path, Mtime, Source });
 					},
 					Err(Error) => {
 						tracing::warn!(Script = %path.display(), error = %Error, "script failed to compile - skipped");

@@ -51,9 +51,11 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 			// FAILURE signal (failing test run, FAILED markers) but no error line was
 			// tallied, surface the failure line instead of a success-looking summary - a
 			// failing test run used to preview as `[build:0E 0W 3L]`.
-			let Fail = (Errors == 0 && Warnings == 0)
-				.then(|| Inp.raw.lines().map(|Line| Line.trim()).find(|Line| Failure::Fn(Line)))
-				.flatten();
+			let Fail = if Errors == 0 && Warnings == 0 {
+				Inp.raw.lines().map(|Line| Line.trim()).find(|Line| Failure::Fn(Line))
+			} else {
+				None
+			};
 
 			match Fail {
 				Some(Fail) => {

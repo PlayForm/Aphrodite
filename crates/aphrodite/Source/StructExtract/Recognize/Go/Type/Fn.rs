@@ -8,7 +8,7 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 /// required the word `struct` on the line and the preview has always reported structs under `types`. It
 /// is not a Go parser: a `type` block (`type ( ... )`) is not read, since the name and the keyword are
 /// not on the same line.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Declares = Trimmed.starts_with("type ") && Trimmed.contains("struct");
 
 	match Declares.then(|| {
@@ -20,7 +20,7 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			.unwrap_or("")
 			.trim();
 
-		match (!Name.is_empty()).then(|| Name.to_string()) {
+		match (!Name.is_empty()).then_some(Name) {
 			Some(Name) => Declaration::Declaration { Kind:"type", Name, Parameters:None, Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}

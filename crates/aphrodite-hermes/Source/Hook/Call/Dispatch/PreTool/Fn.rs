@@ -14,66 +14,72 @@
 
 use aphrodite::State::Struct::AphroditeState;
 
-use crate::Hook::Call::Input::Struct::HookInput;
+use crate::Hook::Call::Input::Struct::Struct;
 
 /// Handle `pre_tool_call`: emit the dev-only pre-tool line, then apply at most
 /// one rewrite (backgrounding, then chain splitting) or pass through.
-pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serde_json::Value {
+///
+/// Both rewrites are values resolved BEFORE the decision to use one: each is an
+/// `Option` whose `None` means "this rewrite does not apply", and `or` picks the
+/// first that does. Neither can rewrite a call it does not cover, because a
+/// rewrite only exists where its own guard produced one.
+pub(crate) fn Fn(State:&mut AphroditeState, Input:&Struct) -> serde_json::Value {
 	// DEV-ONLY debug logger (crate::Debug): pre-tool line with the tool name,
 	// args byte size, effective thresholds, and the expected compression path
 	// (the transform arms log the actual outcome).
-	let call_tool = input.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-	let args_bytes = input.parsed.get("args").map(|a| a.to_string().len()).unwrap_or(0);
-	let expected = crate::Configuration::Path::Fn::Fn(state, call_tool, &input.parsed);
+	let Tool = Input.Parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+	let ArgsBytes = Input.Parsed.get("args").map(|Args| Args.to_string().len()).unwrap_or(0);
+	let Expected = crate::Configuration::Path::Fn::Fn(State, Tool, &Input.Parsed);
 	crate::Debug::Log::Bridge::Fn::Fn(
-		state,
+		State,
 		&crate::Debug::Session::Last::Fn::Fn(),
 		"pre_tool",
 		&[
-			("tool", call_tool.to_string()),
-			("args_bytes", args_bytes.to_string()),
-			("tool_threshold", state.ToolThreshold.to_string()),
-			("terminal_threshold", state.TerminalThreshold.to_string()),
-			("auto_expand_limit", state.AutoExpandLimit.to_string()),
-			("expected", expected),
+			("tool", Tool.to_string()),
+			("args_bytes", ArgsBytes.to_string()),
+			("tool_threshold", State.ToolThreshold.to_string()),
+			("terminal_threshold", State.TerminalThreshold.to_string()),
+			("auto_expand_limit", State.AutoExpandLimit.to_string()),
+			("expected", Expected),
 		],
 	);
+
 	// ── Auto-backgrounding: intercept BEFORE execution ──
 	// Returns {"action":"modify","args":{"background":true,"notify_on_complete":true}}
 	// so Hermes runs the tool in background instead of blocking.
-	let background = match (state.PollWorkerEnabled, call_tool) {
+	let Background = match (State.PollWorkerEnabled, Tool) {
 		(true, "terminal" | "process") => {
-			let command = input.parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
+			let Command = Input
+				.Parsed
+				.get("args")
+				.and_then(|Args| Args.get("command"))
+				.and_then(|v| v.as_str());
 			// For `process(action='poll')`, don't background - it's a check call.
-			let is_poll = call_tool == "process"
-				&& input
-					.parsed
+			let IsPoll = Tool == "process"
+				&& Input
+					.Parsed
 					.get("args")
-					.and_then(|a| a.get("action"))
+					.and_then(|Args| Args.get("action"))
 					.and_then(|v| v.as_str())
-					.map(|a| a == "poll")
+					.map(|Action| Action == "poll")
 					.unwrap_or(false);
 
-			match is_poll {
-				true => None,
-				false => {
-					aphrodite::PollWorker::Should::Entry::Fn::ShouldBackgroundPre(command).map(
-						|(_task_id, cmd_summary)| {
-							// We don't create a BgTask here - Hermes handles the
-							// process lifecycle. We'll track completion via
-							// transform_tool_result when the agent polls.
-							serde_json::json!({
-								"action": "modify",
-								"args": {
-									"background": true,
-									"notify_on_complete": true,
-								},
-								"message": format!("aphrodite: auto-backgrounding `{}`", cmd_summary),
-							})
+			(!IsPoll)
+				.then(|| aphrodite::PollWorker::Should::Entry::Fn::ShouldBackgroundPre(Command))
+				.flatten()
+				.map(|(_, Summary)| {
+					// We don't create a BgTask here - Hermes handles the
+					// process lifecycle. We'll track completion via
+					// transform_tool_result when the agent polls.
+					serde_json::json!({
+						"action": "modify",
+						"args": {
+							"background": true,
+							"notify_on_complete": true,
 						},
-					)
-				},
-			}
+						"message": format!("aphrodite: auto-backgrounding `{}`", Summary),
+					})
+				})
 		},
 		_ => None,
 	};
@@ -85,33 +91,34 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 	// Tier 1 teaching loop: only chains with at least
 	// `chain_split_min_segments` segments are rewritten - the
 	// threshold adapts from retrieval consequences (invisible).
-	let chain = match (state.ChainSplitEnabled, call_tool) {
+	let Chain = match (State.ChainSplitEnabled, Tool) {
 		(true, "terminal") => {
-			input
-				.parsed
+			Input
+				.Parsed
 				.get("args")
-				.and_then(|a| a.get("command"))
+				.and_then(|Args| Args.get("command"))
 				.and_then(|v| v.as_str())
-				.and_then(|command| {
-					aphrodite::ChainSplit::Split::Fn::Fn(command)
-						.filter(|segments| segments.len() >= state.ChainSplitMinimumSegments)
-						.map(|segments| (command, segments))
+				.and_then(|Command| {
+					aphrodite::ChainSplit::Split::Fn::Fn(Command)
+						.filter(|Segments| Segments.len() >= State.ChainSplitMinimumSegments)
+						.map(|Segments| (Command, Segments))
 				})
-				.map(|(command, segments)| {
-					let rewritten = aphrodite::ChainSplit::Marked::Command::Fn::Fn(&segments);
-					(command, segments, rewritten)
+				.map(|(Command, Segments)| {
+					let Rewritten = aphrodite::ChainSplit::Marked::Command::Fn::Fn(&Segments);
+
+					(Command, Segments, Rewritten)
 				})
-				.filter(|(command, _, rewritten)| rewritten != command)
-				.map(|(_, segments, rewritten)| {
-					let mut args = input.parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
-					args["command"] = serde_json::Value::String(rewritten.clone());
+				.filter(|(Command, _, Rewritten)| Rewritten != Command)
+				.map(|(_, Segments, Rewritten)| {
+					let mut Args = Input.Parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
+					Args["command"] = serde_json::Value::String(Rewritten);
 
 					serde_json::json!({
 						"action": "modify",
-						"args": args,
+						"args": Args,
 						"message": format!(
 							"aphrodite: split chained command into {} segments (fine-grained CCR)",
-							segments.len()
+							Segments.len()
 						),
 					})
 				})
@@ -119,8 +126,6 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 		_ => None,
 	};
 
-	match background.or(chain) {
-		Some(rewrite) => rewrite,
-		None => serde_json::Value::Null, // pass through
-	}
+	// Pass through when neither rewrite applies.
+	Background.or(Chain).unwrap_or(serde_json::Value::Null)
 }

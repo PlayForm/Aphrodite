@@ -10,7 +10,13 @@
 //!   the other text exports answer with the payload itself, not a wrapper).
 //! - `Run/` is the panic boundary. It catches an unwind and turns it into
 //!   `{"error":"internal error: panicked"}`, which is the message the exports
-//!   that do not take a handle have always answered.
+//!   that do not take a handle have always answered. The caught payload is handed
+//!   to `Panic/` rather than dropped, because a payload's destructor runs outside
+//!   the catch that produced it and a panicking destructor would unwind again -
+//!   across the `extern "C"` boundary.
+//! - `Panic/` is the payload's disposition: it is forgotten, never dropped, and
+//!   whatever `&str`/`String` it carries is logged before it goes. The policy and
+//!   its cost are stated there.
 //! - `State/` adds the session: it decodes the handle and runs the operation
 //!   under that session's own lock. `State::Fn` goes through
 //!   `Handle::Lookup::WithState`, whose inner `catch_unwind` answers
@@ -30,6 +36,7 @@
 pub mod Answer;
 pub mod Failure;
 pub mod Handle;
+pub mod Panic;
 pub mod Render;
 pub mod Run;
 pub mod State;

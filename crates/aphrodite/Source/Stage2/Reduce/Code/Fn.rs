@@ -31,11 +31,13 @@ pub fn ReduceCode(Content:&str) -> Option<String> {
 		let Normalised = Normalised::new(Line);
 
 		Matcher(&Normalised).into_iter().for_each(|Kind| {
-			Signatures.Push(format!(
-				"  [{}] {}",
-				Kind.Kind(),
-				Normalised.Trimmed().chars().take(SignatureShown).collect::<String>()
-			));
+			Signatures.Push(|| {
+				format!(
+					"  [{}] {}",
+					Kind.Kind(),
+					Normalised.Trimmed().chars().take(SignatureShown).collect::<String>()
+				)
+			});
 		});
 	});
 

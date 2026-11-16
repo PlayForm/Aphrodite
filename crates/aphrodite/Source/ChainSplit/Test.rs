@@ -47,9 +47,12 @@ fn MarkedCommandRoundtrip() {
 	let Out = format!("seg a output\n{}\nseg b output\n{}\nseg c output\n", SegMarker, SegMarker);
 	let Parts = SplitMarkedOutput(&Out);
 	assert_eq!(Parts.len(), 3);
-	assert_eq!(Parts[0], (0, "seg a output".to_string()));
-	assert_eq!(Parts[1], (1, "seg b output".to_string()));
-	assert_eq!(Parts[2], (2, "seg c output".to_string()));
+	assert_eq!(Parts[0].Index, 0);
+	assert_eq!(Parts[0].Text, "seg a output");
+	assert_eq!(Parts[1].Index, 1);
+	assert_eq!(Parts[1].Text, "seg b output");
+	assert_eq!(Parts[2].Index, 2);
+	assert_eq!(Parts[2].Text, "seg c output");
 }
 
 #[test]

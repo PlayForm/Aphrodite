@@ -8,6 +8,7 @@
 pub mod Binary;
 pub mod Configuration;
 pub mod Directory;
+pub mod Failure;
 pub mod Fn;
 pub mod Plugin;
 pub mod Registration;

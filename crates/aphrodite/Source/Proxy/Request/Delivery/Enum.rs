@@ -6,6 +6,7 @@
 //! cached at all.
 
 /// The delivery mode the request asked for.
+#[derive(Clone, Copy)]
 pub(crate) enum Enum {
 	/// A single buffered response body.
 	Buffered,

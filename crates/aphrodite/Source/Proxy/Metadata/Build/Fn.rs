@@ -4,7 +4,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 
 /// Status first, then how much was built, then the error that stopped it.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Content = Analysis.Content;
+	let Content = Analysis.Content();
 	let Status = if Content.contains("error") || Content.contains("aborting") {
 		"FAIL"
 	} else {

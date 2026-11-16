@@ -30,6 +30,7 @@ pub mod Lint;
 pub mod Log;
 pub mod Ls;
 pub mod Markdown;
+pub mod More;
 pub mod Search;
 pub mod Table;
 pub mod Terminal;

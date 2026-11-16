@@ -1,6 +1,6 @@
 //! One category of a language's structure.
 
-use crate::StructExtract::Declaration::Enum::Enum as Declaration;
+use crate::StructExtract::Recognize::Type::Recognize;
 
 /// A wire category and the recognisers that fill it.
 ///
@@ -12,5 +12,5 @@ use crate::StructExtract::Declaration::Enum::Enum as Declaration;
 /// It is not a budget share: the budget is one counter shared by every category in the list.
 pub(crate) struct Struct {
 	pub Key:&'static str,
-	pub Recognize:&'static [fn(&str) -> Declaration],
+	pub Recognize:&'static [Recognize],
 }

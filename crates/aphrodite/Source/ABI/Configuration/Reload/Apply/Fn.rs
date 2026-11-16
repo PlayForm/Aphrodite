@@ -9,20 +9,21 @@ use crate::{ABI::Configuration::Reload::Assessment::Enum::Enum as Assessment, St
 /// "successful reload" from all collapsing into "clear the error": none of them
 /// clears it, and the type says so per variant rather than by a shared default.
 ///
-/// The clone is the genuine fan-out this value has: the same diagnostic is both
-/// the session's self-diagnosis and this response's `config_error` field, so the
-/// second owner appears here and the copy happens once.
-pub(crate) fn Fn(State:&mut AphroditeState, Assessment:&Assessment) -> Option<String> {
+/// The assessment is taken by value, so the invalid case produces exactly one
+/// copy: the session keeps the clone and the response receives the original. The
+/// previous `&Assessment` needed two clones for the same fan-out, because a
+/// borrow cannot be moved.
+pub(crate) fn Fn(State:&mut AphroditeState, Assessment:Assessment) -> Option<String> {
 	match Assessment {
 		Assessment::Ready { Enabled } => {
-			State.ContextEngineEnabled = *Enabled;
+			State.ContextEngineEnabled = Enabled;
 
 			None
 		},
 		Assessment::Invalid { Diagnostic } => {
 			State.ConfigurationError = Some(Diagnostic.clone());
 
-			Some(Diagnostic.clone())
+			Some(Diagnostic)
 		},
 		Assessment::Omitted | Assessment::Unreadable => None,
 	}

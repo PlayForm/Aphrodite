@@ -19,6 +19,8 @@ pub enum ReadOutcome {
 	/// The path is readable but exceeds the per-file prefetch limit; the size
 	/// is carried so the caller can report the real number it refused.
 	SkippedSize { Size:u64 },
-	/// The file was read in full; `Size` is its on-disk length.
-	Loaded { Content:String, Size:u64 },
+	/// The file was read in full. The size the filesystem reported is not carried:
+	/// a file can change between the size check and the read, so the only length that
+	/// means anything is the one `Prepare` measures from the bytes it actually holds.
+	Loaded { Content:String },
 }

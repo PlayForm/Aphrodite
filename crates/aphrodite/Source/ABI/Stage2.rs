@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
-	Guard::Cstr::Fn::Fn as Cstr,
+	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional, Required::Fn::Fn as Required},
 };
 
 /// Stage 2 semantic reduction - port of _stage2.py
@@ -18,13 +18,19 @@ use crate::ABI::{
 /// boundary renders it as the same `{"error": ...}` envelope either way, and
 /// routing it through `?` keeps the two success shapes on the arms that actually
 /// succeed.
+/// # Safety
+/// `Content` and `CCRType` must each be null or point to a valid, NUL-terminated
+/// C string that stays readable and unmoved for the duration of this call. The
+/// returned pointer is owned by the caller and must be released with
+/// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeStage2(Content:*const c_char, CCRType:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeStage2(Content:*const c_char, CCRType:*const c_char) -> *mut c_char {
 	let Content = unsafe { Cstr(Content) };
-	let CCRType = unsafe { Cstr(CCRType) }.unwrap_or_default();
+	let CCRType = unsafe { Cstr(CCRType) };
 
 	Run(move || {
-		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
+		let Content = Required(Content)?;
+		let CCRType = Optional(CCRType)?;
 
 		crate::Stage2::Compress::Fn::CompressStage2(&Content, &CCRType)
 			.map(Answer::Text)

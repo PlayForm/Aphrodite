@@ -19,7 +19,7 @@ use super::{Build, Code, Diff, Error, Git, Go, JS, JSON, Linter, Log, Python, Ru
 
 /// The marker's metadata block: `;`-separated `key=value`, at most 400 chars.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> String {
-	let Parts:Vec<MetadataField> = match ClassifyFamily(Analysis.Ct) {
+	let Parts:Vec<MetadataField> = match ClassifyFamily(Analysis.Ct()) {
 		ContentFamily::CodeRust => Rust::Fn::Fn(Analysis),
 		ContentFamily::CodePython => Python::Fn::Fn(Analysis),
 		ContentFamily::CodeGo => Go::Fn::Fn(Analysis),

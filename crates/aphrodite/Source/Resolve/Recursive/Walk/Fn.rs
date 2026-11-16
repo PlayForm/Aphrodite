@@ -1,54 +1,30 @@
-//! The fresh half of the walk: resolve, scan, substitute.
+//! The fresh half of the walk: enter the path, expand, leave it.
 
-use std::collections::HashMap;
+use crate::Resolve::{Expansion, Halt, Traversal::Struct::Struct as Traversal};
+use super::Build;
 
-use crate::{
-	Resolve::{One, Parse::Find},
-	State::Struct::AphroditeState,
-};
-
-/// Resolve `HashValue`, then resolve every marker its content contains.
+/// Expand `HashValue` and every marker its content contains.
 ///
-/// Called only for a hash the prelude classified `Fresh`, so the three guards
-/// (cycle, depth, cache) are already settled and are not repeated here.
+/// Called only for a hash the prelude classified `Fresh`, so the cycle, depth and cache
+/// questions are already settled and are not repeated here.
 ///
-/// Two invariants are preserved verbatim because each has a recorded failure
-/// behind it. A nested hash already in `Resolved` still contributes a replacement
-/// built from the CACHED value - skipping it left the literal marker in the output
-/// (F4). And an unresolved nested hash leaves the ORIGINAL marker text untouched
-/// - substituting a placeholder here got permanently baked into the stored entry,
-///   so a merely evicted or late nested hash could never heal (F1).
-///
-/// The substitution is a fold, not a loop with an early exit: a document with no
-/// markers folds to itself, so "nothing to replace" needs no arm of its own, and
-/// the order of the replacements is the order the scanner found them.
+/// The path is entered BEFORE the content is loaded and left whatever the expansion finished
+/// with - a completed expansion, an absent hash and an abandoned budget all leave through the
+/// same door. That is why entering lives here rather than in the prelude: a hash that is
+/// entered must be left, and the two statements belong where a reader sees them together. A
+/// path that was never popped was the old shape, and it made "already on the path" and "seen
+/// anywhere in this tree" the same test - so a hash first reached at the depth cap stayed
+/// capped for every later branch.
 pub(crate) fn Fn(
-	State:&mut AphroditeState,
+	Traversal:&mut Traversal,
 	HashValue:&str,
 	Depth:usize,
-	Resolved:&mut HashMap<String, String>,
-	Visited:&mut Vec<String>,
-) -> Option<String> {
-	let Content = One::Fn(State, HashValue)?;
-	Resolved.insert(HashValue.to_string(), Content.clone());
+) -> Result<Expansion::Enum::Enum, Halt::Enum::Enum> {
+	Traversal.Enter(HashValue);
 
-	let NestedMarkers = Find::Fn(&Content);
-	let Replacements:Vec<(String, Option<String>)> = NestedMarkers
-		.iter()
-		.map(|(Marker, NestedHash)| {
-			let Nested = match Resolved.get(NestedHash) {
-				Some(Cached) => Some(Cached.clone()),
-				None => crate::Resolve::Recursive::Recursive::Fn(State, NestedHash, Depth + 1, Resolved, Visited),
-			};
+	let Out = Build::Fn::Fn(Traversal, HashValue, Depth);
 
-			(Marker.clone(), Nested)
-		})
-		.collect();
+	Traversal.Leave();
 
-	Some(
-		Replacements
-			.iter()
-			.filter_map(|(Marker, Replacement)| Replacement.as_ref().map(|Repl| (Marker, Repl)))
-			.fold(Content, |Result, (Marker, Repl)| Result.replace(Marker.as_str(), Repl.as_str())),
-	)
+	Out
 }

@@ -1,27 +1,34 @@
-//! `[templates]` registration and first-turn session injection.
+//! `[templates]` publication and first-turn session injection.
 
 use std::collections::HashMap;
 
-use super::super::Guard::GuardedApplyCompression;
+use super::super::Guard::{GlobalsGuards, GuardedApplyCompression};
 use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 
-// ── Pre-Rust port: `ApplyTemplates` registers `[templates]` +
+// ── Pre-Rust port: `ApplyGlobals` publishes `[templates]` +
 // `[previews] model_family` into the process-global renderer so the
 // dylib path renders `[templates.preview.<family>.<ctype>]` format
-// strings. ──
+// strings, together with the marker grammar and the preview cap. ──
 #[test]
-fn TestApplyTemplatesRegistersTemplatesAndFamily() {
-	let _G = crate::Template::Guard::Fn::Fn();
+fn TestApplyGlobalsRegistersTemplatesAndFamily() {
+	// One publication writes three process-wide registries, so this test holds all
+	// three guards for its WHOLE span: `cargo test` runs module bodies concurrently,
+	// and a sibling test that reset the marker registration between the publish and
+	// the assertions would make this test read another test's state.
+	let _Guards = GlobalsGuards();
+
 	let cfg = Configuration {
-		raw:"[templates.preview.code_first]\ndiff = \"{type} {ln}L\"\n[previews]\nmodel_family = \"code_first\"\n"
+		raw:"[templates.preview.code_first]\ndiff = \"{type} {ln}L\"\n[templates.marker]\nformat = \
+		     \"{preview}\"\nhint = \"H\"\n[prompts]\nccr_marker_hint = true\n[previews]\nmodel_family = \
+		     \"code_first\"\n"
 			.parse()
 			.unwrap(),
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
 	let mut State = crate::State::Struct::AphroditeState::default();
-	GuardedApplyCompression(&cfg, &mut State);
-	cfg.ApplyTemplates(&State);
+	cfg.ApplyCompression(&mut State);
+	cfg.ApplyGlobals();
 	assert_eq!(
 		crate::Template::Family::Get::Fn::Fn().as_deref(),
 		Some("code_first"),
@@ -32,14 +39,28 @@ fn TestApplyTemplatesRegistersTemplatesAndFamily() {
 		Some("diff 3L"),
 		"registered [templates.preview.code_first.diff] must render"
 	);
-	// Restore globals for later tests.
-	crate::Template::Set::Fn::Fn(None);
-	crate::Template::Family::Set::Fn::Fn(None);
+	// The same publication carries the marker grammar, which used to be registered by
+	// the `[templates]` section applier - a second, partial publication point.
+	assert!(crate::Marker::Format::Registration::With::Fn::Fn(|Registered| {
+		Registered.Hint.is_some()
+	}));
+	assert!(crate::Marker::Format::Registration::With::Fn::Fn(|Registered| {
+		matches!(
+			&Registered.Grammar,
+			crate::Marker::Format::Grammar::Enum::Enum::Template(Format) if Format == "{preview}"
+		)
+	}));
+
+	// Restore globals for later tests: an empty document publishes the defaults.
+	Configuration::default().ApplyGlobals();
+	assert!(crate::Marker::Format::Registration::With::Fn::Fn(|Registered| {
+		matches!(&Registered.Grammar, crate::Marker::Format::Grammar::Enum::Enum::Canonical)
+	}));
 }
 
 #[test]
 fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
-	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
+	let _G = crate::Marker::Format::Registration::Guard::Fn::Fn();
 	// [templates.prompts] session_inject (canonical pre-Rust location) wins
 	// over the legacy [prompts] session_inject.
 	let cfg = Configuration {
@@ -72,7 +93,7 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 
 #[test]
 fn TestSessionInjectEnvironmentOverrideBeatsTemplatesPrompts() {
-	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
+	let _G = crate::Marker::Format::Registration::Guard::Fn::Fn();
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_SESSION_INJECT", "env wins");
 	let mut State = crate::State::Struct::AphroditeState::default();

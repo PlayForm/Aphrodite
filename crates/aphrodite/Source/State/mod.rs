@@ -8,6 +8,7 @@
 //! - `Struct.rs` - `AphroditeState` itself, fields and their invariants only.
 //! - `Default.rs` - the seed every session clones from.
 //! - `Const.rs` - the caps and budgets the store and rings enforce.
+//! - `Identity/` - the three identity types the state's records are keyed by.
 //! - `Template/` - the `[templates]` section of the configuration.
 //! - `ChainSplit/` - the Tier 1 teaching loop: events, attribution, adaptation.
 //! - `Directive/` - ephemeral directive activations.
@@ -34,6 +35,7 @@ pub mod Default;
 pub mod Directive;
 pub mod Event;
 pub mod File;
+pub mod Identity;
 pub mod Marker;
 pub mod Store;
 pub mod Struct;

@@ -6,9 +6,13 @@ use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 
 // ── Prompt knobs (pre-Rust port): retrieve_guidance / ccr_marker_hint /
 // catalog_intent_hints previously parsed with no consumer. ──
+//
+// The marker grammar these knobs feed is a PROCESS GLOBAL, published by
+// `ApplyGlobals`; it is asserted in `Apply/Template.rs` alongside the rest of the
+// global publication. This file asserts the state fields only, which is what
+// `ApplyCompression` is responsible for.
 #[test]
 fn TestPromptKnobsResolveFromTomlAndDefault() {
-	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	let cfg = Configuration {
 		raw:"[prompts]\nretrieve_guidance = \"verbose\"\ncatalog_intent_hints = true\nccr_marker_hint = \
 		     true\n\n[templates.marker]\nformat = \"{preview}\"\nhint = \"H\"\n"
@@ -21,25 +25,16 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 	cfg.ApplyCompression(&mut State);
 	assert_eq!(State.RetrieveGuidance, "verbose");
 	assert!(State.CatalogIntentHints);
-	// Marker registration reached the process-global the builder reads.
-	assert!(crate::Marker::Format::Const::MarkerHintEnabled());
-	assert_eq!(
-		crate::Marker::Format::Const::RegisteredMarkerFormat().as_deref(),
-		Some("{preview}")
-	);
 
-	// Absent everywhere => defaults (minimal / off / off / fallback grammar).
+	// Absent everywhere => defaults (minimal / off).
 	let mut State2 = crate::State::Struct::AphroditeState::default();
 	Configuration::default().ApplyCompression(&mut State2);
 	assert_eq!(State2.RetrieveGuidance, "minimal");
 	assert!(!State2.CatalogIntentHints);
-	assert!(!crate::Marker::Format::Const::MarkerHintEnabled());
-	assert!(crate::Marker::Format::Const::RegisteredMarkerFormat().is_none());
 }
 
 #[test]
 fn TestPromptKnobsResolveFromEnvironmentOverride() {
-	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_RETRIEVE_GUIDANCE", "standard");
 	cfg.SetOverride("APHRODITE_CATALOG_INTENT_HINTS", "1");

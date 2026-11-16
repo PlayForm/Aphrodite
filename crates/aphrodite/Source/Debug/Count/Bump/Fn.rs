@@ -15,4 +15,8 @@ use crate::Debug::{
 /// is the whole reason the counters are safe to leave in a release build, and
 /// `then` is what keeps it: the increment lives in a closure the disabled path
 /// never calls.
-pub fn Fn(Counter:Counter) { let _ = Enabled().then(|| Counters[Counter as usize].fetch_add(1, Ordering::Relaxed)); }
+pub fn Fn(Counter:Counter) {
+	if Enabled() {
+		Counters[Counter as usize].fetch_add(1, Ordering::Relaxed);
+	}
+}

@@ -5,7 +5,7 @@ use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field:
 /// Language, the binding names, then the line count.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	let Fns:Vec<&str> = Analysis
-		.Content
+		.Content()
 		.lines()
 		.filter(|Line| {
 			let Trimmed = Line.trim_start();
@@ -26,7 +26,7 @@ pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
 	[
 		Some(MetadataField::New("lang", "js")),
 		(!Fns.is_empty()).then(|| MetadataField::New("fns", Fns.join(","))),
-		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+		Some(MetadataField::New("ln", Analysis.Lines().to_string())),
 	]
 	.into_iter()
 	.flatten()

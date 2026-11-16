@@ -60,9 +60,9 @@ pub fn PrefetchStatus(State:&AphroditeState) -> serde_json::Value {
 		"total_ready": Ready.len(),
 	});
 
-	let _ = State.LiveContainer.then(|| {
+	if State.LiveContainer {
 		Out["live_container"] = serde_json::json!(true);
-	});
+	}
 
 	Out
 }

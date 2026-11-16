@@ -1,44 +1,40 @@
-//! The production wiring: the only part of the watcher that needs a real
-//! filesystem thread.
+//! The production wiring: the only part of the watcher that needs a real filesystem
+//! watch.
 
 use std::sync::Arc;
 
 use aphrodite::Proxy::State::Struct::Struct as AppState;
 
-use super::{Loop, Source};
+use super::{Loop, Outcome, Source, Target};
 use crate::Boot::State::Listener::Bound;
 
-/// Watch `ConfigurationPath`'s directory and apply threshold changes to every
-/// listener.
+/// Watch the configuration file and apply threshold changes to every listener.
 ///
-/// Returns immediately - the watcher runs as its own task for the life of the
-/// process, and a watcher that cannot be created or started warns from inside
-/// that task rather than failing startup.
+/// The watch is created here, before the task is spawned, so its readiness is a fact
+/// this function returns instead of a warning emitted from a task the caller never
+/// holds. A watch that cannot start leaves the process running on the configuration it
+/// already loaded - hot reload is a convenience, and refusing to start because `notify`
+/// failed would be a worse outcome than needing a restart - but it is reported, so
+/// "reload does not work here" is never a mystery.
 ///
-/// The path is made absolute against the current directory before the watch
-/// starts, because `notify` watches a *directory* and a relative path would
-/// resolve against whatever the process later does with its cwd. The path is
-/// still reported as the operator wrote it where that is possible; only the
-/// watch directory needs the absolute form.
-///
-/// Everything below this function is free of `notify`, which is what lets
-/// `Loop` be driven from a channel a test owns.
-pub fn Fn(ConfigurationPath:&str, Bound:&[Bound]) {
-	let RawPath = std::path::PathBuf::from(ConfigurationPath);
-	// `std::path::absolute` joins against the current directory without touching
-	// the filesystem; when the cwd is unavailable the operator's own value is the
-	// honest thing to watch.
-	let WatchPath = std::path::absolute(&RawPath).unwrap_or(RawPath);
-	let WatchPathStr = WatchPath.to_string_lossy().to_string();
+/// Everything below this function is free of `notify`, which is what lets `Loop` be
+/// driven from a channel a test owns.
+pub fn Fn(ConfigurationPath:&str, Bound:&[Bound]) -> Outcome::Enum::Enum {
+	let Target = Target::Struct::Struct::new(ConfigurationPath);
 	let States:Vec<Arc<AppState>> = Bound.iter().map(|b| b.State.clone()).collect();
 
-	tokio::spawn(async move {
-		let Some(Source) = Source::Fn::Fn(&WatchPath) else {
-			return;
-		};
+	let Source = match Source::Fn::Fn(&Target) {
+		Ok(Source) => Source,
+		Err(Cause) => {
+			tracing::warn!(%Cause, "config hot reload is inactive - a config change needs a restart");
 
-		tracing::info!(path = %WatchPathStr, "config file watcher active");
+			return Outcome::Enum::Enum::Inactive;
+		},
+	};
 
-		Loop::Fn::Fn(Source, States, WatchPathStr).await;
-	});
+	tracing::info!(path = %Target.File.display(), "config file watcher active");
+
+	Outcome::Enum::Enum::Watching(tokio::spawn(async move {
+		Loop::Fn::Fn(Source, States).await;
+	}))
 }

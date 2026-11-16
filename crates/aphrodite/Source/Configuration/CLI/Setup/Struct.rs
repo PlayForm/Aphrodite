@@ -1,14 +1,18 @@
 //! The values `setup` acts on.
 
-use super::super::Command::Enum::Enum as Command;
-
 /// Arguments for the `setup` subcommand.
 ///
-/// A plain struct, not a clap type: `setup` writes these into
-/// `aphrodite.toml`, registers the plugin and launches the proxy, and none of
-/// that should care how the values arrived. The `From` impl is the only place
-/// the CLI shape is unwrapped, and it is also what makes a non-`Setup`
-/// invocation produce the documented defaults instead of panicking.
+/// A plain struct, not a clap type: `setup` writes these into `aphrodite.toml`, registers
+/// the plugin and launches the proxy, and none of that should care how the values
+/// arrived. `Request::Setup` is the one place the CLI shape is unwrapped, and it answers
+/// `None` for an invocation that did not ask for `setup`.
+///
+/// There is deliberately no `From<Command>` impl. There used to be one, total over
+/// `Command` so a `run` invocation would produce "the documented defaults" - which meant
+/// this type could be built with a full argument set, two proxy ports and an empty
+/// upstream included, for a command that has no setup arguments at all. Absence is
+/// expressed by not having a `Struct`: the request enum carries no `Setup` variant for a
+/// `run`.
 #[derive(Debug, Clone)]
 pub struct Struct {
 	/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
@@ -25,31 +29,4 @@ pub struct Struct {
 	pub NoLaunch:bool,
 	/// Force re-setup even if already installed.
 	pub Force:bool,
-}
-
-impl From<Command> for Struct {
-	/// Copy the `setup` flags out, or fall back to the documented defaults.
-	///
-	/// The fallback arm is not dead code: `From` is total over `Command`, so
-	/// every non-`Setup` invocation lands there. The ports (9797/9798) match
-	/// the CLI defaults exactly - a mismatch here would silently write a
-	/// different config than the flags advertise.
-	fn from(Command:Command) -> Self {
-		match Command {
-			Command::Setup { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force } => {
-				Self { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force }
-			},
-			_ => {
-				Self {
-					APIKey:None,
-					APIURL:String::new(),
-					Model:String::new(),
-					CachePort:9797,
-					TokenPort:9798,
-					NoLaunch:false,
-					Force:false,
-				}
-			},
-		}
-	}
 }

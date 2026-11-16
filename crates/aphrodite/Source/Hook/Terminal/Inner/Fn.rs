@@ -37,7 +37,7 @@ pub(crate) fn Fn(
 
 	let Input = Input { Content, Classify };
 	let Policy = ResolvePolicy(State, Content);
-	let Plan = Select(&Policy, &Input);
+	let Plan = Select(&Policy, Input);
 
-	Apply(State, &Input, &Policy, Plan)
+	Apply(State, Plan)
 }

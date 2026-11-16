@@ -1,4 +1,4 @@
-//! Apply a closure to every registered session.
+//! Apply a closure to every registered session, and report what the sweep did.
 //!
 //! Compiled in every build, not just production: the sweep is the apply half of
 //! the config watcher (`Session::Watcher::Apply`), and a sweep that only exists
@@ -6,3 +6,4 @@
 //! spawn stays runtime-only; this leaf does not.
 
 pub mod Fn;
+pub mod Report;

@@ -14,13 +14,13 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// Returns `null` when the assembler produced nothing, so the engine injects no
 /// empty context block.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("context_engine_pre_llm", |_args| {
-		crate::Session::With::Fn::with_shared(|state| {
-			let context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(state, None);
+	("context_engine_pre_llm", |_Args| {
+		crate::Session::With::Fn::with_shared(|State| {
+			let Context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(State, None);
 
-			match context.is_empty() {
+			match Context.is_empty() {
 				true => serde_json::Value::Null,
-				false => serde_json::json!({ "context": context }),
+				false => serde_json::json!({ "context": Context }),
 			}
 		})
 	})

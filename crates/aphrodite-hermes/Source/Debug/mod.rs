@@ -24,20 +24,24 @@
 //!   echo off > ~/.hermes/aphrodite/debug.<root-session-id>
 //!
 //! Logging is `tracing` (§4.5): `Init/` installs the one process-wide
-//! `EnvFilter` subscriber (a no-op when the host already owns the dispatcher),
-//! `Log/Bridge` emits each bridge event as a `tracing` event and appends the
-//! same fields to the per-session debug file, and `Warn/` is the warning that
-//! still lands when nothing is subscribed. The `[aphrodite-debug ...]` prefix
-//! line is NOT a log sink - it is a returned payload declared in the
+//! `EnvFilter` subscriber and RECORDS who ended up owning the dispatcher
+//! (`Ownership/` - `Installed` when this crate won, `HostOwned` when the host
+//! got there first), `Log/Bridge` emits each bridge event as a `tracing` event
+//! and appends the same fields to the per-session debug file, and `Warn/` is the
+//! warning that still lands when the dispatcher belongs to a host that may drop
+//! it. `has_been_set()` is deliberately not consulted: it answers "is there a
+//! subscriber", not "will this warning be seen". The `[aphrodite-debug ...]`
+//! prefix line is NOT a log sink - it is a returned payload declared in the
 //! `aphrodite_debug` tool schema (`Schema/Debug/`), which is why it stays a
 //! string rather than becoming an event.
 //!
-//! Layout: `Runtime/` owns the home decision, `Flag/` owns the flag files and
-//! their cache, `Chain/` owns the session-parent graph, `Session/` owns the
-//! last-seen-session state, `Log/` owns the bridge into the core logger,
-//! `Init/` owns the subscriber, `Warn/` the always-visible diagnostic. Each
-//! leaf owns one item named by its kind; this facade declares children and
-//! keeps the old item names alive for callers.
+//! Layout: `Runtime/` owns the home decision, `Flag/` owns the flag files, their
+//! cache and the three-valued state they report, `Chain/` owns the
+//! session-parent graph, `Session/` owns the last-seen-session state, `Log/`
+//! owns the bridge into the core logger, `Init/` owns the subscriber and its
+//! recorded ownership, `Warn/` the always-visible diagnostic. Each leaf owns one
+//! item named by its kind; this facade declares children and keeps the old item
+//! names alive for callers.
 
 mod Chain;
 pub(crate) mod Flag;

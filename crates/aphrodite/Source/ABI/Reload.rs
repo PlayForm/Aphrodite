@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State},
 	Configuration::Reload::{Apply::Fn::Fn as Apply, Assess::Fn::Fn as Assess},
-	Guard::Cstr::Fn::Fn as Cstr,
+	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 };
 
 /// Re-read `[compression] context_engine` from `path` and apply it.
@@ -23,14 +23,22 @@ use crate::ABI::{
 /// reload blocked every other handle's every call, and it was a trap for a
 /// future closure that called back into another `aphrodite_*` fn (non-reentrant
 /// Mutex -> instant deadlock).
+/// # Safety
+/// `Handle` and `path` must each be null or point to a valid, NUL-terminated C
+/// string that stays readable and unmoved for the duration of this call. The
+/// returned pointer is owned by the caller and must be released with
+/// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *mut c_char {
-	let Path = unsafe { Cstr(path) }.unwrap_or_default();
+pub unsafe extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *mut c_char {
+	let Path = unsafe { Cstr(path) };
 
-	let Assessment = Assess(&Path);
+	// Read and parsed before the lock, as before; a refusal from the ingress is
+	// carried into the closure rather than answered here, because the boundary
+	// owns the envelope.
+	let Assessment = Optional(Path).map(|Path| Assess(&Path));
 
 	State(Handle, move |s| {
-		let Diagnostic = Apply(s, &Assessment);
+		let Diagnostic = Apply(s, Assessment?);
 
 		Ok(Answer::JSON(serde_json::json!({"status":"ok", "config_error":Diagnostic})))
 	})

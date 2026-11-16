@@ -25,7 +25,7 @@ const Prefixes:[&str; 6] = [
 ///
 /// It is not a Rust parser: generics are not tracked, so `impl<T> Foo<T>` reports `Foo`, and a
 /// signature split across lines is only half-read.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Lower = Trimmed.to_lowercase();
 	let Declares = Prefixes.iter().any(|Prefix| Lower.starts_with(Prefix)) && Trimmed.contains('(');
 
@@ -53,13 +53,13 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			.map(str::trim)
 			.unwrap_or("");
 
-		match (!Name.is_empty()).then(|| Name.to_string()) {
+		match (!Name.is_empty()).then_some(Name) {
 			Some(Name) => {
 				Declaration::Declaration {
 					Kind:"fn",
 					Name,
-					Parameters:Some(Parameters.to_string()),
-					Return:(!Return.is_empty()).then(|| Return.to_string()),
+					Parameters:Some(Parameters),
+					Return:(!Return.is_empty()).then_some(Return),
 				}
 			},
 			None => Declaration::Malformed { Reason:Reason::NoName },

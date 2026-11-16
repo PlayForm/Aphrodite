@@ -23,7 +23,11 @@ use crate::{
 // Seed an AppState inline store exactly as `Hook::transform_live_container`
 // stores one: round-trip hash + meta envelope + per-chunk entries.
 fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
-	let Chunks = crate::Hook::Live::Chunk::Fn::Fn(Content, crate::Hook::Live::Const::LiveChunkSize);
+	let Chunks:Vec<&str> =
+		crate::Hook::Live::Chunk::Policy::Struct::Struct::new(crate::Hook::Live::Const::LiveChunkSize)
+			.expect("the shipped chunk target is non-zero")
+			.Chunks(Content)
+			.collect();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put(hash.to_string(), Content.to_string());

@@ -1,28 +1,48 @@
-//! `Cstr`: the caller's pointer as an owned `String`.
+//! `Cstr`: the caller's pointer as a bounded, borrowed view.
 
 use std::{ffi::CStr, os::raw::c_char, ptr::NonNull};
 
-/// Convert a caller-supplied C string pointer into an owned `String`.
+use super::Enum::Enum as Decoded;
+use crate::ABI::Guard::Content::Const::MaximumContent;
+
+/// Decode a caller-supplied C string pointer, refusing it above the ingress cap
+/// before any allocation happens.
 ///
-/// A null pointer yields `None`, and each export decides for itself whether
-/// that means "argument absent" (substituted with an empty default) or "request
-/// invalid" (answered with an error payload). `NonNull::new` is what carries
-/// that decision: it turns the nullability into a value before any dereference,
-/// so the `unsafe` block below has one reason to exist instead of two.
+/// The order is the point. A C string carries no length, so locating its
+/// terminator is unavoidable - that is the caller's contract, and
+/// `CStr::from_ptr` is the only way to honour it. What is avoidable is what this
+/// function used to do next: `to_string_lossy().into_owned()` copied the WHOLE
+/// payload before the export's 16 MB check could reject it, so an oversize
+/// argument cost a full copy to be told "no". Here the length is inspected on the
+/// borrowed bytes and the refusal happens before the copy - and because
+/// `to_string_lossy` borrows when the bytes are valid UTF-8, an accepted argument
+/// usually copies nothing either.
 ///
-/// It proves nothing about the pointee - `NonNull` is not a validity claim - so
-/// the block keeps its contract, and the caller's contract is unchanged.
+/// The lossy policy is unchanged: invalid UTF-8 still decodes with replacement
+/// characters rather than being refused. A pointer-only C interface cannot bound
+/// the scan itself; bounding what the scan is allowed to cost is the most this
+/// signature can offer, and a length-carrying entry point would be an additive ABI
+/// change rather than a repair of this one.
 ///
 /// # Safety
-/// `Ptr`, if non-null, must point to a valid, NUL-terminated C string that
-/// stays valid for the duration of this call (the standard `CStr::from_ptr`
-/// contract). Every caller in this crate passes pointers received directly
-/// from the C ABI call, which are expected to uphold that contract.
-pub(crate) unsafe fn Fn(Ptr:*const c_char) -> Option<String> {
-	let Ptr = NonNull::new(Ptr.cast_mut())?;
+/// `Ptr`, if non-null, must point to a valid, NUL-terminated C string that stays
+/// readable and unmoved for the duration of this call (the `CStr::from_ptr`
+/// contract). The returned `Decoded` borrows from it for as long as the caller
+/// chooses, which is the second half of the obligation and the reason this
+/// function is `unsafe` rather than only its dereference.
+pub(crate) unsafe fn Fn<'a>(Ptr:*const c_char) -> Decoded<'a> {
+	let Some(Ptr) = NonNull::new(Ptr.cast_mut()) else {
+		return Decoded::Absent;
+	};
 
-	// SAFETY: `Ptr` is non-null, and per the safety contract of this function
-	// it points to a valid, NUL-terminated C string that remains valid for the
-	// duration of this call.
-	Some(unsafe { CStr::from_ptr(Ptr.as_ptr()) }.to_string_lossy().into_owned())
+	// SAFETY: `Ptr` is non-null, and per this function's safety contract it
+	// points to a valid, NUL-terminated C string that remains readable and
+	// unmoved for the duration of this call.
+	let Raw = unsafe { CStr::from_ptr(Ptr.as_ptr()) };
+
+	if Raw.to_bytes().len() > MaximumContent {
+		return Decoded::Oversize;
+	}
+
+	Decoded::Text(Raw.to_string_lossy())
 }

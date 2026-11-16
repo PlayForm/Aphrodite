@@ -9,7 +9,10 @@
 //! The optional timing is `inspect`ed rather than matched: there is no "logger off"
 //! branch to take, only a value that may not be there.
 
-use crate::{Flow::Section::Label::Fn::Fn as SectionLabel, State::Struct::AphroditeState};
+use crate::{
+	Flow::Section::{Label::Fn::Fn as SectionLabel, Struct::Struct as Section},
+	State::Struct::AphroditeState,
+};
 
 /// Emit the `pre_turn_sections` line: one label + byte size per surviving section, the
 /// flow budget, the floor, and the cumulative metrics snapshot.
@@ -17,15 +20,15 @@ pub(crate) fn LogPreTurn(
 	State:&AphroditeState,
 	T0:Option<std::time::Instant>,
 	Budget:usize,
-	AlwaysSurvive:usize,
-	Sections:&[String],
+	Floor:usize,
+	Sections:&[Section],
 ) {
 	let _ = T0.inspect(|T0| {
 		let Us = T0.elapsed().as_micros() as u64;
 		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::PreTurn, Us);
 		let Secs:Vec<serde_json::Value> = Sections
 			.iter()
-			.map(|Text| serde_json::json!({"label": SectionLabel(Text), "bytes": Text.len()}))
+			.map(|Section| serde_json::json!({"label": SectionLabel(&Section.Text), "bytes": Section.Text.len()}))
 			.collect();
 		crate::Debug::Log::At::Fn::Fn(
 			State.DebugLevel,
@@ -33,7 +36,7 @@ pub(crate) fn LogPreTurn(
 			&[
 				("turn", State.TurnCounter.to_string()),
 				("budget", Budget.to_string()),
-				("always_survive", AlwaysSurvive.to_string()),
+				("always_survive", Floor.to_string()),
 				("sections", serde_json::to_string(&Secs).unwrap_or_default()),
 				("pending_markers", State.RecentMarkers.len().to_string()),
 				("metrics", crate::Debug::Metrics::Fn::Fn().to_string()),

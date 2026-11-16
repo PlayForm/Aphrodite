@@ -27,7 +27,9 @@ impl Struct {
 	pub(crate) fn Push(&mut self, Heading:Heading) {
 		self.Counts[Heading.Level] += 1;
 
-		let _ = self.First.is_none().then(|| self.First = Some(Heading.Text));
+		if self.First.is_none() {
+			self.First = Some(Heading.Text);
+		}
 	}
 
 	/// The levels that occurred, in level order, as `(level, count)` pairs.

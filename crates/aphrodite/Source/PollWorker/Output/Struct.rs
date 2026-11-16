@@ -27,7 +27,15 @@ pub struct Accumulator {
 
 impl Accumulator {
 	/// An empty accumulator at the shipped bound.
-	pub(crate) const fn New() -> Self { Self { Buffer:String::new(), Maximum:MaximumAccumulatedBytes } }
+	pub(crate) const fn New() -> Self { Self::NewWithin(MaximumAccumulatedBytes) }
+
+	/// An empty accumulator at an explicit bound.
+	///
+	/// The bound is a field rather than a constant read at the append site, and this is
+	/// the only other constructor: a test can pin the cap arithmetic byte by byte at a
+	/// size it can reason about (`NewWithin(10)`), while the shipped path always uses
+	/// `New`. Nothing else may lower the bound.
+	pub(crate) const fn NewWithin(Maximum:usize) -> Self { Self { Buffer:String::new(), Maximum } }
 
 	/// Bytes currently kept - what the live-container surface reports.
 	pub(crate) fn Len(&self) -> usize { self.Buffer.len() }

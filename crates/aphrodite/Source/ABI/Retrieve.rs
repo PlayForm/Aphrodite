@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare},
-	Guard::Cstr::Fn::Fn as Cstr,
+	Guard::Cstr::{Fn::Fn as Cstr, Optional::Fn::Fn as Optional},
 };
 
 /// Return the raw content stored under `hash` - not a JSON envelope.
@@ -19,11 +19,18 @@ use crate::ABI::{
 /// Retrieval is also the teaching loop: the FFI path bypasses `ResolveOne`, so
 /// the consequence is attributed here instead, which is what lets the engine
 /// learn which markers are actually worth keeping.
+/// # Safety
+/// `Handle` and `hash` must each be null or point to a valid, NUL-terminated C
+/// string that stays readable and unmoved for the duration of this call. The
+/// returned pointer is owned by the caller and must be released with
+/// `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeRetrieve(Handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let hash = unsafe { Cstr(hash) }.unwrap_or_default();
+pub unsafe extern "C" fn AphroditeRetrieve(Handle:*const c_char, hash:*const c_char) -> *mut c_char {
+	let hash = unsafe { Cstr(hash) };
 
 	Bare(Handle, move |s| {
+		let hash = Optional(hash)?;
+
 		match s.InlineStoreGet(&hash) {
 			Some(Content) => {
 				// Tier 1 teaching loop: the FFI retrieve path bypasses

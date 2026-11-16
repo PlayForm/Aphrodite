@@ -9,34 +9,36 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// stored content and its hash are never touched - only `ccr_type` and `preview`
 /// on the catalogue row.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_reclassify", |args| {
-		let only_hash = args.get("hash").and_then(|v| v.as_str());
-		crate::Session::With::Fn::with_shared(|state| {
-			// Collect (hash, fresh content) for markers we will touch, then
-			// recompute type + preview from the stored content.
-			let targets:Vec<String> = state
+	("aphrodite_reclassify", |Args| {
+		let Only = Args.get("hash").and_then(|v| v.as_str());
+
+		crate::Session::With::Fn::with_shared(|State| {
+			// Collect the hashes to touch FIRST, then recompute type + preview
+			// from each one's stored content: a row appended during the pass
+			// cannot be half-reclassified.
+			let Targets:Vec<String> = State
 				.RecentMarkers
 				.iter()
-				.filter(|mk| only_hash.is_none_or(|h| mk.hash == h))
-				.map(|mk| mk.hash.clone())
+				.filter(|Marker| Only.is_none_or(|Hash| Marker.hash == Hash))
+				.map(|Marker| Marker.hash.clone())
 				.collect();
 
-			let mut updated = 0usize;
+			let mut Updated = 0usize;
 
-			targets.into_iter().for_each(|hash| {
-				if let Some(content) = state.InlineStoreGet(&hash) {
-					let detected = aphrodite::Preview::Detect::Type::Fn(&content);
-					let preview = aphrodite::Preview::Builder::Entry::Fn(&detected, &content);
+			Targets.into_iter().for_each(|Hash| {
+				if let Some(Content) = State.InlineStoreGet(&Hash) {
+					let Detected = aphrodite::Preview::Detect::Type::Fn(&Content);
+					let Preview = aphrodite::Preview::Builder::Entry::Fn(&Detected, &Content);
 
-					if let Some(mk) = state.RecentMarkers.iter_mut().find(|m| m.hash == hash) {
-						mk.CCRType = detected;
-						mk.Preview = preview;
-						updated += 1;
+					if let Some(Marker) = State.RecentMarkers.iter_mut().find(|Marker| Marker.hash == Hash) {
+						Marker.CCRType = Detected;
+						Marker.Preview = Preview;
+						Updated += 1;
 					}
 				}
 			});
 
-			serde_json::json!({"status": "ok", "reclassified": updated})
+			serde_json::json!({"status": "ok", "reclassified": Updated})
 		})
 	})
 }

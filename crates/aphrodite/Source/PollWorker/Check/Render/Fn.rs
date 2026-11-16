@@ -6,6 +6,10 @@
 //! call is one step, the preview so it can decide whether to retrieve at all.
 //! `None` for a stale task: `Select` never hands one over, and this function
 //! refuses rather than inventing a sentence for a case that has none.
+//!
+//! A finished task's hash and preview are not optional here, and there is no `?`
+//! fallback: `BgStatus::Done`/`Failed` own the stored output, so a completion nudge
+//! always names the content it announces.
 
 use crate::PollWorker::{
 	Check::{Plan::Struct::NudgePlan, Polled::Fn::Fn as Polled},
@@ -26,27 +30,26 @@ pub(crate) fn Fn(Task:&BgTask) -> Option<NudgePlan> {
 				TtlTurns:1,
 			}
 		},
-		BgStatus::Done { ExitCode } => {
+		BgStatus::Done { Output } => {
 			NudgePlan {
 				Text:format!(
-					"✓ poll worker: `{}` completed (exit {}). Retrieve: aphrodite_retrieve(hash={}) - {}",
+					"✓ poll worker: `{}` completed (exit 0). Retrieve: aphrodite_retrieve(hash={}) - {}",
 					Task.command,
-					ExitCode,
-					Task.OutputHash.as_deref().unwrap_or("?"),
-					Task.OutputPreview.as_deref().unwrap_or("[output available]")
+					Output.Hash.as_str(),
+					Output.Preview
 				),
 				// Survive 2 turns so the agent has time to act.
 				TtlTurns:2,
 			}
 		},
-		BgStatus::Failed { ExitCode } => {
+		BgStatus::Failed { ExitCode, Output } => {
 			NudgePlan {
 				Text:format!(
 					"✗ poll worker: `{}` failed (exit {}). Retrieve: aphrodite_retrieve(hash={}) - {}",
 					Task.command,
 					ExitCode,
-					Task.OutputHash.as_deref().unwrap_or("?"),
-					Task.OutputPreview.as_deref().unwrap_or("[error output available]")
+					Output.Hash.as_str(),
+					Output.Preview
 				),
 				TtlTurns:2,
 			}

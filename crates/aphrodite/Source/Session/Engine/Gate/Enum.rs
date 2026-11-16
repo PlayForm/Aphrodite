@@ -16,6 +16,11 @@ pub enum Enum {
 	BelowThreshold,
 	/// The middle slice would be shorter than the minimum worth compacting.
 	MiddleTooSmall,
+	/// The protect bounds do not describe a slice of this index at all - a
+	/// configuration pair whose head reaches past the tail. Distinct from
+	/// `MiddleTooSmall` because the fix is different: the bounds are wrong, not
+	/// the history.
+	MiddleOutOfRange,
 	/// The middle turns could not be packed. Unreachable in practice -
 	/// serialising a `serde_json::Value` cannot fail - but named rather than
 	/// panicking, because a refusal is always cheaper than a crash.
@@ -30,6 +35,7 @@ impl Enum {
 			Enum::BelowMinimum => "below_min_msgs",
 			Enum::BelowThreshold => "fill_below_threshold",
 			Enum::MiddleTooSmall => "middle_too_small",
+			Enum::MiddleOutOfRange => "middle_out_of_range",
 			Enum::Unpackable => "unpackable",
 		}
 	}

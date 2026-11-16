@@ -6,7 +6,10 @@ use headroom_core::transforms;
 
 use crate::ABI::{
 	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
-	Guard::{Content::Fn::Fn as CheckContent, Cstr::Fn::Fn as Cstr},
+	Guard::{
+		Content::Fn::Fn as CheckContent,
+		Cstr::{Fn::Fn as Cstr, Required::Fn::Fn as Required},
+	},
 };
 
 /// Classify `Content` and answer with its CCR type, line count and byte size.
@@ -18,12 +21,16 @@ use crate::ABI::{
 /// Null content is a distinct error from empty content - the first means the
 /// caller passed no pointer, the second means it passed a zero-length string,
 /// and a host debugging its own marshalling needs to tell them apart.
+/// # Safety
+/// `Content` must be null or point to a valid, NUL-terminated C string that stays
+/// readable and unmoved for the duration of this call. The returned pointer is
+/// owned by the caller and must be released with `AphroditeFreeString`.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char {
+pub unsafe extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char {
 	let Content = unsafe { Cstr(Content) };
 
 	Run(move || {
-		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
+		let Content = Required(Content)?;
 
 		CheckContent(&Content)?;
 

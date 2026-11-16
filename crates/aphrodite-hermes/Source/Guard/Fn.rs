@@ -50,6 +50,23 @@ pub(crate) fn to_json_error(msg:&str) -> *mut c_char { to_c_string(&serde_json::
 /// zero panic guards until this was added). Every exported fn except
 /// `aphrodite_hermes_free_string` (must stay minimal/infallible) routes
 /// through this.
+///
+/// The caught payload is LEAKED rather than dropped, and that is a policy, not
+/// an oversight: dropping it here would run a foreign `Drop` implementation
+/// outside the `catch_unwind` that produced it, so a payload whose `Drop` panics
+/// would unwind a SECOND time - this time with nothing to catch it, across
+/// `extern "C"`, which is the forced abort this whole function exists to avoid.
+/// The alternative policy (drop it inside a second `catch_unwind`) would recurse
+/// for as long as payloads keep panicking on drop. Leaking is the only policy
+/// with a bound: one allocation per panic, in a process that has already
+/// degraded.
 pub(crate) fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
-	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked in aphrodite-hermes"))
+	match std::panic::catch_unwind(f) {
+		Ok(Value) => Value,
+		Err(Payload) => {
+			std::mem::forget(Payload);
+
+			to_json_error("internal error: panicked in aphrodite-hermes")
+		},
+	}
 }

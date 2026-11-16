@@ -25,8 +25,6 @@
 //! 2 -> trace). The fmt layer is target-restricted to this crate so it can
 //! never duplicate a host's own diagnostics into the same stderr.
 
-use std::sync::Once;
-
 use tracing_subscriber::{
 	EnvFilter,
 	Layer as _,
@@ -35,21 +33,24 @@ use tracing_subscriber::{
 	util::SubscriberInitExt,
 };
 
-use crate::Debug::Init::Const::TARGET;
+use crate::Debug::Init::{Const::TARGET, Ownership, State::INSTALL};
 
-/// Install guard. `call_once` is what makes the second call cheap: it cannot
-/// reach `try_init`, so the "already installed" path is one atomic load.
-static INSTALL:Once = Once::new();
-
-/// Install the process-wide subscriber, once per process.
+/// Install the process-wide subscriber, once per process, and report who ended
+/// up owning the dispatcher.
 ///
 /// Idempotent by design and silent on every failure path: a host that already
 /// installed a subscriber, a filter string that fails to parse, and a second
 /// call from another thread all end in the same place - this crate logs through
 /// whatever dispatcher is in force, and the per-session debug file keeps being
 /// written regardless.
-pub(crate) fn Fn() {
-	INSTALL.call_once(|| {
+///
+/// The answer is a value, not a side effect: `Installed` means this crate's fmt
+/// layer (target-restricted to [`TARGET`]) owns the dispatcher, so an event of
+/// ours is guaranteed to reach stderr. `HostOwned` means the host got there
+/// first and may drop this crate's events without a word - which is exactly the
+/// case `Debug::Warn` has to know about to add its stderr fallback.
+pub(crate) fn Fn() -> &'static Ownership::Enum::Enum {
+	INSTALL.get_or_init(|| {
 		let Filter = std::env::var("RUST_LOG")
 			.ok()
 			.or_else(|| std::env::var("APHRODITE_LOG").ok())
@@ -65,17 +66,21 @@ pub(crate) fn Fn() {
 			.with_target(TARGET, LevelFilter::TRACE);
 
 		// `try_init` reports "already set" as an error instead of panicking -
-		// that error IS the host-subscriber case, and it is not a defect.
-		let _ = tracing_subscriber::registry()
-			.with(Filter)
-			.with(
-				tracing_subscriber::fmt::layer()
-					.with_target(false)
-					.with_writer(std::io::stderr)
-					.with_filter(Only),
-			)
-			.try_init();
-	});
+		// that error IS the host-subscriber case, and it is not a defect. It is
+		// also the answer this function returns, which is the only way a caller
+		// can learn which of the two happened.
+		let Subscriber = tracing_subscriber::registry().with(Filter).with(
+			tracing_subscriber::fmt::layer()
+				.with_target(false)
+				.with_writer(std::io::stderr)
+				.with_filter(Only),
+		);
+
+		match Subscriber.try_init() {
+			Ok(()) => Ownership::Enum::Enum::Installed,
+			Err(_) => Ownership::Enum::Enum::HostOwned,
+		}
+	})
 }
 
 /// The filter default when neither env var is set.

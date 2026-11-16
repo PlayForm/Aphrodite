@@ -19,7 +19,10 @@ use tokio_util::task::TaskTracker;
 
 use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
-	Proxy::{Cache::Entry::Struct::Struct as CacheEntry, Secret::Struct::Struct as Secret},
+	Proxy::{
+		Cache::{Entry::Struct::Struct as CacheEntry, Identity::Struct::Struct as CacheIdentity},
+		Secret::Struct::Struct as Secret,
+	},
 };
 
 /// Shared proxy state: upstream client config, CCR backend, and all
@@ -114,25 +117,35 @@ pub struct Struct {
 	// Stats
 	pub RequestsTotal:AtomicU64,
 	pub RequestsCompressed:AtomicU64,
-	/// Cumulative bytes saved by compression/caching, despite the name
+	/// Cumulative CONTENT bytes saved by compression, despite the name
 	/// (report 05 F5: the field is exposed as `TokensSaved` in `/stats` and
 	/// that external API name is kept for compatibility, but every call site
-	/// now accumulates raw BYTES - originally-removed content length minus
-	/// whatever replaced it (a rendered marker, or nothing at all on a full
-	/// cache hit) - never a token estimate. Previously one site divided by 4
-	/// to estimate tokens while every other site counted bytes, making the
-	/// counter internally inconsistent by 4x; another subtracted the bare
-	/// 40-char hash length instead of the actual (much longer) marker length,
-	/// overstating savings.
+	/// accumulates raw BYTES - the removed content length minus the rendered
+	/// marker that replaced it - never a token estimate. Previously one site
+	/// divided by 4 to estimate tokens while every other site counted bytes,
+	/// making the counter internally inconsistent by 4x; another subtracted the
+	/// bare 40-char hash length instead of the actual (much longer) marker
+	/// length, overstating savings.
+	///
+	/// A cache hit used to add its whole serialised response body here, which is
+	/// an ENCODED-body measurement and now has its own counter
+	/// (`BodyBytesSaved`): a hit replaces no content at all.
 	pub TokensSaved:AtomicU64,
+	/// Cumulative encoded response-body bytes a cache hit avoided. Kept apart
+	/// from `TokensSaved` because the two measure different things on different
+	/// denominators - content replaced versus body bytes never fetched - and one
+	/// counter holding both described neither.
+	pub BodyBytesSaved:AtomicU64,
 	pub CCRHits:AtomicU64,
 	pub CCRMisses:AtomicU64,
 	pub CCRCreated:AtomicU64,
 	pub ToolRelayCalls:AtomicU64,
 	pub CompressionRatioEma:AtomicU64, // ×100 for EMA of compression ratio
 
-	// LLM API response cache (model+messages → compressed response)
-	/// LRU cache: hash(model+messages) → (inserted-at, serialized response body).
+	// LLM API response cache (request identity → compressed response)
+	/// LRU cache: request identity → (inserted-at, serialized response body).
+	/// The key is the whole `Cache::Identity` - its `Hash` is the digest, its `Eq`
+	/// the canonical request bytes - so a hit is equality and not a digest match.
 	/// F5 (report 06): entries never expired on their own - a marker minted at
 	/// minute 0 of a long session was replayed unchanged at minute 90, silently
 	/// diverging from what a fresh (possibly temperature>0) upstream call would
@@ -140,7 +153,7 @@ pub struct Struct {
 	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
 	/// lock is NEVER held across an `.await`; any future code that must hold
 	/// it across one switches this field to `tokio::sync::Mutex`.
-	pub ResponseCache:std::sync::Mutex<lru::LruCache<u64, CacheEntry>>,
+	pub ResponseCache:std::sync::Mutex<lru::LruCache<CacheIdentity, CacheEntry>>,
 	/// TTL applied to `ResponseCache` entries - reuses `cli.ccr_ttl_seconds`
 	/// so cached LLM responses don't outlive the CCR content they were
 	/// derived from by a different, uncoordinated lifetime.

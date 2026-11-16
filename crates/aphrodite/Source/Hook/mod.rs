@@ -14,7 +14,7 @@
 //!    decision so no gate can drop it.
 //! 2. `Classification/`, `Path/`, `Policy/`, `Select/`, `Plan/` - what to do
 //!    about it, decided from values with no session mutation.
-//! 3. `Apply/`, `Emit/`, `Live/` - doing it.
+//! 3. `Apply/`, `Live/` - doing it, through the one shared `Emit/` leaf.
 //!
 //! `Reason/` is the vocabulary a passthrough reports and `Passthrough/` is the
 //! one payload shape it emits; `AutoExpand/`, `Meta/`, `Hash/` and `Tool/` are
@@ -31,6 +31,7 @@
 
 pub mod AutoExpand;
 pub mod Classification;
+pub mod Emit;
 pub mod Hash;
 pub mod LLM;
 pub mod Live;

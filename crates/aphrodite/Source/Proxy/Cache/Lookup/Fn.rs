@@ -16,26 +16,29 @@ use axum::{body::Body, http::StatusCode, response::Response};
 use crate::Proxy::{
 	Cache::{Get::Fn::Fn as ResponseCacheGet, Lookup::Enum::Enum as CacheLookup},
 	Log::Dev::Fn::Fn as DevLog,
+	Measurement::Encoded::Struct::Struct as EncodedAccounting,
 	Request::{Cacheability::Enum::Enum as RequestCacheability, Context::Struct::Struct as RequestContext},
 };
 
 /// Answer the request from the response cache when it may be, and say which of
 /// the three cases it was.
 pub(crate) fn Fn(Context:&RequestContext<'_>, Now:Instant) -> CacheLookup {
-	let Key = match Context.Semantics.Cacheability {
-		RequestCacheability::Cacheable { Key } => Key,
+	let Identity = match &Context.Semantics.Cacheability {
+		RequestCacheability::Cacheable { Identity } => Identity,
 		RequestCacheability::Uncacheable => return CacheLookup::Bypassed,
 	};
 
-	match ResponseCacheGet(Context.State, Key, Now) {
+	match ResponseCacheGet(Context.State, Identity, Now) {
 		Some(CachedBody) => {
 			Context.State.CacheHits.fetch_add(1, Ordering::Relaxed);
-			// Bytes throughout (report 05 F5): a full upstream round-trip was
-			// avoided, so the whole cached response body counts as saved -
-			// previously this divided by 4 to estimate a token count while
-			// every other `TokensSaved` site counted raw bytes, making the
-			// field internally inconsistent by 4x.
-			Context.State.TokensSaved.fetch_add(CachedBody.len() as u64, Ordering::Relaxed);
+			// Encoded-body accounting, not content accounting: a hit avoided a
+			// whole upstream round-trip, so the serialised body never crossed the
+			// wire. This used to be added to `TokensSaved`, which counts the
+			// content bytes a marker replaced - two measurements with two
+			// different denominators in one counter.
+			let Avoided = EncodedAccounting { BodyBytes:CachedBody.len() }.Avoided();
+
+			Context.State.BodyBytesSaved.fetch_add(Avoided, Ordering::Relaxed);
 			DevLog(
 				Context.State.Dev,
 				|| tracing::info!(ID = %Context.ID, CachedLength = CachedBody.len(), "<<< CACHE HIT"),
@@ -66,7 +69,9 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Now:Instant) -> CacheLookup {
 		None => {
 			Context.State.CacheMisses.fetch_add(1, Ordering::Relaxed);
 
-			CacheLookup::Miss { Key }
+			// The whole identity, not its digest: the writer stores exactly what a
+			// hit is decided on. Cloning it is a `Bytes` refcount bump.
+			CacheLookup::Miss { Identity:Identity.clone() }
 		},
 	}
 }

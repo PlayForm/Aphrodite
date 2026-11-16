@@ -8,40 +8,36 @@ use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
 /// `toc` mode drops `turn`/`center` because its whole purpose is to be cheap to
 /// read; `full` is the default so a caller that passes no mode gets everything.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_catalog", |args| {
-		let mode = {
-			let m = Arg::Fn::Fn(args, "mode");
-
-			match m.is_empty() {
-				true => "full",
-				false => m,
-			}
+	("aphrodite_catalog", |Args| {
+		let Mode = match Arg::Fn::Fn(Args, "mode") {
+			"" => "full",
+			Mode => Mode,
 		};
 
-		crate::Session::With::Fn::with_shared(|state| {
-			let items:Vec<serde_json::Value> = state
+		crate::Session::With::Fn::with_shared(|State| {
+			let Items:Vec<serde_json::Value> = State
 				.RecentMarkers
 				.iter()
 				.rev()
-				.map(|e| {
-					match mode {
+				.map(|Marker| {
+					match Mode {
 						"toc" => {
 							serde_json::json!({
-								"hash": &e.hash,
-								"type": e.CCRType, "size": e.Size, "preview": e.Preview,
+								"hash": &Marker.hash,
+								"type": Marker.CCRType, "size": Marker.Size, "preview": Marker.Preview,
 							})
 						},
 						_ => {
 							serde_json::json!({
-								"hash": e.hash, "type": e.CCRType, "size": e.Size,
-								"preview": e.Preview, "turn": e.Turn, "center": e.Center,
+								"hash": Marker.hash, "type": Marker.CCRType, "size": Marker.Size,
+								"preview": Marker.Preview, "turn": Marker.Turn, "center": Marker.Center,
 							})
 						},
 					}
 				})
 				.collect();
 
-			serde_json::json!({"mode": mode, "total": items.len(), "items": items, "turn": state.TurnCounter})
+			serde_json::json!({"mode": Mode, "total": Items.len(), "items": Items, "turn": State.TurnCounter})
 		})
 	})
 }

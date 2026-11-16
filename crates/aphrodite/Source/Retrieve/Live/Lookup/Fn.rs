@@ -4,21 +4,23 @@ use crate::{Proxy::State::Struct::Struct as AppState, Retrieve::Live::Container:
 
 /// Look up a live container's metadata envelope and reassemble its content.
 ///
-/// Returns `None` (the caller then serves the plain resolved content) when the
-/// entry is not a live container or its envelope is missing/malformed - warn +
-/// degrade, never panic. When the entry IS a live container, the content is
-/// reassembled from the container's own chunks (its authoritative store); a
-/// missing chunk degrades to the assembled prefix so far.
+/// Returns `None` (the caller then serves the plain resolved content) when the entry is not a
+/// live container or its envelope is missing/malformed - warn + degrade, never panic. When the
+/// entry IS a live container, the content is reassembled from the container's own chunks (its
+/// authoritative store); a missing chunk degrades to the assembled prefix so far.
 ///
-/// The "is this a container" question is a value, not a pair of tests at the call
-/// site: `Live` is the envelope's own verdict and `Chunks` is what there is to
-/// reassemble, so a degenerate envelope (a container claiming no chunks) answers
-/// `None` here instead of running a loop over nothing and then substituting the
-/// plain entry.
+/// The "is this a container" question is a value, not a pair of tests at the call site: `Live`
+/// is the envelope's own verdict and `Chunks` is what there is to reassemble, so a degenerate
+/// envelope (a container claiming no chunks) answers `None` here instead of running a loop over
+/// nothing and then substituting the plain entry.
+///
+/// The reassembled string is returned BY VALUE, so the caller takes it rather than copying it
+/// out of a borrowed pair. An empty reassembly means the container held nothing usable, and the
+/// plain resolved entry is then the honest answer.
 pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveContainerMeta, String)> {
 	let MetaKey = crate::Hook::Live::Key::Fn::LiveMetaKey(hash);
-	// `get` is `&mut self` on the cache (a hit promotes recency) - the same reason
-	// the handler's inline lookup binds a mutable guard.
+	// `get` is `&mut self` on the cache (a hit promotes recency) - the same reason the
+	// handler's inline lookup binds a mutable guard.
 	let mut Map = match State.InlineCCR.lock() {
 		Ok(Map) => Map,
 		Err(Poisoned) => Poisoned.into_inner(),
@@ -52,12 +54,7 @@ pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveConta
 		Assembled.push_str(Chunk);
 	}
 
-	// An empty reassembly means the container held nothing usable, so the plain
-	// resolved entry is the honest answer - `filter` + `unwrap_or_else` rather
-	// than a test, so the fallback allocates only when it is chosen.
-	let Content = Some(Assembled)
-		.filter(|Assembled| !Assembled.is_empty())
-		.unwrap_or_else(|| Resolved.to_string());
+	let Content = if Assembled.is_empty() { Resolved.to_string() } else { Assembled };
 
 	Some((Meta, Content))
 }

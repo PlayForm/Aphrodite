@@ -51,11 +51,16 @@ pub async fn Run() -> anyhow::Result<()> {
 
 	let Bound = Listen::Bind::All::Fn::Fn(Proxies, Compression.as_ref()).await?;
 
-	Listen::Watcher::Fn::Fn(&Resolved.Path, &Bound);
+	// The watch is started before anything serves and stopped after the drain: its
+	// readiness is a value (`Watching`/`Inactive`), and stopping it is a step rather
+	// than a task left to process exit.
+	let Watcher = Listen::Watcher::Fn::Fn(&Resolved.Path, &Bound);
 
 	let Handles = Listen::Spawn::Spawn(Bound, ShutdownRx);
 
 	Listen::Drain::Drain(ShutdownTx, Handles).await;
+
+	Listen::Watcher::Stop::Fn::Fn(Watcher);
 
 	Ok(())
 }

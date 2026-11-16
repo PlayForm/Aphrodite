@@ -5,7 +5,10 @@
 //! matched back to a poll. The empty case needs no test of its own: an empty string
 //! cannot start with a non-empty prefix.
 
-use crate::PollWorker::Should::{Command::Prefix::Const::SlowCommandPrefixes, Plan::Struct::BackgroundPlan};
+use crate::{
+	PollWorker::Should::{Command::Prefix::Const::SlowCommandPrefixes, Plan::Struct::BackgroundPlan},
+	State::Identity::Command::Struct::CommandID,
+};
 
 /// The identity and label for `command`, when it is a known-slow one.
 pub(crate) fn Fn(command:Option<&str>) -> Option<BackgroundPlan> {
@@ -15,7 +18,7 @@ pub(crate) fn Fn(command:Option<&str>) -> Option<BackgroundPlan> {
 	SlowCommandPrefixes.iter().find(|Prefix| Lower.starts_with(**Prefix))?;
 
 	Some(BackgroundPlan {
-		Identity:headroom_core::ccr::compute_key(Command.as_bytes()),
+		Identity:CommandID::from(headroom_core::ccr::compute_key(Command.as_bytes())),
 		Label:Command.chars().take(60).collect(),
 	})
 }

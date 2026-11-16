@@ -4,7 +4,10 @@ use std::os::raw::c_char;
 
 use crate::{
 	Directive,
-	Guard::Fn::{cstr_to_string, guarded, to_c_string},
+	Guard::{
+		Fn::{cstr_to_string, guarded},
+		ToJSON::Fn::Fn as to_json,
+	},
 };
 
 /// Materialize the embedded behavioral directives into
@@ -27,6 +30,6 @@ pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char
 	let home = unsafe { cstr_to_string(home_dir) };
 	guarded(std::panic::AssertUnwindSafe(move || {
 		let result = Directive::Into::Fn::Fn(&home);
-		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+		to_json(&result)
 	}))
 }

@@ -1,4 +1,4 @@
-//! `Body` - Body handling: the stream flag's byte-exact fast path, the configured size
+//! `Body` - Body handling: the single request interpretation, the configured size
 //!
 //! The item lives in `Fn.rs`; this facade only declares it.
 

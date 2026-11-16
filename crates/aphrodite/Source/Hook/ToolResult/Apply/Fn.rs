@@ -2,14 +2,10 @@
 
 use crate::{
 	Hook::{
-		Classification::Fn::Fn as Classification,
+		Classification::{Fn::Fn as Classification, Hint::Enum::Enum as Hint},
+		Emit::Fn::Fn as Emit,
 		Live::Container::Fn::Fn as Container,
-		ToolResult::{
-			Emit::Fn::Fn as Emit,
-			Input::Struct::Struct as Input,
-			Plan::Enum::Enum as Plan,
-			Policy::Struct::Struct as Policy,
-		},
+		ToolResult::Plan::Enum::Enum as Plan,
 	},
 	State::Struct::AphroditeState,
 };
@@ -17,18 +13,21 @@ use crate::{
 /// The narrow interpreter: one arm per plan, no policy re-tested.
 ///
 /// Every decision was taken during selection, so this leaf only performs the
-/// effects the chosen plan names. The one thing it does read from the policy is
-/// `AutoExpand`, because the compress path has to know whether to return the
-/// stored content inline - and that is a property of the plan's execution, not a
-/// second decision about which plan to run.
-pub(crate) fn Fn(State:&mut AphroditeState, Input:&Input<'_>, Policy:&Policy, Plan:Plan) -> serde_json::Value {
+/// effects the chosen plan names. It receives no input and no policy of its own:
+/// each plan carries the content it transforms and the one execution option it
+/// needs, so a plan selected for one tool result cannot be executed against
+/// another.
+///
+/// The classification hint is the path's own identity (`Hint::Tool`), which is
+/// what keeps shell-shaped words in a tool result from being typed `terminal`.
+pub(crate) fn Fn(State:&mut AphroditeState, Plan:Plan<'_>) -> serde_json::Value {
 	match Plan {
 		Plan::Passthrough(Reason) => crate::Hook::Passthrough::Fn::Fn(Reason.Text()),
-		Plan::Live => {
-			let Resolved = Classification(Input.Content, Input.Classify, false);
+		Plan::Live { Input } => {
+			let Resolved = Classification(Input.Content, Input.Classify, Hint::Tool);
 
 			Container(State, Input.Content, &Resolved.Type)
 		},
-		Plan::Compress => Emit(State, Input, Policy.AutoExpand),
+		Plan::Compress { Input, AutoExpand } => Emit(State, Input.Content, Input.Classify, Hint::Tool, AutoExpand),
 	}
 }

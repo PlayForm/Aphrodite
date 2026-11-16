@@ -1,9 +1,13 @@
-//! How the assembler names, joins and counts a section.
+//! How the assembler names, joins and measures a section.
 //!
-//! Three small questions, three leaves: `Label` names a section for the debug
-//! line, `Join` produces the exact string the budget is measured against, and
-//! `Present` answers whether the never-drop nudge block exists this turn.
+//! Four small questions, four leaves: `Struct.rs` is the section itself (its text
+//! and its protection), `Protection/` is the vocabulary that says whether the
+//! budget may drop it, `Label/` names a section for the debug line, `Join/`
+//! produces the exact string the model receives, and `Size/` measures that same
+//! string without building it.
 
 pub mod Join;
 pub mod Label;
-pub mod Present;
+pub mod Protection;
+pub mod Size;
+pub mod Struct;

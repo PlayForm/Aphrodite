@@ -19,7 +19,11 @@ use crate::ABI::{Boundary::Handle::Fn::Fn as HandleID, Handle::Registry::Const::
 /// This export returns nothing, so it has no envelope to route through the
 /// boundary and no panic to intercept: the two operations it performs are a
 /// pointer read and a map removal, neither of which can unwind.
+/// # Safety
+/// `Handle` must be null or point to a valid, NUL-terminated C string that stays
+/// readable and unmoved for the duration of this call. Nothing is returned, so
+/// there is no allocation to release.
 #[unsafe(no_mangle)]
-pub extern "C" fn AphroditeDestroy(Handle:*const c_char) {
+pub unsafe extern "C" fn AphroditeDestroy(Handle:*const c_char) {
 	let _ = unsafe { HandleID(Handle) }.map(|Hid| Handles.Remove(Hid));
 }

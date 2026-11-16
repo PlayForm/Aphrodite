@@ -19,9 +19,9 @@ const KeysLimit:usize = 10;
 
 /// The keys found, then the entry estimate.
 pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
-	let Keys = CollectKeys(Analysis.Content);
+	let Keys = CollectKeys(Analysis.Content());
 	let Entries = Analysis
-		.Content
+		.Content()
 		.lines()
 		.filter(|Line| {
 			let Trimmed = Line.trim();

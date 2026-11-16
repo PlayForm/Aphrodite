@@ -20,38 +20,40 @@ use crate::{
 	},
 };
 
-/// Resolve a CCR marker hash back to its original content, optionally filtered by
-/// `query` and paged by `offset`/`limit`.
+/// Resolve a CCR marker hash back to its original content, optionally filtered by `query` and
+/// paged by `offset`/`limit`.
 ///
-/// The handler is a sequence of decisions, and every one of them is a value:
-/// where to read from ([`Source::Parse::Fn::Fn`]), what the lookup answered
-/// ([`Lookup::Fn::Fn`]), what the window asked for ([`Mode::Parse::Fn::Fn`]) and
-/// what slicing produced ([`Slice::Fn::Fn`]). It owns the ORDER and nothing else -
-/// the two stores, the filter, the window and the progress each live in a leaf,
-/// so a change to any one of them does not have to be read out of a 200-line
-/// function.
+/// The handler is a sequence of decisions, and every one of them is a value: where to read from
+/// ([`Source::Parse::Fn::Fn`]), what the lookup answered and which store served it
+/// ([`Lookup::Fn::Fn`]), what the window asked for ([`Mode::Parse::Fn::Fn`]) and what slicing
+/// produced ([`Slice::Fn::Fn`]). It owns the ORDER and nothing else - the two stores, the
+/// filter, the window and the progress each live in a leaf, so a change to any one of them does
+/// not have to be read out of a 200-line function.
 ///
-/// The order is the contract and does not move: resolve, reassemble a live
-/// container, narrow by query, cut the window, then advance the container's
-/// progress with the byte count this response actually served.
+/// The order is the contract and does not move: resolve, reassemble a live container, narrow by
+/// query, cut the window, then advance the container's progress with the byte count this
+/// response actually served.
+///
+/// The container's reassembled content is TAKEN, not copied: the handler used to clone it out
+/// of the lookup's answer and then keep the answer for its metadata, which copied the whole
+/// container body on every retrieve of one. Destructuring the two facts costs nothing.
 pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRequest>) -> impl IntoResponse {
 	let Source::Enum::Enum::Hash(hash) = Source::Parse::Fn::Fn(Request.hash.as_deref()) else {
 		return Reply::Fn::Fn(&Failure::Enum::Enum::MissingHash);
 	};
 
-	let Resolved = match Lookup::Fn::Fn(&state, &hash).await {
-		Ok(Content) => Content,
+	let (Resolved, Served) = match Lookup::Fn::Fn(&state, &hash).await {
+		Ok(Answer) => Answer,
 		Err(Failure) => return Reply::Fn::Fn(&Failure),
 	};
 
-	// A live container's chunks are its authoritative store, so a container entry
-	// is served from its own reassembly and a missing or malformed envelope
-	// degrades to the plain entry (warn + degrade, never panic).
-	let LiveContainer = LookupLiveContainer(&state, &hash, &Resolved);
-	let Assembled = LiveContainer
-		.as_ref()
-		.map(|(_Meta, Assembled)| Assembled.clone())
-		.unwrap_or(Resolved);
+	// A live container's chunks are its authoritative store, so a container entry is served
+	// from its own reassembly and a missing or malformed envelope degrades to the plain entry
+	// (warn + degrade, never panic).
+	let (Assembled, Meta) = match LookupLiveContainer(&state, &hash, &Resolved) {
+		Some((Meta, Assembled)) => (Assembled, Some(Meta)),
+		None => (Resolved, None),
+	};
 
 	let Mode = Mode::Parse::Fn::Fn(Request.Offset, Request.Limit);
 	let Filtered = FilterContent(&Assembled, Request.Query.as_deref());
@@ -64,9 +66,9 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 	let Truncated = Render::Truncated::Fn::Fn(&Outcome);
 	let BytesServed = Body.len();
 
-	// Progress is advanced after slicing so the served window's byte count is
-	// known, and written back so a later retrieve observes the accumulation.
-	let Live = LiveContainer.map(|(Meta, _Assembled)| {
+	// Progress is advanced after slicing so the served window's byte count is known, and
+	// written back so a later retrieve observes the accumulation.
+	let Live = Meta.map(|Meta| {
 		let Progress = Advance::Fn::Fn(&Mode, &Meta, BytesServed);
 
 		Advance::Write::Fn::Fn(&state, &hash, &Meta, Progress.BytesArrived);
@@ -74,6 +76,13 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 		Progress
 	});
 
-	Json(RetrieveResponse { Found:true, Content:Some(Body), Source:"ccr".into(), error:None, Truncated, Live })
-		.into_response()
+	Json(RetrieveResponse {
+		Found:true,
+		Content:Some(Body),
+		Source:Served.Wire().into(),
+		error:None,
+		Truncated,
+		Live,
+	})
+	.into_response()
 }

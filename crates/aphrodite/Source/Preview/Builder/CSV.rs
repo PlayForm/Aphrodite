@@ -7,6 +7,7 @@
 //! is a parser for a preview line.
 
 use crate::Preview::Input::Struct::Struct as Input;
+use super::More::Fn::Fn as More;
 
 /// Header cells the preview shows: five.
 const HeaderShown:usize = 5;
@@ -17,23 +18,20 @@ const HeaderShown:usize = 5;
 /// validating reader: a malformed row is counted like any other, and the column count
 /// comes from the first row alone, so a ragged file reports the width of its header
 /// rather than a range.
+///
+/// The rows come from the shared input view rather than a second `lines()` pass, so the
+/// column count and the row count cost one scan of the payload and no row vector.
 pub(crate) fn Fn(Inp:&Input<'_>) -> String {
-	let Rows:Vec<&str> = Inp
-		.raw
-		.lines()
-		.map(|Line| Line.trim())
-		.filter(|Line| !Line.is_empty())
-		.collect();
-	let Columns = Rows.first().map(|Row| Row.split(',').count()).unwrap_or(0);
-	let Header:Vec<&str> = Rows
-		.first()
+	let First = Inp.NonEmpty.first().copied();
+	let Columns = First.map(|Row| Row.split(',').count()).unwrap_or(0);
+	let Header:Vec<&str> = First
 		.map(|Row| Row.split(',').map(|Cell| Cell.trim()).take(HeaderShown).collect())
 		.unwrap_or_default();
-	let More = Columns
-		.checked_sub(Header.len())
-		.filter(|More| *More > 0)
-		.map(|More| format!(" +{More} more"))
-		.unwrap_or_default();
 
-	format!("[csv:{} rows {Columns} cols | {}{More}]", Rows.len(), Header.join(", "))
+	format!(
+		"[csv:{} rows {Columns} cols | {}{}]",
+		Inp.NonEmpty.len(),
+		Header.join(", "),
+		More(Columns, Header.len())
+	)
 }

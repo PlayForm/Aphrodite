@@ -33,6 +33,10 @@ impl AppState {
 				"compressed": self.RequestsCompressed.load(Ordering::Relaxed),
 			},
 			"tokens_saved": self.TokensSaved.load(Ordering::Relaxed),
+			// Encoded-body savings, reported separately: `tokens_saved` is content
+			// bytes a marker replaced, this is the serialised body a cache hit never
+			// fetched. Summing them would be summing two units.
+			"body_bytes_saved": self.BodyBytesSaved.load(Ordering::Relaxed),
 			"ccr": {
 				"hits": self.CCRHits.load(Ordering::Relaxed),
 				"misses": self.CCRMisses.load(Ordering::Relaxed),

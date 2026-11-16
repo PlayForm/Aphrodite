@@ -19,15 +19,16 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// A missing `on` defaults to `true` - asking for the tool at all is the request
 /// to turn debug on, and the schema documents that default.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_debug", |args| {
-		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
-		match crate::Debug::Session::Set::Fn::Fn(on) {
-			Ok((session, flag)) => {
+	("aphrodite_debug", |Args| {
+		let On = Args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
+
+		match crate::Debug::Session::Set::Fn::Fn(On) {
+			Ok((Session, Flag)) => {
 				serde_json::json!({
 					"status": "ok",
-					"debug": on,
-					"session": session,
-					"flag": flag,
+					"debug": On,
+					"session": Session,
+					"flag": Flag,
 				})
 			},
 			Err(e) => serde_json::json!({"error": format!("{e:#}")}),

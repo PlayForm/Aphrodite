@@ -5,21 +5,28 @@
 //! was reported done with the other task's code.
 
 use crate::{
-	PollWorker::{Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus, Update::Fn::UpdateFromPoll},
-	State::Struct::AphroditeState,
+	PollWorker::{
+		Insert::Fn::InsertBgTask,
+		Task::Status::{Enum::BgStatus, Stored::Fn::Fn as Stored},
+		Update::Fn::UpdateFromPoll,
+	},
+	State::{
+		Identity::{Command::Struct::CommandID, Execution::Struct::ExecutionID},
+		Struct::AphroditeState,
+	},
 };
 
 fn TwoRunning(State:&mut AphroditeState) {
 	InsertBgTask(
 		State,
-		headroom_core::ccr::compute_key(b"cargo build"),
+		CommandID::from(headroom_core::ccr::compute_key(b"cargo build")),
 		"terminal".into(),
 		"cargo build".into(),
 		1,
 	);
 	InsertBgTask(
 		State,
-		headroom_core::ccr::compute_key(b"npm install"),
+		CommandID::from(headroom_core::ccr::compute_key(b"npm install")),
 		"terminal".into(),
 		"npm install".into(),
 		2,
@@ -41,13 +48,15 @@ fn TestPollNamingOneCommandFinishesOnlyThatTask() {
 
 	assert!(UpdateFromPoll(&mut State, "process", &Poll));
 
-	assert_eq!(
-		State.BgTasks[0].Status,
-		BgStatus::Done { ExitCode:0 },
+	assert!(
+		matches!(State.BgTasks[0].Status, BgStatus::Done { .. }),
 		"the polled task completes"
 	);
 	assert_eq!(State.BgTasks[1].Status, BgStatus::Running, "the other task keeps running");
-	assert!(State.BgTasks[1].OutputHash.is_none(), "the other task records no output hash");
+	assert!(
+		Stored(&State.BgTasks[1].Status).is_none(),
+		"the other task records no stored output"
+	);
 	assert_eq!(State.BgTasks[1].PollCount, 0, "the other task was not polled");
 	assert!(
 		State.BgTasks[1].AccumulatedOutput.AsStr().is_empty(),
@@ -86,7 +95,10 @@ fn TestPollWithoutIdentityFallsBackToOldestRunning() {
 	// supports is the oldest running task.
 	assert!(UpdateFromPoll(&mut State, "process", "building...\nexit code: 2\n"));
 
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode:2 });
+	assert!(
+		matches!(State.BgTasks[0].Status, BgStatus::Failed { ExitCode, .. } if ExitCode.get() == 2),
+		"the oldest running task takes the failure"
+	);
 	assert_eq!(State.BgTasks[1].Status, BgStatus::Running);
 }
 
@@ -103,7 +115,11 @@ fn TestPollExecutionIdentitySticksToTheTaskItNamed() {
 		"process",
 		&serde_json::json!({"session_id": "proc-7", "output": "a", "exit_code": null}).to_string(),
 	);
-	assert_eq!(State.BgTasks[0].ExecutionID.as_deref(), Some("proc-7"));
+	assert_eq!(
+		State.BgTasks[0].ExecutionID.as_ref().map(ExecutionID::as_str),
+		Some("proc-7"),
+		"the execution identity is recorded on the task it was attributed to"
+	);
 
 	// A later poll naming the same process reaches the same task even though the
 	// oldest running task is still that one - the identity, not the position, is
@@ -113,6 +129,6 @@ fn TestPollExecutionIdentitySticksToTheTaskItNamed() {
 		"process",
 		&serde_json::json!({"session_id": "proc-7", "output": "b", "exit_code": 0}).to_string(),
 	);
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
 	assert_eq!(State.BgTasks[1].Status, BgStatus::Running);
 }

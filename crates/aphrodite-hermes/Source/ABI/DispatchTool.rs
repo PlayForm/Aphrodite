@@ -3,7 +3,10 @@
 use std::os::raw::c_char;
 
 use crate::{
-	Guard::Fn::{cstr_to_string, guarded, to_c_string, to_json_error},
+	Guard::{
+		Fn::{cstr_to_string, guarded},
+		ToJSON::Fn::Fn as to_json,
+	},
 	Tool,
 };
 
@@ -17,9 +20,6 @@ pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_j
 
 	guarded(std::panic::AssertUnwindSafe(move || {
 		let result = Tool::Dispatch::Fn::Fn(&name, &args);
-		match serde_json::to_string(&result) {
-			Ok(json) => to_c_string(&json),
-			Err(e) => to_json_error(&format!("serialize error: {}", e)),
-		}
+		to_json(&result)
 	}))
 }

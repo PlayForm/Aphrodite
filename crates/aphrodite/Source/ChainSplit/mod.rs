@@ -24,6 +24,10 @@
 //! `Const.rs` is the marker's exact bytes, and `ErrorHint/` is the
 //! content-level hint attached to a failed segment.
 //!
+//! `Prepared/` is the third stage: it owns the batch a split produces, from the
+//! parser's owned parts through to the store, so the text a chain was split
+//! from is allocated once and each batch is applied at most once.
+//!
 //! This facade declares the tree and nothing else. A consumer names the leaf
 //! (`ChainSplit::Split::Fn::Fn`), so the file that defines an item is the only
 //! place it is defined and there is exactly one way to spell it.

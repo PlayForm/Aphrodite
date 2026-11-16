@@ -1,52 +1,48 @@
 //! The marker scanner.
 //!
-//! Resolved content is arbitrary text that may contain zero, one or many markers,
-//! in any position, on any line. This module walks that text once and returns each
-//! complete marker with the hash it carries, which is what the recursive resolver
-//! substitutes. It is not a parser of the content itself - it knows nothing about
-//! what surrounds a marker.
+//! Resolved content is arbitrary text that may contain zero, one or many markers, in any
+//! position, on any line. This module walks that text once and returns each reference with
+//! the position it occupies, which is what the recursive resolver substitutes. It is not a
+//! parser of the content itself - it knows nothing about what surrounds a marker - and it is
+//! not the grammar's judge: what a candidate region IS comes from [`super::Tolerance`], so
+//! the tolerance policy has one home and this loop has one job.
 //!
-//! The scanning rule matters more than it looks: after a match the cursor moves
-//! past the closing delimiter, so a prefix inside an already-consumed marker is
-//! never re-matched, and an unclosed prefix is stepped over instead of ending the
-//! scan. Getting that wrong either panics on a malformed blob or silently drops
-//! the markers that follow it - both of which turn a resolve into data loss.
+//! The scanning rule matters more than it looks. After a reference the cursor moves past its
+//! closing delimiter, so a prefix inside an already-consumed marker is never re-matched; an
+//! unclosed prefix is stepped over rather than ending the scan. Getting that wrong either
+//! panics on a malformed blob or silently drops the markers that follow it - both of which
+//! turn a resolve into data loss.
 
-use super::{Hash, Prefix, Suffix};
+use super::{Occurrence, Prefix, Tolerance};
 
-/// Find all CCR markers in content. Returns `(full_marker, hash)` pairs.
+/// Every reference in `Content`, in document order.
 ///
-/// The full marker is returned alongside the hash because the resolver replaces
-/// markers by literal text: the same hash may appear several times and only the
-/// exact marker string can be substituted in place. It is not a de-duplicator -
-/// a marker appearing twice is returned twice, and the caller replaces both.
+/// The occurrences borrow from `Content`, so the caller substitutes by span into the very
+/// document it scanned instead of searching the text again for each marker. That is not only
+/// faster: a marker left in place at the depth cap IS raw marker text, and a second search
+/// would find it inside the output it had just written.
 ///
-/// A marker whose body carries no hash contributes nothing, and `extend` says so
-/// without an arm: the hash extractor's `Option` is already the answer to "is this
-/// a marker worth substituting", so there is no second test to keep in step.
-pub(crate) fn Fn(Content:&str) -> Vec<(String, String)> {
-	let mut Markers = Vec::new();
+/// It is not a de-duplicator - a marker appearing twice is returned twice, at two different
+/// spans, and both are substituted.
+pub(crate) fn Fn(Content:&str) -> Vec<Occurrence::Struct::Struct<'_>> {
+	let mut Occurrences = Vec::new();
 	let mut SearchFrom = 0;
 
 	while let Some(Start) = Content[SearchFrom..].find(Prefix::Const) {
 		let AbsStart = SearchFrom + Start;
-		let AfterPrefix = AbsStart + Prefix::Const.len();
 
-		// An unclosed prefix is stepped over, not treated as the end of the text:
-		// guessing at it would resolve a marker the writer never finished emitting.
-		let Some(End) = Content[AfterPrefix..].find(Suffix::Const) else {
-			SearchFrom = AfterPrefix;
+		match Tolerance::Fn::Fn(Content, AbsStart) {
+			Tolerance::Enum::Enum::Reference { Marker, Hash, End } => {
+				Occurrences.push(Occurrence::Struct::Struct { Span:AbsStart..End, Marker, Hash });
 
-			continue;
-		};
-
-		let AbsEnd = AfterPrefix + End + Suffix::Const.len();
-		let FullMarker = Content[AbsStart..AbsEnd].to_string();
-
-		Markers.extend(Hash::Fn(&FullMarker).map(|hash| (FullMarker, hash)));
-
-		SearchFrom = AbsEnd;
+				SearchFrom = End;
+			},
+			// Complete but nameless: nothing to look up, so the scan continues after it.
+			Tolerance::Enum::Enum::Hashless { End } => SearchFrom = End,
+			// Unclosed: step over the delimiter itself, not the rest of the text.
+			Tolerance::Enum::Enum::Unterminated => SearchFrom = AbsStart + Prefix::Const.len(),
+		}
 	}
 
-	Markers
+	Occurrences
 }

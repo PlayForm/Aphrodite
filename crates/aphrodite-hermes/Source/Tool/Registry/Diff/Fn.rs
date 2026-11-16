@@ -8,10 +8,11 @@ use crate::Tool::Dispatch::Fn::ToolHandler;
 /// marker that was never archived by `post_llm_call` does not appear here even
 /// though `aphrodite_retrieve` can still resolve it.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
-	("aphrodite_diff", |_args| {
-		crate::Session::With::Fn::with_shared(|state| {
-			let turns = aphrodite::Session::Index::Fn::GetConvIndex(state);
-			serde_json::json!({"total": turns.len(), "turns": turns})
+	("aphrodite_diff", |_Args| {
+		crate::Session::With::Fn::with_shared(|State| {
+			let Turns = aphrodite::Session::Index::Fn::GetConvIndex(State);
+
+			serde_json::json!({"total": Turns.len(), "turns": Turns})
 		})
 	})
 }

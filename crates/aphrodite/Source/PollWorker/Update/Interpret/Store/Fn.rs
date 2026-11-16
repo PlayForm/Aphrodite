@@ -1,9 +1,16 @@
 //! Store a completed poll's output and record its marker.
 //!
 //! The output is moved into the store, never copied: `Completion::Build` takes the
-//! applied value by value, so the buffer the poll moved out of the task is the
-//! buffer the store receives. The task then records the hash and preview and takes
-//! the status its exit code implies.
+//! applied value by value, so the buffer the poll moved out of the task is the buffer
+//! the store receives. The task then records the hash, preview and size and takes the
+//! status its exit code implies.
+//!
+//! Order is behaviour. The payload is stored before the marker that names it, and the
+//! marker before the task's status: an interruption leaves content with no marker, or a
+//! marker with a task that has not yet been marked finished - never a finished task whose
+//! content is missing. A store entry evicted by the byte budget immediately after the put
+//! is warned about rather than silently announced, because a marker that does not resolve
+//! is indistinguishable from a retrieve bug.
 
 use crate::{
 	PollWorker::{
@@ -15,24 +22,36 @@ use crate::{
 
 /// Put the output in the store, record the marker, complete the task.
 pub(crate) fn Fn(State:&mut AphroditeState, Index:usize, Completion:Completion) {
-	State.InlineStorePut(Completion.Hash.clone(), Completion.Output);
+	let Completion { Stored, Output, Command, ExitCode } = Completion;
+
+	State.InlineStorePut(Stored.Hash.as_str().to_string(), Output);
+
+	if !State.InlineStoreContains(Stored.Hash.as_str()) {
+		tracing::warn!(
+			Hash = %Stored.Hash,
+			Size = Stored.Size,
+			"poll worker: completion was evicted by the inline store budget immediately after it was stored"
+		);
+	}
 
 	State.RecordMarker(MarkerEntry {
-		hash:Completion.Hash.clone(),
+		hash:Stored.Hash.as_str().to_string(),
 		CCRType:"terminal".to_string(),
-		Size:Completion.Size,
-		Preview:Completion.Preview.clone(),
+		Size:Stored.Size,
+		Preview:Stored.Preview.clone(),
 		Turn:State.TurnCounter,
-		Center:Some(format!("poll:{}", Completion.Command)),
+		Center:Some(format!("poll:{Command}")),
 		meta:None,
 	});
 
-	Complete(
-		&mut Registry(&mut State.BgTasks),
-		Index,
-		&Completion.Hash,
-		&Completion.Preview,
-		Completion.Size,
-		Completion.ExitCode,
-	);
+	match Complete(&mut Registry(&mut State.BgTasks), Index, Stored, ExitCode) {
+		Some(()) => (),
+		// The task was admitted when the poll applied to it, so this is the state a
+		// panic between the two phases would leave - the output and its marker are
+		// real, the task record is gone, and the expiry pass is what would have
+		// removed it. Say so instead of pretending the completion landed on a task.
+		None => {
+			tracing::warn!(Index, "poll worker: completion stored for a task that is no longer tracked")
+		},
+	}
 }

@@ -13,7 +13,11 @@
 //!
 //! Accounting is deliberately unchanged: the latency recorded here is
 //! time-to-headers, not the duration of the stream, because the stream outlives
-//! this function. Reinterpreting it would be a metrics-contract change.
+//! this function. Reinterpreting it would be a metrics-contract change - but the
+//! code says which half it is describing, so a reader cannot compare it with a
+//! buffered request's whole-body latency by mistake. The byte counter below is the
+//! other half: it counts BODY bytes as they pass, which is why the two numbers
+//! describe different parts of one response rather than one duration.
 
 use std::sync::atomic::Ordering;
 
@@ -47,14 +51,19 @@ pub(crate) fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:reqwes
 		|| tracing::info!(ID = %Context.ID, Status = %Head.Status, "<<< STREAM (SSE)"),
 	);
 
-	Context.State.RecordLatency(Context.Started.elapsed());
+	// Time to HEADERS, not the duration of the stream: the stream outlives this
+	// function, so the name is what keeps this number from being read as a
+	// whole-response latency beside the buffered path's.
+	let TimeToHeaders = Context.Started.elapsed();
+
+	Context.State.RecordLatency(TimeToHeaders);
 	Context.State.RecordRequest(
 		Context.ID,
 		Context.Method.as_str(),
 		Context.Path,
 		Head.Status.as_u16(),
 		false,
-		Context.Started.elapsed().as_millis(),
+		TimeToHeaders.as_millis(),
 	);
 
 	let Builder = CopyUpstreamHeaders(Response::builder().status(Head.Status), &Head.Headers);

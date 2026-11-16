@@ -86,7 +86,7 @@ fn TestCompletedTaskStoresTheKeptPrefix() {
 	let Poll = serde_json::json!({"output": "x".repeat(400 * 1024), "exit_code": 0}).to_string();
 	UpdateFromPoll(&mut State, "process", &Poll);
 
-	assert_eq!(State.BgTasks[0].Status, BgStatus::Done { ExitCode:0 });
+	assert!(matches!(State.BgTasks[0].Status, BgStatus::Done { .. }));
 	assert_eq!(
 		State.BgTasks[0].LiveBytesArrived, MaximumAccumulatedBytes,
 		"the final byte count is the stored size"

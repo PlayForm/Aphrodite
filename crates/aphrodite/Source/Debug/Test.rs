@@ -34,7 +34,33 @@ fn TestLevelGateOffIsQuiet() {
 
 #[test]
 fn TestSanitizeKvFlattensNewlines() {
-	assert_eq!(SanitizeKv("a\nb\r c"), "a b  c");
+	assert_eq!(&*SanitizeKv("a\nb\r c"), "a b  c");
+}
+
+#[test]
+fn TestSanitizeKvBorrowsAValueThatIsAlreadyOneLine() {
+	// The common case allocates nothing: the sanitiser only builds a string when it
+	// has a newline to replace.
+	assert!(matches!(SanitizeKv("one line"), std::borrow::Cow::Borrowed(_)));
+	assert!(matches!(SanitizeKv("two\nlines"), std::borrow::Cow::Owned(_)));
+}
+
+#[test]
+fn TestCountersStayStillWhenTheGateIsOff() {
+	// The counter gate is what makes the instrumentation safe in a release build:
+	// with the logger off, a bump must cost one atomic load and no write. Asserting
+	// the snapshot is unchanged after a bump is the observable form of that.
+	SetLevel(0);
+	let Before = MetricsJSON();
+
+	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Warnings);
+	crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::Render, 1_000);
+
+	assert_eq!(
+		MetricsJSON(),
+		Before,
+		"a disabled logger must not move a counter or a timing sample"
+	);
 }
 
 #[test]

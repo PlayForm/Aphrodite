@@ -27,7 +27,14 @@
 //! the previous generation, the ctypesgen + finalize chain is skipped
 //! entirely: a lib.rs edit that does not move the ABI costs nothing.
 
-use std::{env, path::PathBuf, process::Command};
+#![allow(non_snake_case)]
+
+use std::{
+	env,
+	path::PathBuf,
+	process::Command,
+	time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Every pointer-returning export of the crate. Must match src/lib.rs and
 /// plugins/aphrodite/__init__.py::_REQUIRED_VOID_P. `codegen/finalize_bindings.py`
@@ -57,13 +64,22 @@ fn main() {
 	let plugin_bindings = plugin_dir.join("_bindings.py");
 	let finalize_script = crate_dir.join("codegen").join("finalize_bindings.py");
 
-	// Rebuild when any input to the generated bindings moves.
-	println!("cargo:rerun-if-changed=src/lib.rs");
+	// Rebuild when any input to the generated bindings moves. `Source` is the
+	// crate's whole tree (the lib root is `Source/Library.rs`, and the exports
+	// live under `Source/ABI/`): a stale `src/lib.rs` path here would make cargo
+	// re-run this script on every build for the wrong reason, and pointing at the
+	// tree is what makes a signature change regenerate the bindings. The
+	// copy-on-change check below keeps an unchanged header from costing anything.
+	println!("cargo:rerun-if-changed=Source");
 	println!("cargo:rerun-if-changed=cbindgen.toml");
 	println!("cargo:rerun-if-changed={}", finalize_script.display());
 	if plugin_init.exists() {
 		println!("cargo:rerun-if-changed={}", plugin_init.display());
 	}
+
+	// The build stamp, before every early return below: a codegen skip must not
+	// cost the image its identity.
+	stamp();
 
 	// Shared degraded-path exit (LEAN-UP #1): every early return below ends
 	// with the committed artifact still in effect.
@@ -266,4 +282,90 @@ fn report_ctypesgen_variant(version:&str) {
 			 plugins/aphrodite/_bindings.py in effect"
 		));
 	}
+}
+
+/// Emit the build stamp `Health::Build` reports.
+///
+/// `cargo:rustc-env` applies to THIS crate's compilation units only, which is why
+/// this crate needs its own stamp: the core crate's `APHRODITE_*` values are baked
+/// into the core's units and are invisible here. Without this, the only thing the
+/// dylib could report about itself was its semver - and two different images of
+/// one version are indistinguishable, so a health probe could not answer "is this
+/// the dylib I just built?".
+///
+/// `git describe --always --dirty` is the identity, not `--short HEAD`: a build
+/// from a working tree with uncommitted edits is a DIFFERENT image from a build at
+/// that commit, and a stamp that named the commit alone would claim a revision its
+/// bytes do not match. `--always` keeps a repository without tags (or a shallow,
+/// detached clone) from failing the whole stamp.
+///
+/// Every value degrades instead of failing the build: a published crate has no
+/// `.git`, a machine may have no `git` on PATH, and a build must not fail because
+/// it cannot describe itself. `Health::Build` reports `identifies: version-only`
+/// in exactly that case, rather than presenting a version as a build identity.
+fn stamp() {
+	// Re-run when the repository moves: `HEAD` changes on checkout, `index` on
+	// commit. A path that does not exist (a worktree, a published crate) makes
+	// cargo re-run this script on every build, which is the safe direction for a
+	// stamp - a stale identity is worse than a cheap rebuild of one script.
+	println!("cargo:rerun-if-changed=../../.git/HEAD");
+	println!("cargo:rerun-if-changed=../../.git/index");
+
+	if let Ok(Output) = Command::new("git")
+		.args(["describe", "--always", "--dirty", "--abbrev=12"])
+		.output()
+		&& Output.status.success()
+	{
+		let Commit = String::from_utf8_lossy(&Output.stdout).trim().to_string();
+
+		if !Commit.is_empty() {
+			println!("cargo:rustc-env=APHRODITE_HERMES_GIT_HASH={Commit}");
+		}
+	}
+
+	println!(
+		"cargo:rustc-env=APHRODITE_HERMES_TARGET={}",
+		env::var("TARGET").unwrap_or_default()
+	);
+	println!(
+		"cargo:rustc-env=APHRODITE_HERMES_PROFILE={}",
+		env::var("PROFILE").unwrap_or_default()
+	);
+
+	// `SOURCE_DATE_EPOCH` is honoured so a reproducible build gets a reproducible
+	// stamp; `SystemTime` rather than shelling out to `date`, which Windows
+	// runners do not have.
+	let Epoch = env::var("SOURCE_DATE_EPOCH")
+		.ok()
+		.and_then(|Secs| Secs.parse::<u64>().ok())
+		.or_else(|| SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|Age| Age.as_secs()));
+
+	if let Some(Secs) = Epoch {
+		println!("cargo:rustc-env=APHRODITE_HERMES_BUILD_DATE={}", format_iso8601(Secs));
+	}
+}
+
+/// `YYYY-MM-DDTHH:MM:SSZ` from a Unix timestamp, without a date dependency.
+///
+/// A build script's dependencies are its own `[build-dependencies]`, so it cannot
+/// import the core crate's copy of this helper; twenty lines of Howard Hinnant's
+/// civil-from-days are duplicated here rather than adding a date crate to the
+/// build for one string.
+fn format_iso8601(Secs:u64) -> String {
+	let Days = (Secs / 86_400) as i64;
+	let Rem = Secs % 86_400;
+	let (Hour, Minute, Second) = (Rem / 3_600, (Rem % 3_600) / 60, Rem % 60);
+
+	let z = Days + 719_468;
+	let Era = z.div_euclid(146_097);
+	let Doe = z - Era * 146_097;
+	let Yoe = (Doe - Doe / 1_460 + Doe / 36_524 - Doe / 146_096) / 365;
+	let Year = Yoe + Era * 400;
+	let Doy = Doe - (365 * Yoe + Yoe / 4 - Yoe / 100);
+	let Mp = (5 * Doy + 2) / 153;
+	let Day = Doy - (153 * Mp + 2) / 5 + 1;
+	let Month = (Mp + 2) % 12 + 1;
+	let Year = Year + i64::from(Month <= 2);
+
+	format!("{Year:04}-{Month:02}-{Day:02}T{Hour:02}:{Minute:02}:{Second:02}Z")
 }

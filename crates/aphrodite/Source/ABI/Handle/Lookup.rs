@@ -46,8 +46,17 @@ pub(crate) fn Locked<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> anyhow:
 /// those two steps can panic - the poison case is recovered, not unwrapped - so
 /// the widened scope is not observable, and it is what lets `Locked` be the one
 /// resolution path instead of a second copy of it.
+///
+/// A panic here also POISONS the session mutex: `Locked` takes the guard inside
+/// this catch, so the unwind drops a held guard before reaching it. The next
+/// caller recovers the poison rather than failing, which is why a panicking hook
+/// degrades one session instead of wedging it - and why the torn-state contract
+/// above is the real statement of what a caller observes, not the poison flag.
+///
+/// The payload is handed to `Boundary::Panic` rather than dropped here: see that
+/// leaf for why a caught payload's destructor must not run outside its catch.
 pub(crate) fn WithState<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> anyhow::Result<T>) -> anyhow::Result<T> {
 	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| Locked(Hid, f)))
-		.map_err(|_| anyhow::anyhow!("internal error: hook panicked"))
+		.map_err(|Payload| crate::ABI::Boundary::Panic::Fn::Fn(Payload, "internal error: hook panicked"))
 		.and_then(|Inner| Inner)
 }

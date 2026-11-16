@@ -2,7 +2,7 @@
 
 use crate::{
 	ChainSplit::{Const::SegMarker, Prepared::Prepare::Fn::Fn as PrepareChain},
-	Hook::Terminal::{Plan::Enum::Enum as Plan, Policy::Struct::Struct as Policy},
+	Hook::Terminal::{Input::Struct::Struct as Input, Plan::Enum::Enum as Plan, Policy::Struct::Struct as Policy},
 };
 
 /// Split marked output into per-segment markers, when it is a chain.
@@ -18,9 +18,9 @@ use crate::{
 /// "this content is a chain" is a fact about the content: a marker split that
 /// yields fewer than two parts answers `None`, and the caller falls through to
 /// the gates that follow.
-pub(crate) fn Fn(Policy:&Policy, Content:&str) -> Option<Plan> {
-	(Policy.ChainSplit && !Policy.AutoExpand && Content.contains(SegMarker))
-		.then(|| PrepareChain(Content))
+pub(crate) fn Fn<'a>(Policy:&Policy, Input:Input<'a>) -> Option<Plan<'a>> {
+	(Policy.ChainSplit && !Policy.AutoExpand && Input.Content.contains(SegMarker))
+		.then(|| PrepareChain(Input.Content))
 		.flatten()
 		.map(Plan::Split)
 }

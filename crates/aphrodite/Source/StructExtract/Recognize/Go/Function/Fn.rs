@@ -11,7 +11,7 @@ use crate::StructExtract::Declaration::{Enum::Enum as Declaration, Reason::Enum:
 ///
 /// It is not a Go parser: braces are never balanced, so a `func` inside a string literal is recorded
 /// like a real declaration.
-pub(crate) fn Fn(Trimmed:&str) -> Declaration {
+pub(crate) fn Fn(Trimmed:&str) -> Declaration<'_> {
 	let Declares = Trimmed.starts_with("func ") && Trimmed.contains('(');
 
 	match Declares.then(|| {
@@ -46,10 +46,8 @@ pub(crate) fn Fn(Trimmed:&str) -> Declaration {
 			None => "",
 		};
 
-		match (!Named.is_empty()).then(|| Named.to_string()) {
-			Some(Name) => {
-				Declaration::Declaration { Kind:"func", Name, Parameters:Some(Parameters.to_string()), Return:None }
-			},
+		match (!Named.is_empty()).then_some(Named) {
+			Some(Name) => Declaration::Declaration { Kind:"func", Name, Parameters:Some(Parameters), Return:None },
 			None => Declaration::Malformed { Reason:Reason::NoName },
 		}
 	}) {

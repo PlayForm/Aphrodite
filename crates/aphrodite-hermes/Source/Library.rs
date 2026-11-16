@@ -18,18 +18,23 @@
 //!                                           └─ Catalog, session, prefetch, config, chain_split
 //!
 //! This file is the crate root and nothing else: crate docs, the three crate-wide
-//! lint gates, the module list, and the re-exports that keep every caller's
-//! existing path working while the tree is atomized.
+//! lint gates, and the module list. There are no re-exports - a consumer names
+//! the leaf it means (`Session::With::Fn::with_session`), which is the whole point
+//! of the one-item-per-file layout.
 //!
 //! Module map:
 //!   - `ABI/` - one file per exported `aphrodite_hermes_*` C symbol.
 //!   - `Hook/` - the hook bodies `ABI::CallHook` dispatches into.
-//!   - `Session/` - the per-session state registry and its bounded lock.
+//!   - `Session/` - the per-session state registry, its bounded lock, and the
+//!     opt-in config watcher with its handle/readiness/shutdown lifecycle.
 //!   - `Configuration/` - the config-seeded template and its reload path.
-//!   - `Health/` - the proxy port pair and its liveness probe.
-//!   - `Guard/` - the panic guard and C-string marshalling every export uses.
+//!   - `Health/` - the proxy port pair, its liveness probe, and the build stamp.
+//!   - `Guard/` - the panic guard, the one JSON renderer, and C-string
+//!     marshalling every export uses.
 //!   - `Tool/`, `Schema/`, `Directive/`, `Debug/` - tool dispatch, tool
 //!     schemas, directive provisioning, and the per-session debug flag.
+//!   - `Bin/` - the `cargo install` helper binary (a separate target, not a
+//!     module of this crate).
 
 // See crates/aphrodite/Source/Library.rs's matching comment: fixing this properly
 // (marking every `pub extern "C" fn` `unsafe`) is report 03's job, not a
@@ -57,17 +62,9 @@ pub mod Schema;
 pub mod Session;
 pub mod Tool;
 
-// Re-export core aphrodite types for convenience
-
-// The C ABI surface: every `aphrodite_hermes_*` symbol Hermes binds, one per
-// file under `ABI/`. Re-exported at the crate root so the exported symbol set
-// stays greppable from one place; the symbol NAMES are the contract asserted by
-// cbindgen -> `plugins/aphrodite/_bindings.py` and
-// `Maintain/check_ffi_contract.py`, and none of them may change.
-
-// Crate-internal names that peer modules (`Tool/`, `Directive/`, `Schema/`)
-// reach through the crate root.
-
-// Only the session-isolation probe reaches the crate root for `with_session`:
-// production code paths go straight to `Session::With::Fn`, so the alias is
-// gated to keep the lib build warning-free.
+// The C ABI surface lives under `ABI/`, one `aphrodite_hermes_*` symbol per
+// file, and is NOT re-exported here: the symbol names are the contract asserted
+// by cbindgen -> `plugins/aphrodite/_bindings.py` and
+// `Maintain/check_ffi_contract.py`, and a second spelling of them at the crate
+// root would be a second thing to keep in step. Every peer module names the leaf
+// it means, in full.

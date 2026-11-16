@@ -1,9 +1,11 @@
 //! Resolving one `[[proxies]]` entry into the CLI-shaped configuration the
 //! proxy consumes.
 
+use std::net::SocketAddr;
+
 use crate::Configuration::{
 	CLI::Struct::Struct as CLI,
-	Environment::Warn::Fn::EnvironmentParseWarn,
+	Environment::{Text::Fn::EnvironmentText, Warn::Fn::EnvironmentParseWarn},
 	Proxy::Mode::Enum::Enum as ProxyMode,
 };
 use super::super::Struct::Struct;
@@ -42,9 +44,12 @@ impl Struct {
 		// explicitly set).  After parsing, override with env var if set - this
 		// lets multiple concurrent Hermes Agent instances each point at their
 		// own proxy pair without editing aphrodite.toml.
-		let Listen:std::net::SocketAddr = match cfg.Listen.as_deref() {
+		//
+		// The default is built, not parsed: `"127.0.0.1:9797".parse().unwrap()` is an
+		// `expect` on a constant, which cannot fail but reads as if it could.
+		let Listen:SocketAddr = match cfg.Listen.as_deref() {
 			Some(s) => s.parse().map_err(|_| anyhow::anyhow!("invalid listen address: {s}"))?,
-			None => "127.0.0.1:9797".parse().unwrap(),
+			None => SocketAddr::from(([127, 0, 0, 1], 9797)),
 		};
 		let Listen = match (cfg.Mode.as_deref(), cfg.name.as_deref()) {
 			(_, Some("cache")) | (Some("cache"), _) => Self::ApplyPortOverride(Listen, "APHRODITE_CACHE_PORT"),
@@ -83,22 +88,19 @@ impl Struct {
 			// dual-proxy split that the existing per-mode
 			// `APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT` overrides above
 			// are already careful to respect.
-			APIURL:std::env::var("APHRODITE_API_URL")
-				.ok()
+			APIURL:EnvironmentText("APHRODITE_API_URL")
 				.or_else(|| cfg.APIURL.clone())
 				.or_else(|| d.and_then(|d| d.APIURL.clone()))
 				.unwrap_or_else(|| "https://api.openai.com".into()),
 			APIKey,
-			Model:std::env::var("APHRODITE_MODEL")
-				.ok()
+			Model:EnvironmentText("APHRODITE_MODEL")
 				.or_else(|| cfg.Model.clone())
 				.or_else(|| d.and_then(|d| d.Model.clone()))
 				.unwrap_or_else(|| "default-model".into()),
 			MaximumContext,
 			MaximumOutput,
 			// Resolve from toml - proxy.rs handles None default
-			CCRDatabasePath:std::env::var("APHRODITE_DB")
-				.ok()
+			CCRDatabasePath:EnvironmentText("APHRODITE_DB")
 				.or_else(|| cfg.CCRDatabasePath.clone())
 				.filter(|s| !s.is_empty())
 				.map(Into::into),
@@ -119,16 +121,17 @@ impl Struct {
 				.unwrap_or(536_870_912),
 			NoCCRMarker:false,
 			ToolRelay:cfg.ToolRelay.unwrap_or(false),
-			NotifyURL:std::env::var("APHRODITE_NOTIFY_URL").ok().or_else(|| cfg.NotifyURL.clone()),
-			NotifyKey:std::env::var("APHRODITE_NOTIFY_KEY").ok().or_else(|| cfg.NotifyKey.clone()),
+			NotifyURL:EnvironmentText("APHRODITE_NOTIFY_URL").or_else(|| cfg.NotifyURL.clone()),
+			NotifyKey:EnvironmentText("APHRODITE_NOTIFY_KEY").or_else(|| cfg.NotifyKey.clone()),
 			Dev:cfg.Dev.unwrap_or(false),
 			LogCompact:false,
 			Timeout:{
 				let Configured = cfg.Timeout.unwrap_or(300);
 				let Clamped = Configured.min(600);
 
-				let _ = (Clamped != Configured)
-					.then(|| tracing::warn!("timeout {}s exceeds maximum 600s, clamping", Configured));
+				if Clamped != Configured {
+					tracing::warn!("timeout {}s exceeds maximum 600s, clamping", Configured);
+				}
 
 				Clamped
 			},

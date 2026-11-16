@@ -1,9 +1,15 @@
 //! The marker delta line.
 
-use crate::State::Struct::AphroditeState;
+use std::collections::VecDeque;
+
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// The marker half of the catalog summary: what this turn added, or a stable
 /// "no change" line.
+///
+/// Takes the ring it reads rather than the session, so this section cannot reach a
+/// field it does not report on - the capability is the borrow, and the borrow is one
+/// collection.
 ///
 /// Two rules in order. A turn that added markers names them (newest first, as
 /// they are recorded); a turn that added none reports the running total without
@@ -13,10 +19,9 @@ use crate::State::Struct::AphroditeState;
 /// `New` can never exceed `Current` (it is a saturating subtraction), so the
 /// first rule's `Current > 0` is a guard against reporting a delta on an empty
 /// ring rather than a second condition worth its own branch.
-pub(crate) fn Fn(State:&AphroditeState, New:usize, Current:usize) -> Option<String> {
+pub(crate) fn Fn(Markers:&VecDeque<MarkerEntry>, New:usize, Current:usize) -> Option<String> {
 	let Delta = (New > 0 && Current > 0).then(|| {
-		let Previews = State
-			.RecentMarkers
+		let Previews = Markers
 			.iter()
 			.rev()
 			.take(New)

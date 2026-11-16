@@ -1,15 +1,18 @@
 //! The status an exit code implies.
-//!
-//! Zero is success and everything else is failure - the same split the completion
-//! path made by hand, named once so the marker, the status and the nudge cannot
-//! disagree about what "exit 0" means.
 
-use crate::PollWorker::Task::Status::Enum::BgStatus;
+use std::num::NonZeroI32;
 
-/// `Done` for a zero exit code, `Failed` otherwise.
-pub(crate) fn Fn(ExitCode:i32) -> BgStatus {
-	match ExitCode {
-		0 => BgStatus::Done { ExitCode:0 },
-		Code => BgStatus::Failed { ExitCode:Code },
+use crate::PollWorker::Task::Status::{Enum::BgStatus, Stored::Struct::StoredOutput};
+
+/// `Done` for exit zero, `Failed` for any other code - carrying where the output went.
+///
+/// The split is the type's, not a convention: `NonZeroI32::new` answering `None` IS
+/// "success", so `Failed` cannot hold a zero code and `Done` has no code to hold. One
+/// place names it, so the marker, the status and the nudge cannot disagree about what
+/// "exit 0" means.
+pub(crate) fn Fn(ExitCode:i32, Output:StoredOutput) -> BgStatus {
+	match NonZeroI32::new(ExitCode) {
+		None => BgStatus::Done { Output },
+		Some(ExitCode) => BgStatus::Failed { ExitCode, Output },
 	}
 }

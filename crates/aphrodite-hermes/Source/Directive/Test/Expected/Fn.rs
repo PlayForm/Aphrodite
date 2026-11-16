@@ -12,6 +12,6 @@
 pub(crate) fn Fn() -> Vec<(String, String)> {
 	crate::Directive::Builtin::Fn::Fn()
 		.into_iter()
-		.map(|(name, content)| (format!("{name}.md"), content))
+		.map(|Entry| (format!("{}.md", Entry.Name), Entry.Content))
 		.collect()
 }

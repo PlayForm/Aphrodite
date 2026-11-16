@@ -42,11 +42,11 @@ pub fn CatalogSummary(State:&mut AphroditeState) -> String {
 	let NewFiles = CurrentFiles.saturating_sub(PreviousFiles);
 
 	let Sections = [
-		MarkerDelta(State, NewMarkers, CurrentMarkers),
+		MarkerDelta(&State.RecentMarkers, NewMarkers, CurrentMarkers),
 		Archived(State.ConvIndex.len()),
-		FileDelta(State, NewFiles, CurrentFiles),
-		Workers(State),
-		Intent(State, CurrentMarkers),
+		FileDelta(&State.ReferencedFiles, NewFiles, CurrentFiles),
+		Workers(State.PollWorkerEnabled, &State.BgTasks),
+		Intent(State.CatalogIntentHints, &State.RecentMarkers, CurrentMarkers),
 	];
 	let Summary = Sections.into_iter().flatten().collect::<Vec<String>>().join(" ");
 
