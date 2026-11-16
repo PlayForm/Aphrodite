@@ -115,6 +115,39 @@ so `InlineCCRHits` and `TestSSEResponseIsStreamed` are visible - leaves only
 repeating in the verdict, because the card's regex cannot see a compound whose
 middle word is an acronym.
 
+### Ad-hoc verification (not suite green)
+
+No build runs in this card, so the invariants are proven by a throwaway harness
+left in the OS temp directory (`hermes-verify-*-naming-b2.py`, 13 checks, exit
+0). It asserts, over every `.rs` file in the subtree:
+
+| #   | Check                                                                    | Result |
+| --- | ------------------------------------------------------------------------ | ------ |
+| A   | no old identifier survives anywhere in `Proxy/**`, token-exact           | pass   |
+| B   | every new name still has a definition or alias site                      | pass   |
+| C   | `rustfmt --edition 2024 --check` parses and agrees on every changed file | pass   |
+| D1  | serde pin count is 18, unchanged                                         | pass   |
+| D2  | `Ratio` still sits on `rename = "token_savings_ratio"`                   | pass   |
+| D3  | no `arg(long` in the subtree                                             | pass   |
+| D4  | no `pub extern "C"` in the subtree                                       | pass   |
+| E1  | acceptance sweep is allowlist-only                                       | pass   |
+| E2  | `Env\|Cfg\|Impl\|Num\|Dir\|Msg\|Ctx` sweep is empty                      | pass   |
+| E3  | acronym-aware sweep is allowlist-only                                    | pass   |
+| F1  | `Request/Route/mod.rs` declares `pub mod Chat;`                          | pass   |
+| F2  | `Chat/Const.rs` defines `Path` with the literal                          | pass   |
+| F3  | five consumers import `Chat::Path`                                       | pass   |
+
+Three of those checks failed on the first run and all three were harness bugs,
+not tree bugs - worth recording because two are the trap class this note already
+warns about: `re.findall` on a grouped pattern returns the group rather than the
+match (so `[A-Z][a-z0-9]+(...){2,}` "found" `Ext`, `Limit`, `Store`, `Usize`);
+`\bconst\s+(\w+)` captures `fn` from `const fn InitialFill`; and a bare-token
+scan counted `crate::Marker::Parse::...` - another partition's module - as an
+identifier of mine.
+
+**Not proven here**: that the crate compiles, and that the fifteen files listed
+under "Out-of-row repointing" compile. That is the first-build card's job.
+
 ## Words that kept a qualifier, and why
 
 - `RequestBytes`/`ResponseBytes`, `UpstreamLatency`/`TotalLatency`,

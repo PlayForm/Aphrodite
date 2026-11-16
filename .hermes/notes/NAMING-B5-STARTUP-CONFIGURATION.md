@@ -341,11 +341,34 @@ every one passes. It is left in place rather than cleaned up, so the evidence su
 Two findings the probe produced that the by-hand sweep had missed, both fixed: a stale module doc in
 `Home/Database/Fn.rs` and a stale `MaximumContext` reference in `Boot/Route/Chat.rs`.
 
+### Compile evidence (diagnostic, not a gate)
+
+The card forbids a build as its gate, but a rename's call sites can only be proven by a typecheck, so
+`cargo check --lib -p aphrodite -p aphrodite-hermes` was run as a diagnostic. It found seven real
+errors in this partition, all fixed:
+
+| Error | Cause | Fix |
+| --- | --- | --- |
+| `Rendering/Struct.rs`, `Resolve/Template.rs`, `Multi/Struct.rs` - `TemplatesConfiguration` not found | B6 renamed `State::Template::Struct::TemplatesConfiguration` → `Struct` | followed the rename at my three call sites |
+| `Section/Template.rs` - `ShippedSessionInject` not found | B3 renamed `Flow::Prompt::Const::ShippedSessionInject` → `Shipped` | followed the rename |
+| `Setup/Execute/Apply/Fn.rs` ×3 - `cannot find Fn in PluginYAML` | `Setup/Write/{PluginYAML,InitPy,BinaryVersion}` are single files, so the call is `X::Fn(..)`, not `X::Fn::Fn(..)` | dropped the extra hop |
+
+Result: **60 → 10 lib errors, 0 in this partition.** The ten survivors are in `Preview` (4),
+`StructExtract` (2), `Proxy`, `Prefetch`, `PollWorker`, `Hook` - other cards' in-flight work - and
+none of them names anything this card renamed, so no other row was broken by it.
+
+Two honest limits on that evidence. `aphrodite-hermes` never got type-checked (it depends on
+`aphrodite`, which does not yet build), so the B9 call-site edits (`.Startup()`, `.Reload()`,
+`.Global()`, `Struct::Read`) remain compiler-unverified. And `--all-targets` still reports 165 errors
+inside `#[cfg(test)]` modules of other rows (`Resolve/Test/Expand.rs` and friends), so this
+partition's own test modules have not been compiled either. Both clear as the other eight cards land.
+
 One environment note: this tree is shared with the other eight cards and a sibling ran `cargo fmt`
 over it mid-pass, so `#[arg(...)]` attributes here are now one-argument-per-line rather than the
 single lines this card wrote. Formatting only - no attribute was added, dropped or reordered - and
 the CLI probe reads attribute blocks rather than lines so it is insensitive to it.
 
-Not verified here, and owed to the verification card: the compile, the test count, and a real
-`--help` diff. The `value_name` pins make the last one a one-line check.
+Still owed to the verification card: the full build, the test count, and a real `--help` diff. The
+`value_name` pins make the last one a one-line check.
+
 
