@@ -1122,6 +1122,28 @@ mod tests {
 		}
 	}
 
+	// ── Subagent `pre_llm_call` regression (issue 60): `record_session`
+	// with a NON-empty parent must complete. Before the fix it held the
+	// `SESSION_PARENTS` guard across `session_chain`, which re-locks the
+	// same (non-reentrant) `std::sync::Mutex` - every subagent turn parked
+	// its hook thread forever and wedged the gateway. A hang IS the failure
+	// mode, so completing this test is the assertion. ──
+	#[test]
+	fn test_record_session_with_parent_does_not_deadlock() {
+		let _g = test_guard();
+		let root = "probe-tree-root";
+		let child = "probe-tree-child";
+		let grandchild = "probe-tree-grandchild";
+		crate::debug::record_session(root, "");
+		crate::debug::record_session(child, root);
+		crate::debug::record_session(grandchild, child);
+		assert_eq!(
+			crate::debug::last_session(),
+			grandchild,
+			"the last recorded session must be the grandchild"
+		);
+	}
+
 	// ── Chain-split invisibility contract: the LLM sees the natural
 	// per-segment CCR markers (joined, one per line), never the `summary`
 	// string that announces the mechanism. ──

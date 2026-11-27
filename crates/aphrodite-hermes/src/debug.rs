@@ -154,7 +154,7 @@ fn flag_enabled(path:&Path) -> bool {
 		.ok()
 		.map(|t| t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0))
 		.unwrap_or(0.0);
-	let mut guard = aphrodite::sync::bounded(FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new())));
+	let guard = aphrodite::sync::bounded(FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new())));
 	if let Some((cached_mtime, cached_on)) = guard.as_ref().and_then(|cache| cache.get(&key).copied())
 		&& cached_mtime == mtime
 	{
@@ -232,14 +232,10 @@ fn current_root() -> String {
 /// Without this, terminal output with no prior `pre_llm_call` would have no
 /// session scope.
 pub(crate) fn last_session() -> String {
+	if let Some(last) = aphrodite::sync::bounded(LAST_SESSION.get_or_init(|| Mutex::new(String::new())))
+		&& !last.is_empty()
 	{
-		let last = LAST_SESSION
-			.get_or_init(|| Mutex::new(String::new()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		if !last.is_empty() {
-			return last.clone();
-		}
+		return last.clone();
 	}
 	// Reload fallback: read the persisted session id from the runtime home.
 	std::fs::read_to_string(runtime_home().join("session.current"))
@@ -270,9 +266,13 @@ pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
 	let flag = flag_path_for(&root);
 	std::fs::write(&flag, if on { "on" } else { "off" }).map_err(|e| format!("write {}: {}", flag.display(), e))?;
 	// Invalidate the mtime cache so the next read picks up the new value.
+	// Bounded (fail-open): a wedged cache lock only means the stale entry
+	// lives until the file's mtime changes again - the flag write itself,
+	// which is the real toggle, already happened.
 	let key = flag.to_string_lossy().into_owned();
-	if let Some(cache) = FLAG_CACHE.get() {
-		let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+	if let Some(cache) = FLAG_CACHE.get()
+		&& let Some(mut guard) = aphrodite::sync::bounded(cache)
+	{
 		guard.remove(&key);
 	}
 	Ok((root, flag.to_string_lossy().into_owned()))

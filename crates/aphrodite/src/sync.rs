@@ -15,7 +15,7 @@
 //! hook must always return.
 
 use std::{
-	sync::{Mutex, MutexGuard, PoisonError, TryLockError},
+	sync::{Mutex, MutexGuard, TryLockError},
 	time::{Duration, Instant},
 };
 
