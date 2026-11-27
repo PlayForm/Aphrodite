@@ -96,14 +96,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install onnxruntime (Linux)
+      # ONNX Runtime is dlopen'd at first use (`ort-load-dynamic` in
+      # headroom-core), so the Linux leg neither links against it nor ships
+      # it - this step only warms the runtime for any later job that wants
+      # Magika detection, and a missing ORT merely degrades detection at
+      # runtime. Microsoft's release asset is not reliably reachable (the
+      # upstream repo 404s from the runner), and a failed `wget` here took
+      # the whole Linux leg - and with it `Finalize` and the child plugin
+      # push - down with exit 8. Best effort: warn, never fail the matrix.
+      - name: Install onnxruntime (Linux, best effort)
         if: runner.os == 'Linux'
+        continue-on-error: true
         run: |
-          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz -O /tmp/ort.tgz
-          tar xzf /tmp/ort.tgz -C /tmp
-          echo "LD_LIBRARY_PATH=/tmp/onnxruntime-linux-x64-1.21.0/lib" >> $GITHUB_ENV
-          echo "/tmp/onnxruntime-linux-x64-1.21.0/lib" | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
-          sudo ldconfig
+          set -uo pipefail
+          URL=https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz
+          if wget -q "$URL" -O /tmp/ort.tgz && tar xzf /tmp/ort.tgz -C /tmp; then
+            echo "LD_LIBRARY_PATH=/tmp/onnxruntime-linux-x64-1.21.0/lib" >> $GITHUB_ENV
+            echo "/tmp/onnxruntime-linux-x64-1.21.0/lib" | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
+            sudo ldconfig
+          else
+            echo "::warning::onnxruntime unavailable ($URL) - ONNX-backed detection degrades at runtime, build continues"
+          fi
 
       - name: Setup Rust (nightly, latest)
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
