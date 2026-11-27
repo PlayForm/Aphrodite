@@ -108,30 +108,32 @@ pub fn level() -> u8 { LEVEL.load(Ordering::Relaxed) }
 pub fn enabled() -> bool { level() != 0 }
 
 /// Publish the root session id (Hermes bridge `record_session`).
+///
+/// Fail-open: the bookkeeping lock is bounded, so a wedged/abandoned worker
+/// holding it skips this update instead of parking the `pre_llm_call` hook
+/// that called us. `session.current` (written by the bridge) stays the
+/// fallback for the value this skipped.
 pub fn note_root_session(root:&str) {
 	if root.is_empty() {
 		return;
 	}
-	let mut guard = ROOT_SESSION
-		.get_or_init(|| Mutex::new(String::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	if guard.is_empty() || *guard != root {
+	if let Some(mut guard) = crate::sync::bounded(ROOT_SESSION.get_or_init(|| Mutex::new(String::new())))
+		&& (guard.is_empty() || *guard != root)
+	{
 		*guard = root.to_string();
 	}
 }
 
 /// Resolve the current root session id: the in-process static, falling back
 /// to the `session.current` file the bridge persists across restarts.
+///
+/// Fail-open: a wedged bookkeeping lock falls straight through to the file
+/// fallback - a debug-logging read must never block a turn.
 pub fn current_root_session() -> String {
+	if let Some(guard) = crate::sync::bounded(ROOT_SESSION.get_or_init(|| Mutex::new(String::new())))
+		&& !guard.is_empty()
 	{
-		let guard = ROOT_SESSION
-			.get_or_init(|| Mutex::new(String::new()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		if !guard.is_empty() {
-			return guard.clone();
-		}
+		return guard.clone();
 	}
 	std::fs::read_to_string(debug_runtime_home().join("session.current"))
 		.ok()

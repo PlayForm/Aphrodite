@@ -123,46 +123,40 @@ fn config_template() -> &'static AphroditeState {
 /// session starts from the same config without re-reading aphrodite.toml.
 /// Returns an owned `Arc` clone so the registry lock is dropped before the
 /// caller contends on the session's state mutex.
+///
+/// Fail-open contract: the template is resolved BEFORE the registry lock is
+/// taken (first-init runs `Config::load()` file I/O and may spawn the config
+/// watcher - under the lock that would park every hook dispatch on a slow
+/// filesystem), and a wedged registry lock hands back a THROWAWAY state
+/// seeded from the template instead of blocking, the same degradation
+/// `with_shared` uses for a wedged session lock. The throwaway's mutation is
+/// discarded; the session is simply not registered on this call.
 fn session_state(sid:&str) -> Arc<Mutex<AphroditeState>> {
 	let key = if sid.is_empty() { DEFAULT_SESSION } else { sid };
-	let mut map = SESSIONS
-		.get_or_init(|| Mutex::new(HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	// `OnceLock` inside `config_template` makes this idempotent - resolving
+	// it here on every call costs one atomic load after the first.
+	let template = config_template();
+	let map = SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+	let Some(mut map) = aphrodite::sync::bounded(map) else {
+		return Arc::new(Mutex::new(template.clone()));
+	};
 	map.entry(key.to_string())
-		.or_insert_with(|| Arc::new(Mutex::new(config_template().clone())))
+		.or_insert_with(|| Arc::new(Mutex::new(template.clone())))
 		.clone()
 }
 
 static SESSIONS:OnceLock<Mutex<HashMap<String, Arc<Mutex<AphroditeState>>>>> = OnceLock::new();
 
-/// Bounded lock acquisition: try_lock in a loop bounded by a ~100ms
-/// wall-clock deadline (the spec's "about 50 x 2ms" budget; a wall-clock
-/// deadline keeps the bound precise despite platform sleep-granularity
-/// overshoot - macOS sleeps ~6ms for a 2ms request).
+/// Bounded lock acquisition on a session's state: `try_lock` in a loop
+/// bounded by a wall-clock deadline (~100ms), shared with the core engine as
+/// [`aphrodite::sync::bounded`] (see that module for the full contract).
 ///
 /// Returns `None` when the mutex is wedged by an abandoned worker thread
 /// (the gateway-hang root cause: Hermes' `plugins.hook_callback_timeout`
 /// abandoned a worker that still held the old single global lock), so the
 /// caller degrades fail-open instead of blocking past the hook timeout.
-/// Poison is recovered like the old `.lock()` path: a panic in one call
-/// must not wedge every later call.
 fn lock_bounded(state:&Arc<Mutex<AphroditeState>>) -> Option<std::sync::MutexGuard<'_, AphroditeState>> {
-	let deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
-	loop {
-		match state.try_lock() {
-			Ok(guard) => return Some(guard),
-			// Poisoned: recover the guard (same contract as the pre-fix
-			// `.unwrap_or_else(PoisonError::into_inner)` path).
-			Err(std::sync::TryLockError::Poisoned(p)) => return Some(p.into_inner()),
-			Err(std::sync::TryLockError::WouldBlock) => {
-				if std::time::Instant::now() >= deadline {
-					return None;
-				}
-				std::thread::sleep(std::time::Duration::from_millis(2));
-			},
-		}
-	}
+	aphrodite::sync::bounded(state)
 }
 
 /// Run `f` against the given session's state under a BOUNDED lock.
@@ -229,10 +223,13 @@ fn apply_config_reload(cfg:&aphrodite::config_loader::Config, state:&mut Aphrodi
 /// Returns true when any session still has `auto_reload` on after the pass
 /// (the watcher keeps running only while at least one session wants it).
 fn for_each_session(f:impl Fn(&mut AphroditeState)) -> bool {
-	let map = SESSIONS
-		.get_or_init(|| Mutex::new(HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	let map = SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+	// Bounded registry lock (fail-open): a wedged registry means the reload
+	// pass is skipped, so report "keep watching" - the next filesystem event
+	// retries it instead of the watcher stopping silently.
+	let Some(map) = aphrodite::sync::bounded(map) else {
+		return true;
+	};
 	// Clone the Arcs so the registry lock is released before contending on
 	// any session state mutex.
 	let sessions:Vec<Arc<Mutex<AphroditeState>>> = map.values().cloned().collect();

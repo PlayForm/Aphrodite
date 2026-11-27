@@ -76,15 +76,16 @@ fn runtime_home() -> PathBuf {
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
 /// self-referential pairs are ignored (a root session has no parent).
+///
+/// Every lock on this path is bounded (fail-open): a `pre_llm_call` dispatch
+/// must never park behind a wedged bookkeeping mutex. When the in-memory
+/// cache update is skipped the `session.current` file below still carries the
+/// durable value `last_session()` reads back.
 pub(crate) fn record_session(session:&str, parent:&str) {
 	if session.is_empty() {
 		return;
 	}
-	{
-		let mut last = LAST_SESSION
-			.get_or_init(|| Mutex::new(String::new()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner);
+	if let Some(mut last) = aphrodite::sync::bounded(LAST_SESSION.get_or_init(|| Mutex::new(String::new()))) {
 		*last = session.to_string();
 	}
 	// Persist across process restarts: a fresh Hermes process (and every
@@ -99,11 +100,15 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 		aphrodite::debug::note_root_session(session);
 		return;
 	}
-	let mut map = SESSION_PARENTS
-		.get_or_init(|| Mutex::new(HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	map.entry(session.to_string()).or_insert_with(|| parent.to_string());
+	// Learn the edge in its OWN scope: `session_chain` re-locks this same
+	// map, and `std::sync::Mutex` is NOT reentrant - holding the guard
+	// across the walk deadlocked every subagent `pre_llm_call` (the hook
+	// thread parked forever on the second lock, wedging the gateway).
+	{
+		if let Some(mut map) = aphrodite::sync::bounded(SESSION_PARENTS.get_or_init(|| Mutex::new(HashMap::new()))) {
+			map.entry(session.to_string()).or_insert_with(|| parent.to_string());
+		}
+	}
 	// Publish the ROOT of this session tree (root-most ancestor) so the
 	// env-gated logger targets `debug.<root>` for the whole tree.
 	let root = session_chain(session).last().cloned().unwrap_or_else(|| session.to_string());
@@ -112,11 +117,14 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 
 /// Walk session -> parent -> ... -> root, root first. Depth-capped at 16 so
 /// a malicious/cyclic chain cannot loop forever.
+///
+/// Fail-open: a wedged chain map treats the session as its own root - the
+/// debug flag then resolves to that session's own scoped flag (or off)
+/// instead of blocking the hook.
 fn session_chain(session:&str) -> Vec<String> {
-	let map = SESSION_PARENTS
-		.get_or_init(|| Mutex::new(HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	let Some(map) = aphrodite::sync::bounded(SESSION_PARENTS.get_or_init(|| Mutex::new(HashMap::new()))) else {
+		return vec![session.to_string()];
+	};
 	let mut chain = vec![session.to_string()];
 	let mut cur = session.to_string();
 	for _ in 0..16 {
@@ -136,6 +144,9 @@ fn flag_path_for(session:&str) -> PathBuf { runtime_home().join(format!("{}.{}",
 fn global_flag_path() -> PathBuf { runtime_home().join(FLAG_PREFIX) }
 
 /// Mtime-cached read of one flag file; missing file = off.
+///
+/// Fail-open: a wedged cache lock skips the cache (the file is still read,
+/// so the answer stays correct) instead of blocking the hook that asked.
 fn flag_enabled(path:&Path) -> bool {
 	let key = path.to_string_lossy().into_owned();
 	let mtime = std::fs::metadata(path)
@@ -143,12 +154,11 @@ fn flag_enabled(path:&Path) -> bool {
 		.ok()
 		.map(|t| t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0))
 		.unwrap_or(0.0);
-	let cache = FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-	let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	if let Some((cached_mtime, cached_on)) = guard.get(&key)
-		&& *cached_mtime == mtime
+	let mut guard = aphrodite::sync::bounded(FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new())));
+	if let Some((cached_mtime, cached_on)) = guard.as_ref().and_then(|cache| cache.get(&key).copied())
+		&& cached_mtime == mtime
 	{
-		return *cached_on;
+		return cached_on;
 	}
 	let on = std::fs::read_to_string(path)
 		.ok()
@@ -161,7 +171,9 @@ fn flag_enabled(path:&Path) -> bool {
 		.map(|s| s.trim_start().to_lowercase())
 		.map(|s| s.starts_with("1") || s.starts_with("on") || s.starts_with("true") || s.starts_with("debug"))
 		.unwrap_or(false);
-	guard.insert(key, (mtime, on));
+	if let Some(mut guard) = guard {
+		guard.insert(key, (mtime, on));
+	}
 	on
 }
 
@@ -194,12 +206,14 @@ pub(crate) fn enabled_for(session:&str) -> bool {
 }
 
 /// Resolve the most recently seen session's ROOT id.
+///
+/// Fail-open: an empty string on a wedged lock - the caller
+/// (`set_enabled_current`, dev-only) then falls back to `last_session()`.
 #[cfg(debug_assertions)]
 fn current_root() -> String {
-	let last = LAST_SESSION
-		.get_or_init(|| Mutex::new(String::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	let Some(last) = aphrodite::sync::bounded(LAST_SESSION.get_or_init(|| Mutex::new(String::new()))) else {
+		return String::new();
+	};
 	if last.is_empty() {
 		return String::new();
 	}

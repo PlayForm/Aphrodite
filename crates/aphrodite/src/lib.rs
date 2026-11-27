@@ -37,6 +37,7 @@ pub mod session;
 pub mod stage2;
 pub mod state;
 pub mod struct_extract;
+pub mod sync;
 pub mod templates;
 
 // Proxy modules (used by main.rs binary) - gated behind the `proxy`
