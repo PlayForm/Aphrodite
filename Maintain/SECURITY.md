@@ -23,7 +23,7 @@ internal one to match it.
 
 ## Current Posture&#x2001;📋
 
-The state below is the `1.8.1` binary with the `2.3.1` plugin.
+The state below is the `1.8.2` binary with the `2.3.3` plugin.
 
 | Area                        | State                                                                                           | Maintainer action                                                                                    |
 | :-------------------------- | :---------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |

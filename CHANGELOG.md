@@ -1,5 +1,55 @@
 # Changelog
 
+## v1.8.2 - Hook path fully bounded: no lock in the dispatch path can outlive an abandoned worker (2026-11-27)
+
+A wedge release. `1.7.0` made the per-session `AphroditeState` lock bounded and
+fail-open, but the hook dispatch path still crossed four unbounded
+`Mutex::lock()` sites, so one abandoned worker was enough to park every later
+hook and force a gateway restart (issue #60: `hermes-hook-_dispatch` threads
+dumped inside `_call_json`'s plain `ctypes` call, which cannot time out a Rust
+block - Hermes abandons the worker at `plugins.hook_callback_timeout`, and the
+abandoned worker keeps whatever mutex it held, forever).
+
+The fourth site was worse than "unbounded": `record_session` held the
+`SESSION_PARENTS` guard across `session_chain()`, which re-locks that same map.
+`std::sync::Mutex` is not reentrant, so **every subagent `pre_llm_call`**
+(child session id ≠ parent) parked its hook thread permanently on the second
+lock - the subagent-shaped wedge that hit delegated sessions first. The guard
+is now scoped to the insert, and a regression test (`test_record_session_with_parent_does_not_deadlock`)
+exercises a root → child → grandchild chain: before the fix that test hangs,
+which is exactly the failure mode.
+
+- **Fix (locks)**: new `crates/aphrodite/src/sync.rs` exposes
+  `aphrodite::sync::bounded` - `try_lock` in a loop behind a ~100 ms wall-clock
+  deadline with poison recovery - and every hook-path lock now uses it: the
+  bridge's `lock_bounded` delegates to it instead of carrying its own copy, the
+  debug module's `LAST_SESSION`, `SESSION_PARENTS` and `FLAG_CACHE` mutexes are
+  bounded, and so is the core logger's `ROOT_SESSION` (`note_root_session` /
+  `current_root_session`).
+- **Fix (registry)**: `session_state()` resolves `config_template()` **before**
+  taking the `SESSIONS` registry lock (first init runs `Config::load()` TOML
+  I/O and may spawn the config watcher - under the registry lock that made every
+  hook dispatch wait on the filesystem) and hands back a throwaway state seeded
+  from the template when the registry lock is wedged, the same degradation
+  `with_shared` already used. `for_each_session` takes the registry read
+  bounded too and reports "keep watching" so a reload is retried on the next
+  filesystem event.
+- **Fix (degrade contract)**: each skip is the cheapest correct answer rather
+  than a silent loss - a wedged `LAST_SESSION` still persists `session.current`
+  (the file `last_session()` falls back to), a wedged `FLAG_CACHE` still reads
+  the flag file (uncached), and a wedged `SESSION_PARENTS` treats the session as
+  its own root so flag resolution stays per-session instead of blocking.
+- **Version track**: `crates/aphrodite` + `crates/aphrodite-hermes` + the
+  `aphrodite-hermes` dependency pin + `package.json` → `1.8.2`, README release
+  badge → v1.8.2; `plugin.yaml` `2.3.2 → 2.3.3` with its `install_message`
+  header and the plugin README badge. `aphrodite-headroom-core` stays `0.2.1`.
+- **Tests**: `cargo test -p aphrodite -p aphrodite-hermes` ✅ 580 passed
+  (500 + 16 + 2 + 62), 0 failed, 1 ignored - including the new deadlock
+  regression and the existing wedged-lock probe
+  (`probe_wedged_session_lock_degrades_fail_open`). `cargo clippy --lib -p
+  aphrodite -p aphrodite-hermes -- -D warnings` ✅ · `rustfmt --check` on every
+  touched file ✅.
+
 ## v1.8.1 - Docs catch up to the engine, ASCII ellipsis markers, compile-time debug gate (2026-11-14)
 
 A documentation and wording release with two engine-side consequences. The docs
